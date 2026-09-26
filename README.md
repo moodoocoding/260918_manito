@@ -1,10 +1,11 @@
 # 우리 반 비밀친구
 
-초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. 현재 단계는 Firebase 데이터 계약과 보안 기반 구성이다.
+초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. 현재 단계는 Firebase 백엔드 기반 구축과 개발 프로젝트 배포까지 완료됐으며, 프런트엔드는 아직 구현하지 않았다.
 
 ## 현재 구성
 
 - `docs/manitto-development-plan.md`: 제품·운영·개발 계획
+- `docs/work-log.md`: 날짜별 작업 내용과 현재 구현 범위
 - `docs/firestore-schema.md`: Firestore 경로, 권한, 불변 조건
 - `firestore.rules`: 교사·학생 읽기 권한과 기본 쓰기 차단
 - `firestore.indexes.json`: 첫 화면과 운영 대시보드용 인덱스
@@ -23,7 +24,7 @@ npm run test:rules
 npm run test:integration
 ```
 
-Firestore 에뮬레이터는 Java가 필요하다. `.firebaserc`의 `demo-manitto`는 로컬 전용이므로 실제 배포 전에 별도 Firebase 프로젝트를 연결해야 한다.
+Firestore 에뮬레이터는 Java가 필요하다. `.firebaserc`의 `demo-manitto`는 로컬 전용이며, 배포된 개발 프로젝트는 `dev` 별칭의 `manito-938cc`다.
 
 ## 다음 구현 순서
 
