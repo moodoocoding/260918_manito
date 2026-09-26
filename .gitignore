@@ -1,0 +1,9 @@
+node_modules/
+functions/lib/
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+*.local
+.DS_Store
+

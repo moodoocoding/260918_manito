@@ -1,0 +1,160 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return signedIn() && request.auth.token.role == 'teacher';
+    }
+
+    function isStudent() {
+      return signedIn() && request.auth.token.role == 'student';
+    }
+
+    function classRecord(classId) {
+      return get(/databases/$(database)/documents/classes/$(classId));
+    }
+
+    function memberRecord(classId, studentUid) {
+      return get(/databases/$(database)/documents/classes/$(classId)/members/$(studentUid));
+    }
+
+    function isClassTeacher(classId) {
+      return isTeacher()
+        && classRecord(classId).data.status == 'active'
+        && request.auth.uid in classRecord(classId).data.teacherUids;
+    }
+
+    function isSelf(studentUid) {
+      return isStudent()
+        && request.auth.uid == studentUid
+        && request.auth.token.memberId == studentUid;
+    }
+
+    function isActiveClassStudent(classId, studentUid) {
+      return isSelf(studentUid)
+        && request.auth.token.classId == classId
+        && memberRecord(classId, studentUid).data.accessStatus == 'active'
+        && memberRecord(classId, studentUid).data.sessionVersion == request.auth.token.sessionVersion;
+    }
+
+    function isRoundParticipant(classId, roundId, studentUid) {
+      return isActiveClassStudent(classId, studentUid)
+        && exists(/databases/$(database)/documents/classes/$(classId)/rounds/$(roundId)/participants/$(studentUid));
+    }
+
+    // All application writes go through Cloud Functions. The Admin SDK bypasses
+    // these rules, so every callable function must repeat its authorization and
+    // round-state checks.
+    match /teachers/{teacherUid} {
+      allow read: if isTeacher() && request.auth.uid == teacherUid;
+      allow write: if false;
+    }
+
+    match /classes/{classId} {
+      allow read: if isClassTeacher(classId);
+      allow write: if false;
+
+      match /members/{studentUid} {
+        allow read: if isClassTeacher(classId)
+          || isActiveClassStudent(classId, studentUid);
+        allow write: if false;
+      }
+
+      match /rounds/{roundId} {
+        allow read: if isClassTeacher(classId)
+          || (isStudent()
+            && isRoundParticipant(classId, roundId, request.auth.uid));
+        allow write: if false;
+
+        match /participants/{studentUid} {
+          allow read: if isClassTeacher(classId)
+            || isRoundParticipant(classId, roundId, studentUid);
+          allow write: if false;
+        }
+
+        match /studentData/{studentUid} {
+          allow read: if isClassTeacher(classId)
+            || isRoundParticipant(classId, roundId, studentUid);
+          allow write: if false;
+
+          match /missions/{missionId} {
+            allow read: if isClassTeacher(classId)
+              || isRoundParticipant(classId, roundId, studentUid);
+            allow write: if false;
+          }
+
+          match /inboxItems/{messageId} {
+            allow read: if isClassTeacher(classId)
+              || isRoundParticipant(classId, roundId, studentUid);
+            allow write: if false;
+          }
+
+          match /sentMessages/{messageId} {
+            allow read: if isClassTeacher(classId)
+              || isRoundParticipant(classId, roundId, studentUid);
+            allow write: if false;
+          }
+
+          match /helpRequests/{requestId} {
+            allow read: if isClassTeacher(classId)
+              || isActiveClassStudent(classId, studentUid);
+            allow write: if false;
+          }
+        }
+
+        // These collections contain relationship information that must never be
+        // fetched directly by a browser, including a teacher browser. Audited
+        // teacher access is provided by a callable function later.
+        match /assignmentSecrets/{studentUid} {
+          allow read, write: if false;
+        }
+
+        match /messageSecrets/{messageId} {
+          allow read, write: if false;
+        }
+      }
+
+      match /pairHistory/{pairId} {
+        allow read, write: if false;
+      }
+
+      match /auditLogs/{logId} {
+        allow read: if isClassTeacher(classId);
+        allow write: if false;
+      }
+
+      match /commands/{commandId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /missionCatalog/{missionId} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+
+    match /studentCredentials/{credentialId} {
+      allow read, write: if false;
+    }
+
+    match /studentCredentialLookups/{lookupDigest} {
+      allow read, write: if false;
+    }
+
+    match /classCodes/{classCode} {
+      allow read, write: if false;
+    }
+
+    match /teacherCommands/{commandId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
