@@ -4,6 +4,7 @@
 
 ## 현재 구성
 
+- `AGENTS.md`: 제품 원칙, 구현 불변 조건, 검증·문서화 지침
 - `docs/manitto-development-plan.md`: 제품·운영·개발 계획
 - `docs/work-log.md`: 날짜별 작업 내용과 현재 구현 범위
 - `docs/firestore-schema.md`: Firestore 경로, 권한, 불변 조건
