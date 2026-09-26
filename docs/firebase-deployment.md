@@ -2,6 +2,8 @@
 
 이 문서는 마니또 서비스의 Firestore 보안 규칙·인덱스와 Cloud Functions를 실제 Firebase 환경에 배포하는 절차다. 처음에는 운영 프로젝트와 분리된 **개발 프로젝트**를 사용한다.
 
+현재 개발 환경은 표시 이름 `260918 manito`, 프로젝트 ID `manito-938cc`, Firebase 별칭 `dev`를 사용한다. `demo-manitto`는 계속 로컬 Emulator 전용으로 유지한다.
+
 ## 1. 배포 대상 준비
 
 ### 새 Firebase 프로젝트 만들기

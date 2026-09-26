@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "demo-manitto"
+    "default": "demo-manitto",
+    "dev": "manito-938cc"
   }
 }
-
