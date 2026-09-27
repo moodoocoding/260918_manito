@@ -249,3 +249,9 @@
 - `git fetch origin` 후 로컬 `main`과 GitHub `origin/main`이 모두 `47ef8f1`로 일치하고 작업 트리가 깨끗한 것을 확인했다.
 - `47ef8f1`에 연결된 Vercel 프로덕션 빌드도 오류 상태임을 확인했다. 앞선 빌드 로그의 차단 원인은 비어 있는 `VITE_FIREBASE_API_KEY`이며, Vercel 환경 변수 6개의 실제 값과 App Check·Google 로그인 설정은 아직 완료되지 않았다.
 - GitHub 커밋 전달과 Firebase 개발 백엔드 배포는 성공 상태다. 접속 가능한 Vercel 웹 배포는 성공으로 기록하지 않는다.
+
+## 2026-09-27 — Vercel Firebase 웹 키 유형 수정
+
+- Vercel `manito`의 `VITE_FIREBASE_API_KEY`는 기존에 Secret으로 저장돼 Config로 직접 변경할 수 없었다. 기존 변수가 삭제된 상태를 확인하고 Firebase 웹 앱의 동일한 키를 Config로 다시 등록했다. 적용 환경은 기존과 같은 Production·Preview다. 키 값은 작업일지와 Git에 기록하지 않았다.
+- Vercel 환경 변수 목록에서 유형 `Config`, 적용 환경 `Production and Preview`, 등록 성공 알림을 확인했다. 이 변경은 새 배포부터 적용되며, 웹 배포 성공을 뜻하지 않는다.
+- 남은 작업: 다른 Firebase 웹 환경 변수와 App Check 사이트 키의 실제 값·적용 범위, Firebase Auth·App Check 설정을 확인하고 새 Vercel 배포에서 빌드와 로그인 흐름을 검증한다. 실제 학생 데이터는 사용하지 않았다.
