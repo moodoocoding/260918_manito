@@ -337,7 +337,7 @@ function App() {
               {cards.length > 0 && <p className="help">카드 코드는 이 화면을 떠나면 다시 볼 수 없어요. 분실하면 새 카드로 재발급해 주세요.</p>}
             </> : <p className="muted">왼쪽에서 학급을 선택하거나 새로 만들어 주세요.</p>}
           </section></div>
-          {selected && <TeacherRounds classId={selected.classId} gradeBand={selected.gradeBand} members={members} />}
+          {selected && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} />}
           {selected && <TeacherRights classId={selected.classId} />}
           {selected && <section className="panel"><h2>학급 데이터 삭제</h2><p>모든 회차를 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="outline" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section>}
         </section> : null}

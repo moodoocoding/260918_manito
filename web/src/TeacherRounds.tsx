@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { call } from "./firebase";
 
 type Member = { studentUid: string; displayName: string; accessStatus: string };
@@ -41,8 +41,10 @@ export function TeacherRounds({ classId, gradeBand, members }: {
 }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [chosen, setChosen] = useState<string>("");
+  const chosenRef = useRef("");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
+  const assignmentRequest = useRef(0);
   const [catalog, setCatalog] = useState<Array<{missionId: string; text: string}>>([]);
   const [title, setTitle] = useState("");
   const [start, setStart] = useState(() => localInput(new Date().toISOString()));
@@ -67,14 +69,14 @@ export function TeacherRounds({ classId, gradeBand, members }: {
   }, [classId]);
   const loadOverview = useCallback(async (roundId: string) => {
     const result = await call<object, Overview>("getTeacherRoundOverview", {classId, roundId});
-    setOverview(result);
+    if (chosenRef.current === roundId) setOverview(result);
   }, [classId]);
-  useEffect(() => { setChosen(""); setOverview(null); setAssignments(null); void load().catch(() => setError("회차 목록을 불러오지 못했어요.")); }, [load]);
+  useEffect(() => { assignmentRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setAssignments(null); void load().catch(() => setError("회차 목록을 불러오지 못했어요.")); }, [load]);
   useEffect(() => { void call<object, {missions: typeof catalog}>("getMissionCatalog", {gradeBand})
     .then((result) => setCatalog(result.missions)).catch(() => setCatalog([])); }, [gradeBand]);
   useEffect(() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); }, [members]);
   useEffect(() => {
-    const hide = () => { if (document.visibilityState !== "visible") setAssignments(null); };
+    const hide = () => { if (document.visibilityState !== "visible") { assignmentRequest.current++; setAssignments(null); } };
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
@@ -99,11 +101,12 @@ export function TeacherRounds({ classId, gradeBand, members }: {
       const result = current && ["draft", "ready"].includes(current.status)
         ? await call<object, {roundId: string}>("updateRound", {...payload, roundId: current.roundId, requestId: crypto.randomUUID()})
         : await call<object, {roundId: string}>("createRound", {...payload, requestId: crypto.randomUUID()});
-      setChosen(result.roundId); setNotice("회차 설정을 저장했어요.");
+      chosenRef.current = result.roundId; setChosen(result.roundId); setNotice("회차 설정을 저장했어요.");
     });
   }
   async function action(name: string) {
     if (!current) return;
+    assignmentRequest.current++;
     setAssignments(null);
     await run(async () => {
       if (name === "prepare") {
@@ -121,12 +124,15 @@ export function TeacherRounds({ classId, gradeBand, members }: {
     });
   }
   async function selectRound(roundId: string) {
+    assignmentRequest.current++;
+    chosenRef.current = roundId;
     setChosen(roundId); setAssignments(null); setOverview(null); setSafetyMessages({});
     if (!roundId) { setTitle(""); setExcludedPairs([]); setMissionIds([]);
       setDates(plannedDates().join(", ")); return; }
     try {
       const round = rounds.find((r) => r.roundId === roundId);
       const settings = await call<object, Settings>("getRoundSettingsForTeacher", {classId, roundId});
+      if (chosenRef.current !== roundId) return;
       if (round) { setTitle(round.title); setStart(localInput(round.startsAt)); setEnd(localInput(round.endsAt));
         setAllowFree(round.allowFreeTextMessages); }
       setParticipants(settings.participantIds); setMissionIds(settings.missionIds);
@@ -165,7 +171,7 @@ export function TeacherRounds({ classId, gradeBand, members }: {
       const result = await call<object, {roundId: string}>("copyRoundSettings", {classId,
         sourceRoundId: current.roundId, title: nextTitle, startsAt: startDate.toISOString(),
         endsAt: endDate.toISOString(), requestId: crypto.randomUUID()});
-      setChosen(result.roundId); setTitle(nextTitle); setStart(localInput(startDate.toISOString()));
+      chosenRef.current = result.roundId; setChosen(result.roundId); setTitle(nextTitle); setStart(localInput(startDate.toISOString()));
       setEnd(localInput(endDate.toISOString())); setDates(plannedDates().join(", "));
       setNotice("설정을 복사했어요. 수업일을 확인하고 저장해 주세요.");
     });
@@ -209,7 +215,7 @@ export function TeacherRounds({ classId, gradeBand, members }: {
         <h3>3. 접속·활동 확인</h3><p className="help">학생별 지원을 위한 비공개 정보예요. 점수나 순위로 사용하지 마세요.</p><ul className="member-list">{overview.participation.map((p) => <li key={p.studentUid}><span>{p.displayName} · {participationLabels[p.status] ?? p.status}<small>{p.accessStatus === "active" ? "입장 가능" : "입장 제한"} · {p.lastLoginAt ? `최근 입장 ${new Date(p.lastLoginAt).toLocaleDateString("ko-KR")}` : "입장 기록 없음"} · {p.hasActivity ? "활동 기록 있음" : "활동 기록 없음"}</small></span>{p.status === "active" && ["active", "paused", "reveal_pending"].includes(current.status) && <button className="small outline" disabled={busy} onClick={() => void stop(p.studentUid)}>참여 중단</button>}</li>)}</ul>
         <h3>4. 일정</h3><p>{overview.activityDates.join(", ")}</p>
       </>}
-      {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => { if (assignments) { setAssignments(null); return; } void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); setAssignments(result.assignments); }); }}>{assignments ? "배정표 가리기" : "안전 대응용 배정표 열람"}</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}
+      {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => { if (assignments) { assignmentRequest.current++; setAssignments(null); return; } const version = ++assignmentRequest.current; void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); if (version === assignmentRequest.current && document.visibilityState === "visible") setAssignments(result.assignments); }); }}>{assignments ? "배정표 가리기" : "안전 대응용 배정표 열람"}</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}
     </div>}
   </section>;
 }
