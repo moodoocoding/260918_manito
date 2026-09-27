@@ -1,9 +1,11 @@
 node_modules/
 functions/lib/
+web/dist/
+web/*.tsbuildinfo
+.vercel/
 .firebase/
 firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
 *.local
 .DS_Store
-

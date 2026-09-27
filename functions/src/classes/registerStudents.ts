@@ -7,8 +7,10 @@ import {
   hashSecret,
 } from "../auth/codes.js";
 import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
+import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { callableOptions } from "../shared/callableOptions.js";
 import { db } from "../shared/firebase.js";
+import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
   requireDocumentId,
   requireRecord,
@@ -25,6 +27,7 @@ interface StudentCardResult {
 export const registerStudents = onCall(
   { ...callableOptions, timeoutSeconds: 60 },
   async (request): Promise<{ students: StudentCardResult[]; requiresCredentialRotation: boolean }> => {
+    requireFreshAppCheck(request);
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
     const classId = requireDocumentId(input.classId, "학급");
@@ -34,10 +37,13 @@ export const registerStudents = onCall(
       throw new HttpsError("invalid-argument", "학생은 한 번에 1명 이상 40명 이하로 등록해 주세요.");
     }
     const displayNames = input.displayNames.map((name) => requireText(name, "학생 이름", 20));
+    const fingerprint = inputFingerprint({ classId, displayNames });
     const classRef = db.doc(`classes/${classId}`);
     const commandRef = classRef.collection("commands").doc(requestId);
-    const existing = await commandRef.get();
+    const [classBefore, existing] = await Promise.all([classRef.get(), commandRef.get()]);
+    assertClassTeacher(classBefore.data(), teacherUid);
     if (existing.exists) {
+      assertSameCommand(existing.data(), "registerStudents", teacherUid, fingerprint);
       return {
         students: (existing.get("result.students") ?? []).map(
           (student: { studentUid: string; displayName: string }) => ({ ...student, cardCode: "" }),
@@ -78,8 +84,11 @@ export const registerStudents = onCall(
         transaction.get(commandRef),
         ...plans.map((plan) => transaction.get(db.doc(`studentCredentialLookups/${plan.lookupDigest}`))),
       ]);
-      if (commandSnapshot.exists) return;
       assertClassTeacher(classSnapshot.data(), teacherUid);
+      if (commandSnapshot.exists) {
+        assertSameCommand(commandSnapshot.data(), "registerStudents", teacherUid, fingerprint);
+        return;
+      }
 
       const currentCount = Number(classSnapshot.get("memberCount") ?? 0);
       if (currentCount + plans.length > 40) {
@@ -127,6 +136,7 @@ export const registerStudents = onCall(
         type: "registerStudents",
         status: "succeeded",
         requestedBy: teacherUid,
+        inputFingerprint: fingerprint,
         result: { students: safeStudents },
         attemptId,
         createdAt: FieldValue.serverTimestamp(),

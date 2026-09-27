@@ -7,6 +7,7 @@ import {
   verifySecret,
 } from "../auth/codes.js";
 import { auth, db } from "../shared/firebase.js";
+import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { callableOptions } from "../shared/callableOptions.js";
 import { requireRecord } from "../shared/validation.js";
 
@@ -20,6 +21,7 @@ function invalidLogin(): HttpsError {
 export const loginStudent = onCall(
   { ...callableOptions, timeoutSeconds: 30 },
   async (request): Promise<{ customToken: string; classId: string }> => {
+    requireFreshAppCheck(request);
     const input = requireRecord(request.data);
     if (typeof input.classCode !== "string" || typeof input.cardCode !== "string") {
       throw invalidLogin();
@@ -55,7 +57,12 @@ export const loginStudent = onCall(
     if (!valid) {
       await db.runTransaction(async (transaction) => {
         const current = await transaction.get(credentialRef);
-        if (!current.exists) return;
+        if (
+          !current.exists
+          || current.get("lookupDigest") !== lookupDigest
+          || current.get("secretHash") !== credential.get("secretHash")
+          || current.get("codeVersion") !== credential.get("codeVersion")
+        ) return;
         const failures = Number(current.get("failedAttempts") ?? 0) + 1;
         transaction.update(credentialRef, {
           failedAttempts: failures,
@@ -69,24 +76,42 @@ export const loginStudent = onCall(
     }
 
     const memberRef = db.doc(`classes/${classId}/members/${studentUid}`);
-    const [classSnapshot, memberSnapshot] = await Promise.all([
-      db.doc(`classes/${classId}`).get(),
-      memberRef.get(),
-    ]);
-    if (
-      !classSnapshot.exists
-      || classSnapshot.get("status") !== "active"
-      || !memberSnapshot.exists
-      || memberSnapshot.get("accessStatus") !== "active"
-    ) {
-      throw new HttpsError("permission-denied", "현재 사용할 수 없는 학생 계정이에요.");
-    }
-
-    const sessionVersion = Number(memberSnapshot.get("sessionVersion"));
-    await credentialRef.update({
-      failedAttempts: 0,
-      lockedUntil: null,
-      updatedAt: FieldValue.serverTimestamp(),
+    const classRef = db.doc(`classes/${classId}`);
+    const classCodeRef = db.doc(`classCodes/${classCode}`);
+    // A rotation can happen while scrypt runs. Commit the login only if the
+    // credential, lookup, class and member still describe the card we checked.
+    const sessionVersion = await db.runTransaction(async (transaction) => {
+      const [currentCode, currentLookup, currentCredential, classSnapshot, memberSnapshot] =
+        await Promise.all([
+          transaction.get(classCodeRef),
+          transaction.get(db.doc(`studentCredentialLookups/${lookupDigest}`)),
+          transaction.get(credentialRef),
+          transaction.get(classRef),
+          transaction.get(memberRef),
+        ]);
+      if (
+        !currentCode.exists || currentCode.get("status") !== "active"
+        || currentCode.get("classId") !== classId
+        || !currentLookup.exists || currentLookup.get("studentUid") !== studentUid
+        || !currentCredential.exists
+        || currentCredential.get("lookupDigest") !== lookupDigest
+        || currentCredential.get("secretHash") !== credential.get("secretHash")
+        || currentCredential.get("secretSalt") !== credential.get("secretSalt")
+        || currentCredential.get("codeVersion") !== credential.get("codeVersion")
+        || !classSnapshot.exists || classSnapshot.get("status") !== "active"
+        || !memberSnapshot.exists || memberSnapshot.get("accessStatus") !== "active"
+        || memberSnapshot.get("sessionVersion") !== currentCredential.get("sessionVersion")
+      ) throw invalidLogin();
+      const currentLock = currentCredential.get("lockedUntil") as Timestamp | null;
+      if (currentLock && currentLock.toMillis() > Date.now()) {
+        throw new HttpsError("resource-exhausted", "잠시 뒤 다시 시도해 주세요.");
+      }
+      transaction.update(credentialRef, {
+        failedAttempts: 0,
+        lockedUntil: null,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return Number(memberSnapshot.get("sessionVersion"));
     });
     const customToken = await auth.createCustomToken(studentUid, {
       role: "student",

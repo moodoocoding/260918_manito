@@ -2,8 +2,10 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { generateClassCode } from "../auth/codes.js";
 import { requireVerifiedTeacher } from "../shared/authorization.js";
+import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { callableOptions } from "../shared/callableOptions.js";
 import { db } from "../shared/firebase.js";
+import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
   requireGradeBand,
   requireRecord,
@@ -20,16 +22,19 @@ interface CreateClassResult {
 export const createClass = onCall(
   callableOptions,
   async (request): Promise<CreateClassResult> => {
+    requireFreshAppCheck(request);
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
     const name = requireText(input.name, "학급 이름", 40);
     const schoolYear = requireSchoolYear(input.schoolYear);
     const gradeBand = requireGradeBand(input.gradeBand);
     const requestId = requireRequestId(input.requestId);
+    const fingerprint = inputFingerprint({ name, schoolYear, gradeBand });
 
     const commandRef = db.doc(`teacherCommands/${teacherUid}_${requestId}`);
     const existingCommand = await commandRef.get();
     if (existingCommand.exists) {
+      assertSameCommand(existingCommand.data(), "createClass", teacherUid, fingerprint);
       const result = existingCommand.get("result") as CreateClassResult | undefined;
       if (result) return result;
       throw new HttpsError("aborted", "처리 중인 요청이에요. 잠시 후 다시 시도해 주세요.");
@@ -45,7 +50,10 @@ export const createClass = onCall(
         transaction.get(commandRef),
         transaction.get(classCodeRef),
       ]);
-      if (command.exists) return;
+      if (command.exists) {
+        assertSameCommand(command.data(), "createClass", teacherUid, fingerprint);
+        return;
+      }
       if (classCodeRecord.exists) {
         throw new HttpsError("aborted", "학급 코드를 다시 만들고 있어요. 다시 시도해 주세요.");
       }
@@ -71,6 +79,7 @@ export const createClass = onCall(
         type: "createClass",
         status: "succeeded",
         requestedBy: teacherUid,
+        inputFingerprint: fingerprint,
         result,
         createdAt: FieldValue.serverTimestamp(),
       });

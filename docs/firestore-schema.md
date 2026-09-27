@@ -32,6 +32,7 @@ studentCredentials/{studentUid}         # 서버 전용
 studentCredentialLookups/{lookupDigest} # 서버 전용
 classCodes/{classCode}                   # 서버 전용
 teacherCommands/{teacherUid_requestId}  # 서버 전용
+operatorAuditLogs/{logId}                # 서버 전용
 missionCatalog/{missionId}
 ```
 
@@ -56,6 +57,7 @@ missionCatalog/{missionId}
 | `studentCredentialLookups` | 카드 로그인 ID를 학생 UID로 연결 | 아니요 | 아니요 | 서버만 |
 | `classCodes` | 8자리 학급 코드를 학급 ID로 연결 | 아니요 | 아니요 | 서버만 |
 | `teacherCommands` | 학급 생성 명령의 중복 실행 방지 | 아니요 | 아니요 | 서버만 |
+| `operatorAuditLogs` | 교사 승인·중지의 관리자 실행 기록 | 아니요 | 아니요 | 서버만 |
 | `auditLogs` | 민감정보 열람·매칭·공개·삭제 기록 | 아니요 | 담당 교사 | 서버만 |
 
 Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’은 자동으로 안전하다는 뜻이 아니며 각 함수가 교사 소유권, 학생 소속, 접근 상태, 회차 상태와 요청 중복 여부를 다시 검사해야 한다.
@@ -70,6 +72,8 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 6. 로그인 카드 재발급·계정 차단 시 `members.sessionVersion`과 인증 클레임의 값이 달라져 기존 세션 읽기가 즉시 거절된다.
 7. 회차 중단 학생과 연결된 대기 쪽지는 승인하지 않으며 정체 공개·감사 카드 대상에서도 제외한다.
 8. 모든 재시도 가능한 명령은 `requestId`를 받아 동일 요청이 중복 문서를 만들지 않게 한다.
+9. `teacherCommands`와 `classes/{classId}/commands`에는 명령 종류, 요청자, 입력 fingerprint를 기록한다. 재사용한 ID가 다른 입력 또는 작업을 뜻하면 거절한다. 등록 재시도 시 담당 학급 권한을 먼저 확인한다.
+10. 교사 직접 읽기는 Claims의 `teacherVerified`와 `teachers/{uid}.verificationStatus == verified`가 모두 맞아야 한다. 교사 상태가 `suspended`면 직접 읽기와 함수 실행을 거절한다.
 
 ## 서버 명령의 트랜잭션 범위
 
@@ -92,4 +96,4 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 
 ## v2 계획서와 연결되는 미구현 보강
 
-이 문서의 경로는 기반 계약이며 회차 이후 쓰기 기능은 아직 구현되지 않았다. [개발 계획서](./manitto-development-plan.md) 12.6~12.8절의 학생 홈 최소 조회, 교사 활동 요약과 개인 비밀 보기 분리, 정지 교사 읽기 차단, 참여 중단·보관 정책, 실제 학생 활성화 준비를 담당 단계에서 구현한다. 특히 현재 Rules는 교사가 `studentData`를 직접 읽는 구조이므로 모든 배정 열람이 감사된다고 간주하지 않는다. 새 경로·필드와 Rules 변경은 구현 단계에서 이 계약에 함께 반영한다.
+이 문서의 경로는 기반 계약이며 회차 이후 쓰기 기능은 아직 구현되지 않았다. [개발 계획서](./manitto-development-plan.md) 12.6~12.8절 중 학생 홈 최소 조회와 정지 교사 읽기 차단은 D1 로컬 코드에 반영했다. 교사 활동 요약과 개인 비밀 보기 분리, 참여 중단·보관 정책, 실제 학생 활성화 준비는 담당 단계에서 구현한다. 특히 현재 Rules는 교사가 `studentData`를 직접 읽는 구조이므로 모든 배정 열람이 감사된다고 간주하지 않는다. 새 경로·필드와 Rules 변경은 구현 단계에서 이 계약에 함께 반영한다.

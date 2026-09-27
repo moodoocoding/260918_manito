@@ -100,7 +100,7 @@
 
 ## 기술 기준
 
-- 프런트엔드 구현 기본안: React + TypeScript + Vite 반응형 웹, 기존 npm workspace에 `web/` 추가, Firebase Hosting 배포. 아직 구현하지 않았다.
+- 프런트엔드: React + TypeScript + Vite 반응형 웹을 `web/` workspace에 구현 중이며 Vercel로 배포한다. Firebase는 백엔드로 유지한다.
 - 백엔드: Firebase Authentication, Cloud Firestore, Cloud Functions, Security Rules, App Check.
 - Functions: 2세대, Node.js 22, TypeScript, 서울 `asia-northeast3`.
 - Firestore: 서울 `asia-northeast3`의 Native mode Standard 데이터베이스.
@@ -114,14 +114,15 @@
 
 ## 현재 구현 범위
 
-2026-09-27 기준 완료된 것은 Firebase 계정·학급 백엔드 기반이다. 현재 상태가 바뀌면 이 절과 작업일지를 함께 갱신한다.
+2026-09-27 기준 개발 프로젝트에는 계정·학급 백엔드 4개 함수가 배포돼 있다. D1 웹 첫 입장과 인증 보강 코드는 로컬에서 구현·검증 중이며 아직 클라우드에 배포하지 않았다. 현재 상태가 바뀌면 이 절과 작업일지를 함께 갱신한다.
 
 - 구현·배포 완료: Firestore 스키마, 보안 규칙, 복합 인덱스, `createClass`, `registerStudents`, `loginStudent`, `rotateStudentCredential`.
-- 미구현: 교사·학생 프런트엔드, 웹 앱 등록, 교사 로그인·승인 UI, App Check 웹 설정, 회차·매칭, 미션, 쪽지·도움 요청, 공개·회고, Hosting.
+- 로컬 구현: 교사·학생 첫 입장 웹 화면, 교사 상태·학급 코드·학생 홈 조회, 학생 입장 차단, B-01~03·05 보강, Vercel 정적 배포 설정. Firebase 웹 앱 등록과 개발 클라우드 연결은 미검증이다.
+- 미구현: 회차·매칭, 미션, 쪽지·도움 요청, 공개·회고, 실제 학생 도입·삭제, Vercel 배포와 클라우드 App Check·Custom Token 검증.
 
 백엔드 배포가 웹서비스 완성을 의미한다고 기록하거나 보고하지 않는다.
 
-기존 구현에도 보강 과제가 있다. 계획서 B-01~06을 따라 학생 등록 재시도 권한·멱등 처리, 카드 검증/재발급 동시성, 정지 교사 읽기 차단, 학생 개인 보기와 교사 감사 열람 분리, 학생 활성화 준비 조건을 담당 단계에서 구현한다. 이는 아직 수정되지 않은 항목이다.
+계획서 B-01~03·05는 로컬에서 수정했으며 회귀 테스트와 브라우저 확인을 거쳤다. B-04의 회차·민감 열람 분리와 B-06의 실제 학생 활성화 준비 조건은 남아 있다.
 
 ## 개발 우선순위
 
@@ -169,6 +170,7 @@ P0의 완료 기준은 같은 학급에서 교사가 실제로 두 회차를 운
 
 - Firebase 명령은 대상 프로젝트를 명시한다. `demo-manitto`에는 실제 배포하지 않는다.
 - 개발 배포는 `manito-938cc` 또는 `dev` 별칭만 사용한다.
+- Vercel 웹 빌드에는 Emulator 설정을 사용하지 않는다. 개발 미리보기는 개발 Firebase 웹 앱 설정과 App Check·Auth 허용 도메인을 확인한 뒤 연결한다.
 - 로컬 Firestore Rules 배포는 Console 규칙을 덮어쓰므로 저장소 파일을 기준으로 관리한다.
 - 비밀 키, 서비스 계정 파일, `.env` 파일, 학생 데이터와 로그 원문을 Git에 커밋하지 않는다.
 - 실제 운영 프로젝트는 개발 프로젝트와 분리하고, 생성·결제·리전·데이터 이전을 명시적으로 검토한 뒤 연결한다.

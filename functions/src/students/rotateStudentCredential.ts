@@ -6,8 +6,10 @@ import {
   hashSecret,
 } from "../auth/codes.js";
 import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
+import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { callableOptions } from "../shared/callableOptions.js";
 import { db } from "../shared/firebase.js";
+import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
   requireDocumentId,
   requireRecord,
@@ -17,17 +19,22 @@ import {
 export const rotateStudentCredential = onCall(
   callableOptions,
   async (request): Promise<{ studentUid: string; cardCode: string }> => {
+    requireFreshAppCheck(request);
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
     const classId = requireDocumentId(input.classId, "학급");
     const studentUid = requireDocumentId(input.studentUid, "학생");
     const requestId = requireRequestId(input.requestId);
+    const fingerprint = inputFingerprint({ classId, studentUid });
     const classRef = db.doc(`classes/${classId}`);
     const memberRef = classRef.collection("members").doc(studentUid);
     const credentialRef = db.doc(`studentCredentials/${studentUid}`);
     const commandRef = classRef.collection("commands").doc(requestId);
 
-    if ((await commandRef.get()).exists) {
+    const [classBefore, existing] = await Promise.all([classRef.get(), commandRef.get()]);
+    assertClassTeacher(classBefore.data(), teacherUid);
+    if (existing.exists) {
+      assertSameCommand(existing.data(), "rotateStudentCredential", teacherUid, fingerprint);
       throw new HttpsError(
         "failed-precondition",
         "이미 재발급된 요청이에요. 새 카드를 다시 재발급해 주세요.",
@@ -48,10 +55,11 @@ export const rotateStudentCredential = onCall(
           transaction.get(commandRef),
           transaction.get(newLookupRef),
         ]);
-      if (commandSnapshot.exists) {
-        throw new HttpsError("failed-precondition", "이미 재발급된 요청이에요.");
-      }
       assertClassTeacher(classSnapshot.data(), teacherUid);
+      if (commandSnapshot.exists) {
+        assertSameCommand(commandSnapshot.data(), "rotateStudentCredential", teacherUid, fingerprint);
+        throw new HttpsError("failed-precondition", "이미 재발급된 요청이에요. 새 카드를 다시 재발급해 주세요.");
+      }
       if (!memberSnapshot.exists || !credentialSnapshot.exists) {
         throw new HttpsError("not-found", "학생 계정을 찾지 못했어요.");
       }
@@ -85,6 +93,7 @@ export const rotateStudentCredential = onCall(
         type: "rotateStudentCredential",
         status: "succeeded",
         requestedBy: teacherUid,
+        inputFingerprint: fingerprint,
         result: { studentUid },
         createdAt: FieldValue.serverTimestamp(),
       });

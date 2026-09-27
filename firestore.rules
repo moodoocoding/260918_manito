@@ -7,7 +7,11 @@ service cloud.firestore {
     }
 
     function isTeacher() {
-      return signedIn() && request.auth.token.role == 'teacher';
+      return signedIn()
+        && request.auth.token.role == 'teacher'
+        && request.auth.token.teacherVerified == true
+        && exists(/databases/$(database)/documents/teachers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.verificationStatus == 'verified';
     }
 
     function isStudent() {

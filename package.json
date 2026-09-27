@@ -3,10 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "functions"
+    "functions",
+    "web"
   ],
   "scripts": {
-    "build": "npm --workspace functions run build",
+    "build": "npm --workspace functions run build && npm --workspace web run build",
+    "dev:web": "npm --workspace web run dev",
     "deploy:backend": "node scripts/deploy-backend.mjs",
     "emulators": "firebase emulators:start --project demo-manitto",
     "test:functions": "npm --workspace functions test",

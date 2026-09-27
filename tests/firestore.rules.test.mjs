@@ -24,6 +24,8 @@ beforeEach(async () => {
   await testEnv.clearFirestore();
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
+    await setDoc(doc(db, "teachers/teacher-a"), { verificationStatus: "verified" });
+    await setDoc(doc(db, "teachers/teacher-b"), { verificationStatus: "verified" });
     await setDoc(doc(db, "classes/class-a"), {
       status: "active",
       teacherUids: ["teacher-a"],
@@ -76,7 +78,7 @@ after(async () => {
 });
 
 function teacherDb(uid) {
-  return testEnv.authenticatedContext(uid, { role: "teacher" }).firestore();
+  return testEnv.authenticatedContext(uid, { role: "teacher", teacherVerified: true }).firestore();
 }
 
 function studentDb(uid, classId = "class-a", sessionVersion = 1) {
@@ -104,6 +106,15 @@ test("the assigned teacher can read the class and its student data", async () =>
 test("a teacher from another class cannot read the class", async () => {
   const db = teacherDb("teacher-b");
   await assertFails(getDoc(doc(db, "classes/class-a")));
+});
+
+test("suspended and unverified teachers cannot read student data", async () => {
+  const unverified = testEnv.authenticatedContext("teacher-a", { role: "teacher" }).firestore();
+  await assertFails(getDoc(doc(unverified, "classes/class-a")));
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "teachers/teacher-a"), { verificationStatus: "suspended" });
+  });
+  await assertFails(getDoc(doc(teacherDb("teacher-a"), "classes/class-a/members/student-a")));
 });
 
 test("a student can read only their own round view", async () => {

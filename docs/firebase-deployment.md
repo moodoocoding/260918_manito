@@ -93,7 +93,7 @@ Firebase Console에서도 아래 항목을 확인한다.
 
 ## 5. 프런트엔드 연결 전 필요한 작업
 
-백엔드 배포만으로 사용자가 접속할 웹사이트가 생기지는 않는다. 다음 개발 단계에서 교사용·학생용 웹 UI를 만들고 Firebase Hosting 또는 다른 정적 호스팅에 배포해야 한다. UI 연결에 필요한 값은 웹 앱 등록 때 받은 Firebase 설정과 함수 리전 `asia-northeast3`이다.
+백엔드 배포만으로 사용자가 접속할 웹사이트가 생기지는 않는다. 교사용·학생용 첫 입장 웹은 `web/`에 로컬 구현했으며, 배포 대상은 Vercel이다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel 프로젝트에는 `web/.env.example`의 `VITE_*` 값을 개발 Firebase 웹 앱 설정으로 입력하고 `VITE_USE_EMULATORS=false`를 유지한다. 공개할 Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 등록 범위에 추가한 뒤 가상 계정으로 확인한다. 현재 Vercel과 Firebase 개발 클라우드의 연결은 아직 검증하지 않았다.
 
 프로덕션 공개 전에는 개발 프로젝트의 전체 흐름을 검증한 뒤 별도 운영 프로젝트를 만들고 같은 방식으로 배포한다. 개발 데이터와 실제 학생 데이터를 한 프로젝트에 섞지 않는다.
 
