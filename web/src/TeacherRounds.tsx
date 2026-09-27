@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { call } from "./firebase";
+import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Round = { roundId: string; title: string; status: string; startsAt: string; endsAt: string;
@@ -7,7 +8,9 @@ type Round = { roundId: string; title: string; status: string; startsAt: string;
 type Overview = { helps: Array<{helpId: string; studentName: string; category: string; note: string; messageId: string | null}>;
   pendingMessages: Array<{messageId: string; senderName: string; receiverName: string; text: string}>;
   participation: Array<{studentUid: string; displayName: string; status: string; accessStatus: string;
-    lastLoginAt: string | null; hasActivity: boolean}>; activityDates: string[] };
+  lastLoginAt: string | null; hasActivity: boolean}>; activityDates: string[] };
+type Summary = { helpCount: number; pendingMessageCount: number; participantCount: number; activityDates: string[];
+  helps?: Overview["helps"]; pendingMessages?: Overview["pendingMessages"] };
 type Assignment = { giverUid: string; giverName: string; receiverName: string };
 type SafetyMessage = { text: string; senderName: string; receiverName: string; status: string };
 type Settings = { participantIds: string[]; excludedPairs: Array<{a: string; b: string}>;
@@ -36,20 +39,34 @@ function plannedDates() {
   return dates;
 }
 
-export function TeacherRounds({ classId, gradeBand, members }: {
-  classId: string; gradeBand: string; members: Member[];
+export type TeacherRoundView = "overview" | "rounds" | "safety" | "history";
+export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, onDirtyChange }: {
+  classId: string; gradeBand: string; members: Member[]; view: TeacherRoundView;
+  onNavigate: (view: TeacherRoundView) => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [roundsError, setRoundsError] = useState(false);
   const [chosen, setChosen] = useState<string>("");
   const chosenRef = useRef("");
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const assignmentRequest = useRef(0);
   const [catalog, setCatalog] = useState<Array<{missionId: string; text: string}>>([]);
+  const [catalogError, setCatalogError] = useState(false);
   const [title, setTitle] = useState("");
   const [start, setStart] = useState(() => localInput(new Date().toISOString()));
   const [end, setEnd] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 14); return localInput(d.toISOString()); });
   const [dates, setDates] = useState(() => plannedDates().join(", "));
+  const [dateInput, setDateInput] = useState("");
+  const [step, setStep] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{name: string; studentUid?: string} | null>(null);
+  const [overviewError, setOverviewError] = useState(false);
+  const safetyRequest = useRef(0);
+  const summaryRequest = useRef(0);
   const [participants, setParticipants] = useState<string[]>([]);
   const [excludedPairs, setExcludedPairs] = useState<Array<{a: string; b: string}>>([]);
   const [pairA, setPairA] = useState("");
@@ -59,32 +76,83 @@ export function TeacherRounds({ classId, gradeBand, members }: {
   const [nextTitle, setNextTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [stepError, setStepError] = useState("");
   const [notice, setNotice] = useState("");
   const [resolution, setResolution] = useState<Record<string, string>>({});
   const [safetyMessages, setSafetyMessages] = useState<Record<string, SafetyMessage>>({});
+  const [openHelpId, setOpenHelpId] = useState<string | null>(null);
+  const [openReviewMessageId, setOpenReviewMessageId] = useState<string | null>(null);
+  const pendingSave = useRef<{key: string; requestId: string} | null>(null);
+  const pendingStatusAction = useRef<{key: string; requestId: string} | null>(null);
+  useEffect(() => { onDirtyChange?.(view === "rounds" && creating && dirty); }, [view, creating, dirty, onDirtyChange]);
 
   const load = useCallback(async () => {
     const result = await call<{classId: string}, {rounds: Round[]}>("listRounds", {classId});
-    setRounds(result.rounds);
+    setRounds(result.rounds); setRoundsError(false);
   }, [classId]);
   const loadOverview = useCallback(async (roundId: string) => {
     const result = await call<object, Overview>("getTeacherRoundOverview", {classId, roundId});
-    if (chosenRef.current === roundId) setOverview(result);
+    if (chosenRef.current === roundId) { setOverview(result); setOverviewError(false); }
   }, [classId]);
-  useEffect(() => { assignmentRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setAssignments(null); void load().catch(() => setError("회차 목록을 불러오지 못했어요.")); }, [load]);
-  useEffect(() => { void call<object, {missions: typeof catalog}>("getMissionCatalog", {gradeBand})
-    .then((result) => setCatalog(result.missions)).catch(() => setCatalog([])); }, [gradeBand]);
+  const loadSummary = useCallback(async (roundId: string) => {
+    const version = ++summaryRequest.current;
+    const result = await call<object, Summary>("getTeacherRoundOverview", {classId, roundId, summaryOnly: true});
+    if (version !== summaryRequest.current) return;
+    setSummary({ helpCount: result.helpCount ?? result.helps?.length ?? 0,
+      pendingMessageCount: result.pendingMessageCount ?? result.pendingMessages?.length ?? 0,
+      participantCount: result.participantCount, activityDates: result.activityDates });
+    setOverviewError(false);
+  }, [classId]);
+  useEffect(() => { assignmentRequest.current++; summaryRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); setAssignments(null); void load().catch(() => {setRoundsError(true); setError("회차 목록을 불러오지 못했어요.");}); }, [load]);
+  async function loadCatalog() {
+    try {
+      const result = await call<object, {missions: typeof catalog}>("getMissionCatalog", {gradeBand});
+      setCatalog(result.missions); setCatalogError(false);
+    } catch { setCatalogError(true); }
+  }
+  useEffect(() => { void loadCatalog(); }, [gradeBand]);
   useEffect(() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); }, [members]);
   useEffect(() => {
-    const hide = () => { if (document.visibilityState !== "visible") { assignmentRequest.current++; setAssignments(null); } };
+    const hide = () => { if (document.visibilityState !== "visible") {
+      assignmentRequest.current++; safetyRequest.current++; setAssignments(null); setSafetyMessages({});
+      setOpenHelpId(null); setOpenReviewMessageId(null);
+    } };
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
-  const current = rounds.find((item) => item.roundId === chosen);
+  const activeRound = rounds.find((item) => ["active","paused","reveal_pending"].includes(item.status))
+    ?? rounds.find((item) => item.status === "revealed");
+  const roundOrder = (status: string) => ["active","paused","reveal_pending"].includes(status) ? 0
+    : ["ready","draft"].includes(status) ? 1 : 2;
+  const orderedRounds = [...rounds].sort((a,b) => roundOrder(a.status) - roundOrder(b.status)
+    || b.startsAt.localeCompare(a.startsAt));
+  const chosenRound = rounds.find((item) => item.roundId === chosen);
+  const current = view === "safety" ? activeRound : chosenRound;
+  useEffect(() => {
+    if (view === "overview") {
+      if (activeRound) void loadSummary(activeRound.roundId).catch(() => setOverviewError(true));
+      else setSummary(null);
+    }
+    if (view === "safety" && activeRound) {
+      if (chosenRef.current !== activeRound.roundId) void selectRound(activeRound.roundId);
+      else void loadOverview(activeRound.roundId).catch(() => setOverviewError(true));
+    }
+  }, [view, activeRound?.roundId]);
+  useEffect(() => {
+    if (view !== "safety") { safetyRequest.current++; setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null); }
+    if (view !== "rounds") { assignmentRequest.current++; setAssignments(null); }
+    if (view !== "rounds" && creating) { setCreating(false); setDirty(false); }
+  }, [view]);
 
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
-    try { await action(); await load(); if (chosen) await loadOverview(chosen); }
+    try { await action();
+      try { await load(); if (chosenRef.current) {
+        if (view === "safety") await loadOverview(chosenRef.current);
+        else await loadSummary(chosenRef.current);
+      } }
+      catch { setError("작업은 완료됐어요. 최신 목록을 다시 불러와 주세요."); }
+    }
     catch (caught) { setError(caught instanceof Error ? caught.message : "처리하지 못했어요."); }
     finally { setBusy(false); }
   }
@@ -98,10 +166,14 @@ export function TeacherRounds({ classId, gradeBand, members }: {
     await run(async () => {
       const payload = formData();
       if (missionIds.length !== 3) throw new Error("미션 3개를 선택해 주세요.");
+      const key = JSON.stringify([current?.roundId ?? null, payload]);
+      if (pendingSave.current?.key !== key) pendingSave.current = {key, requestId: crypto.randomUUID()};
       const result = current && ["draft", "ready"].includes(current.status)
-        ? await call<object, {roundId: string}>("updateRound", {...payload, roundId: current.roundId, requestId: crypto.randomUUID()})
-        : await call<object, {roundId: string}>("createRound", {...payload, requestId: crypto.randomUUID()});
-      chosenRef.current = result.roundId; setChosen(result.roundId); setNotice("회차 설정을 저장했어요.");
+        ? await call<object, {roundId: string}>("updateRound", {...payload, roundId: current.roundId, requestId: pendingSave.current.requestId})
+        : await call<object, {roundId: string}>("createRound", {...payload, requestId: pendingSave.current.requestId});
+      pendingSave.current = null;
+      chosenRef.current = result.roundId; setChosen(result.roundId); setDirty(false); setCreating(false);
+      setNotice("준비 내용을 저장했어요. 조건을 확인한 뒤 시작할 수 있어요.");
     });
   }
   async function action(name: string) {
@@ -109,26 +181,31 @@ export function TeacherRounds({ classId, gradeBand, members }: {
     assignmentRequest.current++;
     setAssignments(null);
     await run(async () => {
+      const key = JSON.stringify([name, current.roundId, current.rosterVersion]);
+      if (pendingStatusAction.current?.key !== key) pendingStatusAction.current = {key, requestId: crypto.randomUUID()};
+      const requestId = pendingStatusAction.current.requestId;
       if (name === "prepare") {
         await call<object, object>("prepareRound", {classId, roundId: current.roundId});
       } else if (name === "start") {
         await call<object, object>("startRound", {classId, roundId: current.roundId,
-          rosterVersion: current.rosterVersion, requestId: crypto.randomUUID()});
+          rosterVersion: current.rosterVersion, requestId});
       } else if (name === "reveal") {
-        await call<object, object>("revealRound", {classId, roundId: current.roundId, requestId: crypto.randomUUID()});
+        await call<object, object>("revealRound", {classId, roundId: current.roundId, requestId});
       } else {
         await call<object, object>("changeRoundStatus", {classId, roundId: current.roundId,
-          action: name, requestId: crypto.randomUUID()});
+          action: name, requestId});
       }
+      pendingStatusAction.current = null;
       setNotice("회차 상태를 변경했어요.");
     });
   }
   async function selectRound(roundId: string) {
     assignmentRequest.current++;
     chosenRef.current = roundId;
-    setChosen(roundId); setAssignments(null); setOverview(null); setSafetyMessages({});
+    setChosen(roundId); setAssignments(null); setOverview(null); setSummary(null); setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
     if (!roundId) { setTitle(""); setExcludedPairs([]); setMissionIds([]);
-      setDates(plannedDates().join(", ")); return; }
+      setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid));
+      setDates(plannedDates().join(", ")); setStep(1); setDirty(false); return; }
     try {
       const round = rounds.find((r) => r.roundId === roundId);
       const settings = await call<object, Settings>("getRoundSettingsForTeacher", {classId, roundId});
@@ -138,8 +215,10 @@ export function TeacherRounds({ classId, gradeBand, members }: {
       setParticipants(settings.participantIds); setMissionIds(settings.missionIds);
       setDates(settings.activityDates.length ? settings.activityDates.join(", ") : plannedDates().join(", "));
       setExcludedPairs(settings.excludedPairs);
-      await loadOverview(roundId);
-    } catch { setError("회차 현황을 불러오지 못했어요."); }
+      setStep(1); setDirty(false);
+      if (view === "safety") await loadOverview(roundId);
+      else await loadSummary(roundId);
+    } catch { setOverviewError(true); setError("회차 현황을 불러오지 못했어요. 다시 시도해 주세요."); }
   }
   async function review(messageId: string, decision: "approve" | "reject") {
     if (!current) return;
@@ -153,10 +232,12 @@ export function TeacherRounds({ classId, gradeBand, members }: {
   }
   async function inspectMessage(messageId: string) {
     if (!current) return;
+    const version = ++safetyRequest.current;
     await run(async () => {
       const result = await call<object, SafetyMessage>("getMessageForReview", {classId,
         roundId: current.roundId, messageId});
-      setSafetyMessages((old) => ({...old, [messageId]: result}));
+      if (version === safetyRequest.current && view === "safety" && document.visibilityState === "visible"
+        && chosenRef.current === current.roundId) setSafetyMessages((old) => ({...old, [messageId]: result}));
     });
   }
   async function stop(studentUid: string) {
@@ -173,49 +254,145 @@ export function TeacherRounds({ classId, gradeBand, members }: {
         endsAt: endDate.toISOString(), requestId: crypto.randomUUID()});
       chosenRef.current = result.roundId; setChosen(result.roundId); setTitle(nextTitle); setStart(localInput(startDate.toISOString()));
       setEnd(localInput(endDate.toISOString())); setDates(plannedDates().join(", "));
+      setStep(1); setDirty(false); setCreating(true); onNavigate("rounds");
       setNotice("설정을 복사했어요. 수업일을 확인하고 저장해 주세요.");
     });
   }
 
+  const selectedDates = dates.split(/[\s,]+/).filter(Boolean);
+  function markChanged() { setDirty(true); setNotice(""); setStepError(""); }
+  function chooseRound(roundId: string, edit = false) {
+    if (dirty && !window.confirm("저장하지 않은 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
+    setCreating(edit); void selectRound(roundId);
+  }
+  function addDate() {
+    if (!dateInput || selectedDates.includes(dateInput)) return;
+    setDates([...selectedDates, dateInput].sort().join(", "));
+    setDateInput(""); markChanged();
+  }
+  function nextStep() {
+    setError(""); setStepError("");
+    if (step === 1 && (!title.trim() || !start || !end || new Date(end) <= new Date(start)
+      || ![5,10].includes(selectedDates.length) || selectedDates.some((day) => day < start.slice(0,10) || day > end.slice(0,10)))) {
+      setStepError("주제와 기간을 확인하고, 기간 안의 수업일을 5일 또는 10일 선택해 주세요."); return;
+    }
+    if (step === 2 && (participants.length < 4 || participants.length > 40
+      || excludedPairs.some((pair) => !participants.includes(pair.a) || !participants.includes(pair.b)))) {
+      setStepError("참가 학생 4~40명과 참가자 사이의 제외 관계를 확인해 주세요."); return;
+    }
+    if (step === 3 && missionIds.length !== 3) { setStepError("미션을 정확히 3개 선택해 주세요."); return; }
+    setStep((value) => Math.min(4, value + 1)); window.scrollTo(0,0);
+  }
+  function askAction(name: string, studentUid?: string) { setConfirmAction({name, studentUid}); }
+  function confirmedAction() {
+    const pending = confirmAction;
+    setConfirmAction(null);
+    if (!pending) return;
+    if (pending.name === "stop" && pending.studentUid) void stop(pending.studentUid);
+    else void action(pending.name);
+  }
+  const confirmLabels: Record<string,{title:string; detail:string; button:string}> = {
+    start: {title:"매칭하고 시작할까요?",detail:`${current?.title ?? "이 활동"}의 배정을 확정합니다. 시작 뒤에는 같은 활동을 다시 추첨할 수 없어요.`,button:"매칭하고 시작"},
+    end: {title:"활동을 종료할까요?",detail:`${current?.title ?? "이 활동"}의 새 제출을 닫고 공개 대기로 옮깁니다. 친구 정체는 아직 공개되지 않아요.`,button:"활동 종료"},
+    reveal: {title:"친구 정체를 공개할까요?",detail:`${current?.title ?? "이 활동"}에서 처리할 도움·쪽지가 없는지 서버가 다시 확인합니다. 승인하면 학생별 본인 관계가 공개됩니다.`,button:"정체 공개 승인"},
+    cancel: {title:"회차를 취소할까요?",detail:`${current?.title ?? "이 활동"}을 취소합니다. 참가자는 이 회차에서 더 활동할 수 없어요.`,button:"회차 취소"},
+    stop: {title:"학생 참여를 중단할까요?",detail:`${overview?.participation.find((p) => p.studentUid === confirmAction?.studentUid)?.displayName ?? "선택한 학생"}의 이 회차 제출과 정체 공개를 차단합니다.`,button:"참여 중단"},
+  };
+  const confirmation = confirmAction ? confirmLabels[confirmAction.name] : null;
+
   return <section className="panel round-panel">
-    <h2>회차 운영</h2>
+    <div className="page-header"><div><h2>{view === "overview" ? "운영 요약" : view === "rounds" ? "회차" : view === "safety" ? "안전 확인" : "지난 활동"}</h2>
+      <p>{view === "overview" ? "도움 요청과 검토할 쪽지를 먼저 확인하세요." : view === "rounds" ? "준비부터 공개까지 회차별로 운영해요." : view === "safety" ? "요청과 쪽지를 비공개로 확인하고 처리해요." : "지난 기록과 다음 활동 준비를 살펴봐요."}</p></div>
+      {view === "rounds" && <div className="page-actions"><button type="button" className="outline" onClick={() => chooseRound("")}>회차 목록</button>
+        <button type="button" onClick={() => chooseRound("", true)}>새 회차 준비</button></div>}
+    </div>
     {error && <p className="message error" role="alert">{error}</p>}
     {notice && <p className="message success" role="status">{notice}</p>}
-    <label>회차 선택<select value={chosen} onChange={(event) => void selectRound(event.target.value)}>
-      <option value="">새 회차</option>{rounds.map((round) => <option key={round.roundId} value={round.roundId}>{round.title} · {roundStatusLabels[round.status] ?? round.status}</option>)}
-    </select></label>
-    {(!current || ["draft", "ready"].includes(current.status)) && <form className="stack" onSubmit={(event) => void saveRound(event)}>
-      <h3>{current ? "회차 설정 수정" : "새 회차 만들기"}</h3>
-      <label>주제<input required maxLength={60} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-      <label>시작 시각<input required type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} /></label>
-      <label>종료 시각<input required type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} /></label>
-      <label>수업일 5일 또는 10일 (쉼표로 구분)<textarea rows={2} value={dates} onChange={(event) => setDates(event.target.value)} /></label>
-      <fieldset><legend>참가 학생 ({participants.length}명)</legend><div className="choice-grid">{members.map((m) => <label key={m.studentUid} className="check-line"><input type="checkbox" checked={participants.includes(m.studentUid)} disabled={m.accessStatus !== "active"} onChange={(event) => setParticipants((old) => event.target.checked ? [...old, m.studentUid] : old.filter((id) => id !== m.studentUid))} />{m.displayName}</label>)}</div></fieldset>
-      <fieldset><legend>필수 제외 관계</legend><div className="action-row"><select aria-label="첫 번째 학생" value={pairA} onChange={(e) => setPairA(e.target.value)}><option value="">첫 번째 학생</option>{members.map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName} ({m.studentUid.slice(-4)})</option>)}</select><select aria-label="두 번째 학생" value={pairB} onChange={(e) => setPairB(e.target.value)}><option value="">두 번째 학생</option>{members.map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName} ({m.studentUid.slice(-4)})</option>)}</select><button type="button" className="small outline" disabled={!pairA || !pairB || pairA === pairB} onClick={() => { if (!excludedPairs.some((p) => [p.a,p.b].includes(pairA) && [p.a,p.b].includes(pairB))) setExcludedPairs((old) => [...old,{a:pairA,b:pairB}]); setPairA(""); setPairB(""); }}>제외 추가</button></div><ul>{excludedPairs.map((p,index) => <li key={`${p.a}_${p.b}`}>{members.find((m) => m.studentUid === p.a)?.displayName} ↔ {members.find((m) => m.studentUid === p.b)?.displayName} <button type="button" className="small outline" onClick={() => setExcludedPairs((old) => old.filter((_,i) => i !== index))}>제거</button></li>)}</ul></fieldset>
-      <fieldset><legend>이번 회차 미션 3개</legend><div className="choice-grid">{catalog.map((m) => <label key={m.missionId} className="check-line"><input type="checkbox" checked={missionIds.includes(m.missionId)} onChange={(event) => setMissionIds((old) => event.target.checked ? [...old, m.missionId] : old.filter((id) => id !== m.missionId))} />{m.text}</label>)}</div></fieldset>
-      <label className="check-line"><input type="checkbox" checked={allowFree} onChange={(event) => setAllowFree(event.target.checked)} />자유 쪽지 허용 (교사 승인 후 전달)</label>
-      <button disabled={busy}>설정 저장</button>
+    {view === "overview" && <div className="stack">
+      {activeRound ? <p><strong>{activeRound.title}</strong> · {roundStatusLabels[activeRound.status]} · {activeRound.participantCount}명</p> : <p>진행 중인 회차가 없어요. 학생을 등록하고 새 회차를 준비할 수 있어요.</p>}
+      {overviewError ? <p className="message error" role="alert">현황을 불러오지 못했어요. <button className="small outline" onClick={() => activeRound && void loadSummary(activeRound.roundId).catch(() => setOverviewError(true))}>다시 시도</button></p>
+        : activeRound && !summary ? <p>현황을 불러오는 중이에요…</p> : null}
+      <h3>먼저 확인해 주세요</h3><div className="teacher-overview-grid">
+        <button type="button" className="task-card" onClick={() => onNavigate("safety")}><strong>도움 요청 {summary?.helpCount ?? "확인 중"}건</strong><span>안전 확인에서 살펴보기</span></button>
+        <button type="button" className="task-card" onClick={() => onNavigate("safety")}><strong>검토할 쪽지 {summary?.pendingMessageCount ?? "확인 중"}건</strong><span>보낼지 판단하기</span></button>
+      </div>
+      {summary && <><h3>접속·활동 확인</h3><p className="field-help">학생별 지원 현황은 안전 확인에서 비공개로 볼 수 있어요.</p>
+        <p>참가 학생 {summary.participantCount ?? activeRound?.participantCount ?? 0}명</p>
+        <h3>일정</h3><p>{summary.activityDates.join(" · ") || "수업일 정보가 없어요."}</p></>}
+      <button className="outline" onClick={() => onNavigate("rounds")}>{activeRound ? "진행 회차 자세히 보기" : "새 회차 준비하기"}</button>
+    </div>}
+
+    {view === "rounds" && !creating && !current && <div className="round-list">
+      {roundsError ? <p className="message error" role="alert">회차 목록을 불러오지 못했어요. <button className="small outline" onClick={() => void load().catch(() => setRoundsError(true))}>다시 시도</button></p> : rounds.length === 0 ? <p className="muted">아직 회차가 없어요. 새 회차를 준비해 보세요.</p> : orderedRounds.map((round) =>
+        <button key={round.roundId} type="button" onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong>
+          <small>{roundStatusLabels[round.status] ?? round.status} · {round.participantCount}명 · {round.activityDates.length}수업일</small></button>)}
+    </div>}
+
+    {view === "rounds" && creating && (!current || ["draft","ready"].includes(current.status)) && <form className="teacher-page-form stack" onSubmit={(event) => { if (step === 4) void saveRound(event); else { event.preventDefault(); nextStep(); } }}>
+      <p className="form-status">{dirty || !current ? "준비 내용: 아직 저장 전" : "저장된 준비 내용"}</p>
+      <ol className="round-nav" aria-label="준비 단계">{["기본 정보","참가자·제외","미션·쪽지","확인·저장"].map((label,index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined}>{index + 1} {label}</li>)}</ol>
+      {step === 1 && <><h3>1. 기본 정보</h3><label>활동 주제<input required maxLength={60} value={title} aria-invalid={!!stepError && !title.trim()} aria-describedby={stepError ? "round-step-error" : undefined} onChange={(event) => { setTitle(event.target.value); markChanged(); }} /></label>
+        <div className="form-grid"><label>시작 시각<input required type="datetime-local" value={start} onChange={(event) => { setStart(event.target.value); markChanged(); }} /></label>
+          <label>종료 시각<input required type="datetime-local" value={end} onChange={(event) => { setEnd(event.target.value); markChanged(); }} /></label></div>
+        <h3>수업일 선택 · {selectedDates.length}/5 또는 10일</h3><p className="field-help">학교 일정에 맞는 날짜를 하루씩 추가해 주세요. 휴일은 자동으로 제외되지 않아요.</p>
+        <div className="action-row"><label>추가할 날짜<input type="date" value={dateInput} onChange={(event) => setDateInput(event.target.value)} /></label><button type="button" className="outline" disabled={!dateInput || selectedDates.includes(dateInput)} onClick={addDate}>날짜 추가</button></div>
+        <ul className="date-list">{selectedDates.map((day) => <li key={day}>{day}<button type="button" className="small outline" aria-label={`${day} 수업일 제거`} onClick={() => { setDates(selectedDates.filter((d) => d !== day).join(", ")); markChanged(); }}>제거</button></li>)}</ul></>}
+      {step === 2 && <><h3>2. 참가자와 필수 제외 관계</h3><p>{participants.length}명 선택 · {members.length - participants.length}명 미선택</p>
+        <label>학생 찾기<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="표시 이름 검색" /></label>
+        <div className="action-row"><button type="button" className="small outline" onClick={() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); markChanged(); }}>입장 가능한 학생 전체 선택</button><button type="button" className="small outline" onClick={() => { setParticipants([]); setExcludedPairs([]); markChanged(); }}>선택 해제</button></div>
+        <fieldset aria-describedby={stepError ? "round-step-error" : undefined}><legend>참가 학생 ({participants.length}명)</legend><div className="participant-grid">{members.filter((m) => m.displayName.includes(memberSearch)).map((m) => <CheckboxRow key={m.studentUid} checked={participants.includes(m.studentUid)} disabled={m.accessStatus !== "active"} onChange={(checked) => { setParticipants((old) => checked ? [...old,m.studentUid] : old.filter((id) => id !== m.studentUid)); setExcludedPairs((old) => old.filter((p) => checked || (p.a !== m.studentUid && p.b !== m.studentUid))); markChanged(); }}>{m.displayName}{m.accessStatus !== "active" ? " · 입장 제한" : ""}</CheckboxRow>)}</div></fieldset>
+        <fieldset><legend>필수 제외 관계 · {excludedPairs.length}쌍</legend><p className="field-help">서로 배정되지 않아야 할 두 학생을 선택해 주세요. 양방향으로 적용됩니다.</p>
+          <div className="action-row"><select aria-label="첫 번째 참가자" value={pairA} onChange={(e) => setPairA(e.target.value)}><option value="">첫 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
+            <select aria-label="두 번째 참가자" value={pairB} onChange={(e) => setPairB(e.target.value)}><option value="">두 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
+            <button type="button" className="small outline" disabled={!pairA || !pairB || pairA === pairB} onClick={() => { if (!excludedPairs.some((p) => [p.a,p.b].includes(pairA) && [p.a,p.b].includes(pairB))) { setExcludedPairs((old) => [...old,{a:pairA,b:pairB}]); markChanged(); } setPairA(""); setPairB(""); }}>제외 추가</button></div>
+          <ul>{excludedPairs.map((p) => <li key={`${p.a}_${p.b}`}>{members.find((m) => m.studentUid === p.a)?.displayName} ↔ {members.find((m) => m.studentUid === p.b)?.displayName} <button type="button" className="small outline" onClick={() => { setExcludedPairs((old) => old.filter((pair) => pair !== p)); markChanged(); }}>제거</button></li>)}</ul></fieldset></>}
+      {step === 3 && <><h3>3. 미션과 쪽지</h3><p>이번 활동에서 사용할 미션을 3개 골라 주세요. <strong>선택 {missionIds.length}/3</strong></p>
+        {catalogError && <p className="message error" role="alert">미션 목록을 불러오지 못했어요. <button type="button" className="small outline" onClick={() => void loadCatalog()}>다시 시도</button></p>}
+        <div className="mission-grid">{catalog.map((m) => <CheckboxRow key={m.missionId} checked={missionIds.includes(m.missionId)} disabled={missionIds.length >= 3 && !missionIds.includes(m.missionId)} onChange={(checked) => { setMissionIds((old) => checked ? [...old,m.missionId] : old.filter((id) => id !== m.missionId)); markChanged(); }}>{m.text}</CheckboxRow>)}</div>
+        {missionIds.length >= 3 && <p className="field-help">세 개를 골랐어요. 다른 미션을 선택하려면 먼저 하나를 해제해 주세요.</p>}
+        <fieldset><legend>쪽지는 어떻게 쓸까요?</legend><label className="choice-row"><input type="radio" name="free-message" checked={!allowFree} onChange={() => { setAllowFree(false); markChanged(); }} /><span>준비된 문구로만 보내기</span></label>
+          <label className="choice-row"><input type="radio" name="free-message" checked={allowFree} onChange={() => { setAllowFree(true); markChanged(); }} /><span>직접 쓰기도 허용하기 · 선생님 검토 후 전달</span></label>
+          <p className="field-help">수업일마다 학생 한 명당 선택형과 직접 쓰기를 합쳐 한 건만 보낼 수 있어요.</p></fieldset></>}
+      {step === 4 && <><h3>4. 준비 내용 확인</h3><p>여기서 저장하면 회차 초안이 만들어져요. 시작은 조건 확인 뒤 별도로 진행합니다.</p>
+        <dl className="review-summary"><dt>주제</dt><dd>{title}</dd><dt>기간</dt><dd>{start} ~ {end}</dd><dt>수업일</dt><dd>{selectedDates.length}일 · {selectedDates.join(" · ")}</dd><dt>참가자</dt><dd>{participants.length}명</dd><dt>필수 제외</dt><dd>{excludedPairs.length}쌍</dd><dt>미션</dt><dd>{missionIds.length}개</dd><dt>쪽지</dt><dd>{allowFree ? "직접 쓰기 허용 · 교사 검토" : "준비된 문구만"}</dd></dl></>}
+      {stepError && <p id="round-step-error" className="field-error" role="alert">{stepError}</p>}
+      <div className="action-row">{step > 1 && <button type="button" className="outline" onClick={() => { setStep((value) => value - 1); setError(""); setStepError(""); }}>이전</button>}
+        {step < 4 ? <button type="button" onClick={(event) => {event.preventDefault(); nextStep();}}>다음</button> : <button type="submit" disabled={busy || catalogError}>{busy ? "저장 중…" : "준비 내용 저장"}</button>}</div>
     </form>}
-    {current && <div className="stack"><p><strong>{current.title}</strong> · {roundStatusLabels[current.status] ?? current.status} · {current.participantCount}명</p>
+
+    {view === "rounds" && current && !creating && <div className="stack"><p><strong>{current.title}</strong> · {roundStatusLabels[current.status] ?? current.status} · {current.participantCount}명</p>
+      <p className="field-help">{current.startsAt.slice(0,10)} ~ {current.endsAt.slice(0,10)} · 수업일 {current.activityDates.length}일</p>
+      {["draft","ready"].includes(current.status) && <button className="outline" onClick={() => setCreating(true)}>준비 내용 수정</button>}
       <div className="action-row">
         {current.status === "draft" && <button disabled={busy} onClick={() => void action("prepare")}>조건 확인</button>}
-        {current.status === "ready" && <button disabled={busy} onClick={() => void action("start")}>매칭하고 시작</button>}
-        {current.status === "active" && <><button disabled={busy} onClick={() => void action("pause")}>일시정지</button><button disabled={busy} onClick={() => void action("end")}>활동 종료</button></>}
-        {current.status === "paused" && <><button disabled={busy} onClick={() => void action("resume")}>재개</button><button disabled={busy} onClick={() => void action("end")}>활동 종료</button></>}
-        {current.status === "reveal_pending" && <button disabled={busy} onClick={() => void action("reveal")}>정체 공개 승인</button>}
+        {current.status === "ready" && <button disabled={busy} onClick={() => askAction("start")}>매칭하고 시작</button>}
+        {current.status === "active" && <><button disabled={busy} onClick={() => void action("pause")}>일시정지</button><button className="danger" disabled={busy} onClick={() => askAction("end")}>활동 종료</button></>}
+        {current.status === "paused" && <><button disabled={busy} onClick={() => void action("resume")}>재개</button><button className="danger" disabled={busy} onClick={() => askAction("end")}>활동 종료</button></>}
+        {current.status === "reveal_pending" && <button disabled={busy} onClick={() => askAction("reveal")}>정체 공개 승인</button>}
         {["revealed", "cancelled"].includes(current.status) && <button disabled={busy} onClick={() => void action("archive")}>보관하고 다음 회차 준비</button>}
-        {["draft", "ready", "active", "paused"].includes(current.status) && <button className="outline" disabled={busy} onClick={() => void action("cancel")}>회차 취소</button>}
+        {["draft", "ready", "active", "paused"].includes(current.status) && <button className="danger" disabled={busy} onClick={() => askAction("cancel")}>회차 취소</button>}
       </div>
       {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료 시각<input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 5일 또는 10일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:new Date(end).toISOString(), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
-      {["revealed", "archived", "cancelled"].includes(current.status) && <div className="review-card"><label>다음 회차 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정만 복사해 새 회차 만들기</button></div>}
-      <button className="small outline" disabled={busy} onClick={() => void loadOverview(current.roundId)}>현황 새로고침</button>
-      {overview && <>
-        <h3>1. 도움 요청</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {helpCategoryLabels[h.category] ?? h.category}</strong><p>{h.note}</p>{h.messageId && <><button className="small outline" disabled={busy} onClick={() => void inspectMessage(h.messageId!)}>신고 쪽지 원문 확인</button>{safetyMessages[h.messageId] && <p>발신 {safetyMessages[h.messageId].senderName} → 수신 {safetyMessages[h.messageId].receiverName}: {safetyMessages[h.messageId].text}</p>}</>}<input aria-label={`${h.studentName} 처리 내용`} placeholder="처리 내용" value={resolution[h.helpId] ?? ""} onChange={(e) => setResolution((old) => ({...old, [h.helpId]: e.target.value}))} /><button disabled={busy || !resolution[h.helpId]} onClick={() => void resolve(h.helpId)}>처리 완료</button></div>)}
-        <h3>2. 검토할 쪽지</h3>{overview.pendingMessages.length === 0 ? <p>대기 중인 쪽지가 없어요.</p> : overview.pendingMessages.map((m) => <div className="review-card" key={m.messageId}><strong>{m.senderName} → {m.receiverName}</strong><p>{m.text}</p><button disabled={busy} onClick={() => void review(m.messageId, "approve")}>승인</button><button className="outline" disabled={busy} onClick={() => void review(m.messageId, "reject")}>반려</button></div>)}
-        <h3>3. 접속·활동 확인</h3><p className="help">학생별 지원을 위한 비공개 정보예요. 점수나 순위로 사용하지 마세요.</p><ul className="member-list">{overview.participation.map((p) => <li key={p.studentUid}><span>{p.displayName} · {participationLabels[p.status] ?? p.status}<small>{p.accessStatus === "active" ? "입장 가능" : "입장 제한"} · {p.lastLoginAt ? `최근 입장 ${new Date(p.lastLoginAt).toLocaleDateString("ko-KR")}` : "입장 기록 없음"} · {p.hasActivity ? "활동 기록 있음" : "활동 기록 없음"}</small></span>{p.status === "active" && ["active", "paused", "reveal_pending"].includes(current.status) && <button className="small outline" disabled={busy} onClick={() => void stop(p.studentUid)}>참여 중단</button>}</li>)}</ul>
-        <h3>4. 일정</h3><p>{overview.activityDates.join(", ")}</p>
-      </>}
+      {current.status === "reveal_pending" && summary && (summary.helpCount + summary.pendingMessageCount > 0) && <p className="message error">도움 요청 {summary.helpCount}건과 검토할 쪽지 {summary.pendingMessageCount}건을 처리한 뒤 공개해 주세요. <button className="small outline" onClick={() => onNavigate("safety")}>안전 확인으로</button></p>}
       {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => { if (assignments) { assignmentRequest.current++; setAssignments(null); return; } const version = ++assignmentRequest.current; void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); if (version === assignmentRequest.current && document.visibilityState === "visible") setAssignments(result.assignments); }); }}>{assignments ? "배정표 가리기" : "안전 대응용 배정표 열람"}</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}
     </div>}
+
+    {view === "safety" && <div className="stack">
+      {!current ? <p>진행 중인 활동이 없어요. 지난 회차는 회차 목록에서 확인해 주세요.</p> : <><p><strong>{current.title}</strong> · {roundStatusLabels[current.status] ?? current.status}</p>
+        <button className="small outline" disabled={busy} onClick={() => void loadOverview(current.roundId).catch(() => setOverviewError(true))}>안전 목록 새로고침</button>
+        {overviewError && <p className="message error" role="alert">목록을 불러오지 못했어요. 다시 시도해 주세요.</p>}
+        {!overview && !overviewError && <p>안전 목록을 불러오는 중이에요…</p>}
+        {overview && <><h3>도움 요청 · {overview.helps.length}건</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {helpCategoryLabels[h.category] ?? h.category}</strong><button className="small outline" onClick={() => {setOpenHelpId((old) => old === h.helpId ? null : h.helpId); setOpenReviewMessageId(null); setSafetyMessages({});}}>{openHelpId === h.helpId ? "내용 닫기" : "내용 확인"}</button>{openHelpId === h.helpId && <><p>{h.note}</p>
+          {h.messageId && <><button className="small outline" disabled={busy} onClick={() => safetyMessages[h.messageId!] ? setSafetyMessages((old) => { const next = {...old}; delete next[h.messageId!]; return next; }) : void inspectMessage(h.messageId!)}>{safetyMessages[h.messageId] ? "원문 닫기" : "신고 쪽지 원문 확인"}</button>
+            {safetyMessages[h.messageId] && <p className="safety-secret">발신 {safetyMessages[h.messageId].senderName} → 수신 {safetyMessages[h.messageId].receiverName}: {safetyMessages[h.messageId].text}</p>}</>}
+          <label>처리 내용<input value={resolution[h.helpId] ?? ""} onChange={(e) => setResolution((old) => ({...old, [h.helpId]: e.target.value}))} /></label><button disabled={busy || !resolution[h.helpId]?.trim()} onClick={() => void resolve(h.helpId)}>처리 완료</button></>}</div>)}
+          <h3>검토할 쪽지 · {overview.pendingMessages.length}건</h3>{overview.pendingMessages.length === 0 ? <p>대기 중인 쪽지가 없어요.</p> : overview.pendingMessages.map((m,index) => <div className="review-card" key={m.messageId}><strong>검토할 쪽지 {index + 1}</strong><button className="small outline" onClick={() => {setOpenReviewMessageId((old) => old === m.messageId ? null : m.messageId); setOpenHelpId(null); setSafetyMessages({});}}>{openReviewMessageId === m.messageId ? "원문 닫기" : "원문 확인"}</button>{openReviewMessageId === m.messageId && <><p>{m.senderName} → {m.receiverName}</p><p>{m.text}</p><button disabled={busy} onClick={() => void review(m.messageId, "approve")}>승인</button><button className="outline" disabled={busy} onClick={() => void review(m.messageId, "reject")}>반려</button></>}</div>)}
+          <h3>접속·활동 지원</h3><p className="field-help">학생별 지원을 위한 비공개 정보예요. 점수나 순위로 사용하지 마세요.</p><ul className="member-list">{overview.participation.map((p) => <li key={p.studentUid}><span>{p.displayName} · {participationLabels[p.status] ?? p.status}<small>{p.accessStatus === "active" ? "입장 가능" : "입장 제한"} · {p.lastLoginAt ? `최근 입장 ${new Date(p.lastLoginAt).toLocaleDateString("ko-KR")}` : "입장 기록 없음"} · {p.hasActivity ? "활동 기록 있음" : "활동 기록 없음"}</small></span>{p.status === "active" && ["active", "paused", "reveal_pending"].includes(current.status) && <button className="small outline" disabled={busy} onClick={() => askAction("stop", p.studentUid)}>참여 중단</button>}</li>)}</ul></>}
+      </>}
+    </div>}
+
+    {view === "history" && <div className="round-list">{rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).length === 0 ? <p>지난 활동이 없어요.</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).map((round) => <button key={round.roundId} onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong><small>{roundStatusLabels[round.status]} · {round.startsAt.slice(0,10)} ~ {round.endsAt.slice(0,10)}</small></button>)}
+      {current && ["revealed","archived","cancelled"].includes(current.status) && <div className="review-card"><h3>{current.title} · {roundStatusLabels[current.status]}</h3><p>주제·참가자·미션·쪽지 설정만 다음 회차에 복사합니다. 이전 배정과 활동 기록은 복사하지 않아요.</p><label>다음 회차 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정 복사해 새 회차 준비</button></div>}</div>}
+    {confirmation && <ConfirmDialog title={confirmation.title} detail={confirmation.detail} confirmLabel={confirmation.button} busy={busy} onCancel={() => setConfirmAction(null)} onConfirm={confirmedAction} />}
   </section>;
 }

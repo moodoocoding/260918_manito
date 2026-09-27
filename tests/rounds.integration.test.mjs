@@ -115,12 +115,16 @@ test("four students complete two isolated rounds with review, help, reveal and h
   assert.ok(assignments.every((a)=>a.giverUid!==a.receiverUid));
   const firstHome = await students[0].call("getStudentHome",null);
   assert.equal(firstHome.round.status,"active");
+  assert.equal(firstHome.gradeBand,"middle");
   const ownDataPath = `classes/${classId}/rounds/${roundId}/studentData/${ids[0]}`;
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/assignmentSecrets/${ids[0]}`)));
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/studentData/${ids[1]}`)));
   await assert.rejects(getDoc(doc(teacher.db,ownDataPath)));
   const activity = await students[0].call("getStudentActivity",null);
   assert.equal(activity.missions.length,3);
+  assert.equal(activity.thankYouSent,false);
+  assert.equal(activity.reflectionText,null);
+  assert.equal(typeof activity.koreaDate,"string");
   await students[0].call("setMissionStatus", {missionId:activity.missions[0].missionId,status:"done"});
   const replaceId = rid();
   await students[0].call("replaceMission", {missionId:activity.missions[1].missionId,requestId:replaceId});
@@ -142,6 +146,13 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const overview = await teacher.call("getTeacherRoundOverview", {classId,roundId});
   assert.equal(overview.pendingMessages.length,1);
   assert.ok(overview.participation.every((item) => item.lastLoginAt));
+  const summary = await teacher.call("getTeacherRoundOverview", {classId,roundId,summaryOnly:true});
+  assert.equal(summary.pendingMessageCount,1);
+  assert.equal(summary.participantCount,4);
+  assert.equal(JSON.stringify(summary).includes("좋은 생각을 알려줘서"),false);
+  assert.equal("pendingMessages" in summary,false);
+  await assert.rejects(other.call("getTeacherRoundOverview",{classId,roundId,summaryOnly:true}),
+    {code:"functions/permission-denied"});
   await teacher.call("reviewMessage",{classId,roundId,messageId:free.messageId,decision:"approve",requestId:rid()});
   await receiver0.call("createHelpRequest", {category:"message",messageId:firstMsg.messageId,requestId:rid()});
   const reported = await teacher.call("getMessageForReview",{classId,roundId,messageId:firstMsg.messageId});
@@ -172,6 +183,9 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await assert.rejects(students[0].call("sendThankYou",{text:"나를 챙겨 줘서 고마워!",requestId:thanksId}),
     {code:"functions/already-exists"});
   await students[0].call("saveReflection",{text:"친구의 이야기를 들어 주었다."});
+  const reflected = await students[0].call("getStudentActivity",{roundId});
+  assert.equal(reflected.reflectionText,"친구의 이야기를 들어 주었다.");
+  assert.equal(reflected.thankYouSent,true);
   assert.equal((await students[0].call("listStudentRounds",null)).rounds[0].roundId,roundId);
   const second = await teacher.call("copyRoundSettings", {classId,sourceRoundId:roundId,
     title:"두 번째 작전",startsAt:new Date(Date.now()-3600_000).toISOString(),

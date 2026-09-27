@@ -20,9 +20,10 @@ export const getStudentHome = onCall( async (request) => {
   ) throw new HttpsError("permission-denied", "입장 카드가 변경되었어요. 선생님께 확인해 주세요.");
 
   const roundId = classSnapshot.get("activeRoundId") ?? classSnapshot.get("lastRoundId");
+  const gradeBand = classSnapshot.get("gradeBand") as string;
   if (typeof roundId !== "string") {
     return { displayName: memberSnapshot.get("displayName") as string,
-      className: classSnapshot.get("name") as string, round: null };
+      className: classSnapshot.get("name") as string, gradeBand, round: null };
   }
   const [round, participation, view] = await Promise.all([
     db.doc(`classes/${classId}/rounds/${roundId}`).get(),
@@ -33,12 +34,13 @@ export const getStudentHome = onCall( async (request) => {
     || (classSnapshot.get("activeRoundId") !== roundId
       && !["revealed", "archived"].includes(round.get("status")))) {
     return { displayName: memberSnapshot.get("displayName") as string,
-      className: classSnapshot.get("name") as string, round: null };
+      className: classSnapshot.get("name") as string, gradeBand, round: null };
   }
   const roundStatus = round.get("status") as string;
   return {
     displayName: memberSnapshot.get("displayName") as string,
     className: classSnapshot.get("name") as string,
+    gradeBand,
     round: {
       title: round.get("title") as string,
       status: roundStatus,

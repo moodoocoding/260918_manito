@@ -21,18 +21,28 @@ export const getStudentActivity = onCall(async (request) => {
   const student = await requireStudentRound(request, typeof input.roundId === "string"
     ? requireDocumentId(input.roundId, "회차") : undefined);
   const dataRef = student.roundRef.collection("studentData").doc(student.uid);
-  const [view, missions, inbox, sent, help] = await Promise.all([
+  const today = koreaDate();
+  const [view, missions, inbox, sent, help, day, reflection, thankYou] = await Promise.all([
     dataRef.get(),
     dataRef.collection("missions").get(), dataRef.collection("inboxItems").get(),
     dataRef.collection("sentMessages").get(), dataRef.collection("helpRequests").get(),
+    student.roundRef.collection("messageDays").doc(`${student.uid}_${today}`).get(),
+    dataRef.collection("reflection").doc("mine").get(),
+    student.roundRef.collection("thankYouSecrets").doc(student.uid).get(),
   ]);
+  const activityDates = student.roundDoc.get("activityDates") as string[];
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
     title: student.roundDoc.get("title"),
     targetDisplayName: view.get("targetDisplayName") ?? null,
     incomingDisplayName: view.get("incomingDisplayName") ?? null,
-    activityDates: student.roundDoc.get("activityDates") as string[],
+    activityDates,
     canSubmit: activeForSubmission(student.roundDoc),
+    koreaDate: today,
+    canSendMessage: activeForSubmission(student.roundDoc) && activityDates.includes(today) && !day.exists,
+    nextActivityDate: activityDates.filter((date) => date > today).sort()[0] ?? null,
+    reflectionText: reflection.exists ? reflection.get("text") as string : null,
+    thankYouSent: thankYou.exists,
     allowFreeTextMessages: student.roundDoc.get("allowFreeTextMessages") === true,
     presetMessages,
     missions: missions.docs.map((doc) => ({ missionId: doc.id, text: doc.get("text"), status: doc.get("status") })),
@@ -292,6 +302,15 @@ export const getTeacherRoundOverview = onCall(async (request) => {
   const classId = requireDocumentId(input.classId, "학급");
   const roundId = requireDocumentId(input.roundId, "회차");
   const { classRef, roundRef, roundDoc } = await requireTeacherRound(teacherUid, classId, roundId);
+  if (input.summaryOnly === true) {
+    const [helps, messages, participants] = await Promise.all([
+      roundRef.collection("helpSecrets").where("status", "==", "open").get(),
+      roundRef.collection("messageSecrets").where("status", "==", "pending").get(),
+      roundRef.collection("participants").get(),
+    ]);
+    return { roundId, status: roundDoc.get("status"), activityDates: roundDoc.get("activityDates"),
+      helpCount: helps.size, pendingMessageCount: messages.size, participantCount: participants.size };
+  }
   const [helps, messages, participants, members] = await Promise.all([
     roundRef.collection("helpSecrets").get(), roundRef.collection("messageSecrets").get(),
     roundRef.collection("participants").get(), classRef.collection("members").get(),

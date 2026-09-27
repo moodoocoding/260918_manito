@@ -150,7 +150,7 @@ test("teacher creates a class, registers students, and rotates a student card", 
   await signInWithCustomToken(studentAuth, login.data.customToken);
   const getStudentHome = httpsCallable(studentFunctions, "getStudentHome");
   assert.deepEqual((await getStudentHome()).data, {
-    displayName: "가람", className: "별빛반", round: null,
+    displayName: "가람", className: "별빛반", gradeBand: "middle", round: null,
   });
 
   const studentDb = getFirestore(studentApp);

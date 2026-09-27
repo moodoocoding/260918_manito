@@ -4,3 +4,95 @@
 .message.development-notice{background:#fff1ce;border:1px solid #e5c576;color:#594513;font-size:.94rem;line-height:1.55}
 .card-secret{display:block;margin-top:8px;padding:8px 10px;border-radius:8px;background:#fff1ce;color:#493a1a;font-size:1rem;letter-spacing:.06em;user-select:all}
 .student-activities .small{font-size:1rem;min-height:48px}
+
+/* Shared interaction and layout system */
+button{background:#b94440}
+button:disabled{cursor:not-allowed}
+button[aria-busy="true"]{cursor:wait}
+.outline{border-color:#b77e76;color:#8d302b}
+.secondary{background:#276585}
+.danger{background:#862e33}
+.nav-active{color:#8d302b;border-color:#d7a59d}
+.topbar,.content{max-width:1320px}
+.topbar{padding-block:14px}
+.topbar>.small:first-of-type{margin-left:auto}
+.content{padding-top:18px}
+.teacher-layout{gap:18px}
+.teacher-layout>.panel{border-radius:18px;box-shadow:0 4px 16px #7457360c;padding:24px}
+.teacher-layout>.panel h2{margin-bottom:12px}
+.teacher-layout>.panel label:not(.choice-row){display:block;font-weight:700;margin:16px 0}
+.teacher-layout>.panel label:not(.choice-row) input:not([type="checkbox"]),
+.teacher-layout>.panel label:not(.choice-row) select,
+.teacher-layout>.panel label:not(.choice-row) textarea{display:block;width:100%;max-width:720px;margin-top:8px;padding:12px;border:1px solid #a8aeb8;border-radius:10px;background:white;color:#283449}
+.teacher-shell{display:grid;grid-template-columns:210px minmax(0,1fr);gap:20px;align-items:start}
+.teacher-sidebar{position:sticky;top:12px;background:#fff;border:1px solid #eee0d4;border-radius:18px;padding:14px;display:grid;gap:4px}
+.teacher-sidebar button,.mobile-teacher-menu button{background:transparent;color:#354158;text-align:left;font-weight:650}
+.teacher-sidebar button[aria-current="page"],.mobile-teacher-menu button[aria-current="page"]{background:#fbe5dc;color:#8d302b}
+.teacher-main{min-width:0;display:grid;gap:18px}
+.teacher-context{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.teacher-context h1{margin:0;font-size:clamp(1.55rem,3vw,2rem)}
+.teacher-context p{margin:3px 0;color:#546177}
+.teacher-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.task-card{display:block;border:1px solid #e5d4c8;border-radius:14px;padding:20px;background:#fffaf3;color:#283449;text-align:left;min-width:0}
+.task-card strong{display:block;font-size:1.1rem}
+.task-card span{display:block;color:#52647a;margin-top:8px}
+.task-card:hover{border-color:#b94440;background:#fff2e8;filter:none}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.page-header h2{margin:0}
+.page-header p{margin:8px 0 0;color:#546177}
+.page-actions{display:flex;gap:8px;flex-wrap:wrap}
+.teacher-page-form{max-width:840px}
+.teacher-page-form .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.round-nav{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none;margin:0 0 18px}
+.round-nav li{padding:9px 13px;border-radius:20px;background:#f5eee6;color:#546177;font-weight:700}
+.round-nav li[aria-current="step"]{background:#b94440;color:#fff}
+.round-list{display:grid;gap:12px}
+.round-list button{text-align:left;background:#fff8ef;color:#283449;border:1px solid #ead9c9}
+.round-list button strong,.round-list button small{display:block}
+.round-list button small{margin-top:4px;color:#546177;font-weight:500}
+.participant-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mission-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.choice-row,.teacher-layout>.panel label.choice-row{display:flex;align-items:flex-start;gap:10px;margin:0;padding:12px;min-height:48px;border:1px solid #cbd1d7;border-radius:12px;font-weight:600;color:#283449;background:#fff;cursor:pointer;overflow-wrap:anywhere}
+.teacher-page-form label.choice-row{display:flex;align-items:flex-start;gap:10px;margin:0;padding:12px;min-height:48px}
+.choice-row.is-selected{border-color:#a74d46;background:#fff3ed}
+.choice-row.is-disabled{opacity:.6;cursor:not-allowed}
+.choice-row input,.teacher-layout>.panel label.choice-row input{flex:none;display:block;width:20px;height:20px;min-width:20px;margin:2px 0 0;padding:0;accent-color:#b94440}
+.choice-row span{min-width:0;line-height:1.45}
+.round-panel{min-width:0}
+.round-panel .teacher-page-form fieldset{margin:20px 0;border:1px solid #e5d4c8}
+.field-help{font-size:.9rem;color:#546177;margin:4px 0 10px;line-height:1.5}
+.field-error{color:#8d302b;font-weight:650;margin:6px 0}
+.form-status{font-weight:700;color:#6e3b34}
+.date-list{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}
+.date-list li{display:flex;align-items:center;gap:5px;background:#f5eee6;border-radius:10px;padding:4px 8px}
+.date-list button{min-height:36px;padding:4px 8px}
+.confirm-dialog{max-width:min(440px,calc(100vw - 32px));border:1px solid #cfbcb2;border-radius:20px;padding:24px;color:#283449;box-shadow:0 24px 60px #15191e44}
+.confirm-dialog::backdrop{background:#17233488}
+.confirm-dialog h2{margin-top:0}
+.confirm-dialog p{line-height:1.6}
+.confirm-dialog .action-row{justify-content:flex-end}
+.student-nav{display:flex;gap:8px;flex-wrap:wrap}
+.student-nav button{background:#fff;color:#354158;border:1px solid #e2cfc2}
+.student-nav button[aria-current="page"]{background:#b94440;color:#fff}
+.student-grid{max-width:680px;gap:16px}
+.student-grid .panel{border-radius:22px;padding:24px;box-shadow:0 5px 18px #74573610}
+.student-hero{padding:24px}
+.student-hero h1{font-size:clamp(1.6rem,5vw,2.2rem);margin:8px 0}
+.student-hero p{margin:0;font-size:1rem}
+.student-main-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.student-main-actions button{min-height:48px}
+.mission-list li{padding:15px;border:1px solid #e8d9ca;border-radius:14px;margin:10px 0;background:#fffdf9}
+.student-activities .panel{margin:0}
+.student-activities .panel label,.student-grid .panel label{display:block;font-weight:700;margin:16px 0}
+.student-activities .panel label input,.student-activities .panel label select,.student-activities .panel label textarea,
+.student-grid .panel label input,.student-grid .panel label select,.student-grid .panel label textarea{display:block;width:100%;min-width:0;margin-top:8px;padding:12px;border:1px solid #a8aeb8;border-radius:10px;background:#fff;color:#283449}
+.student-secret{background:#fff0ca;border-radius:14px;padding:16px;display:inline-block;font-size:1.6rem;font-weight:850;min-width:150px;text-align:center}
+.student-page-title{margin:0;font-size:1.55rem}
+.student-shell{display:grid;gap:16px}
+.member-list li>div.member-primary{display:block;flex:1;min-width:0}
+.member-primary .choice-row{width:max-content;max-width:100%}
+.mobile-teacher-menu{display:none}
+@media(max-width:900px){.teacher-shell{grid-template-columns:1fr}.teacher-sidebar{display:none}.mobile-teacher-menu{display:block}.mobile-teacher-menu summary{padding:14px;border:1px solid #dbcabc;border-radius:12px;background:white;font-weight:700;cursor:pointer}.mobile-teacher-menu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;background:white}.teacher-overview-grid{grid-template-columns:1fr}.participant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.topbar{gap:8px}.content{padding-inline:16px}.panel{padding:20px;border-radius:20px}.teacher-layout>.panel{padding:18px}.teacher-page-form .form-grid,.participant-grid,.mission-grid{grid-template-columns:1fr}.section-heading h1{font-size:1.8rem}.student-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.student-nav button{padding-inline:5px}.student-hero{padding:18px}.student-grid .panel{padding:18px}.teacher-context{align-items:flex-start}.action-row button{flex-grow:1}}
+@media(max-width:360px){.brand{white-space:normal}.topbar{padding-inline:14px}.content{padding-inline:12px}.student-nav button{font-size:.9rem}}
+@media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}
