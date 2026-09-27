@@ -35,7 +35,7 @@ Firestore 에뮬레이터는 Java가 필요하다. `.firebaserc`의 `demo-manitt
 
 ## Vercel 배포 준비
 
-Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 루트 디렉터리를 저장소 루트로 설정했다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. Vercel의 빌드 환경 변수에 `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`를 설정하고 `VITE_USE_EMULATORS=false`로 둔다. 현재 변수 이름만 있으며 값은 비어 있다. Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 설정에 등록해야 한다. 값이 빠지면 웹 빌드가 실패하도록 설정했다. 첫 Vercel 배포는 프로젝트 루트가 `web/`로 설정돼 실패했고, 이후 루트 설정을 수정했다. 성공한 웹 배포와 클라우드 인증 검증은 아직 없다.
+Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 루트 디렉터리를 저장소 루트로 설정했다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. Vercel의 빌드 환경 변수에 `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`를 설정하고 `VITE_USE_EMULATORS=false`로 둔다. 현재 변수 이름만 있으며 값은 비어 있다. Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 설정에 등록해야 한다. 값이 빠지면 웹 빌드가 실패하도록 설정했다. 첫 Vercel 빌드의 프로젝트 루트 오류는 수정했으며, 이후 빌드는 빈 Firebase 웹 환경 변수 때문에 실패했다. 성공한 웹 배포와 클라우드 인증 검증은 아직 없다.
 
 ## 다음 구현 순서
 

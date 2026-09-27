@@ -243,3 +243,9 @@
 - GitHub와 연결된 Vercel `manito` 프로젝트의 첫 배포는 프로젝트 루트가 `web/`인 채 저장소 루트용 빌드 명령을 실행해 `No workspaces found: --workspace=web`로 실패했다. Vercel 루트를 저장소 루트로 수정했다. 환경 변수 6개는 이름만 등록돼 값이 비어 있으며, 성공한 웹 배포는 아직 없다.
 - 문서 커밋 `e3cda61`도 GitHub `main`에 푸시했다. 이 커밋으로 실행된 두 번째 Vercel 빌드는 올바른 작업 공간에서 시작했지만 빈 `VITE_FIREBASE_API_KEY` 때문에 실패했다. 저장소 루트 문제는 해결됐고 웹 환경 설정이 다음 차단 조건임을 확인했다.
 - 이 항목의 GitHub 푸시와 Firebase 백엔드 배포는 완료됐지만 Vercel 웹 배포는 별도 상태다. 실제 학생 데이터는 사용하지 않았다.
+
+## 2026-09-27 — GitHub 동기화와 Vercel 상태 재확인
+
+- `git fetch origin` 후 로컬 `main`과 GitHub `origin/main`이 모두 `47ef8f1`로 일치하고 작업 트리가 깨끗한 것을 확인했다.
+- `47ef8f1`에 연결된 Vercel 프로덕션 빌드도 오류 상태임을 확인했다. 앞선 빌드 로그의 차단 원인은 비어 있는 `VITE_FIREBASE_API_KEY`이며, Vercel 환경 변수 6개의 실제 값과 App Check·Google 로그인 설정은 아직 완료되지 않았다.
+- GitHub 커밋 전달과 Firebase 개발 백엔드 배포는 성공 상태다. 접속 가능한 Vercel 웹 배포는 성공으로 기록하지 않는다.
