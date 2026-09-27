@@ -319,7 +319,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       {summary && <><h3>접속·활동 확인</h3><p className="field-help">학생별 지원 현황은 안전 확인에서 비공개로 볼 수 있어요.</p>
         <p>참가 학생 {summary.participantCount ?? activeRound?.participantCount ?? 0}명</p>
         <h3>일정</h3><p>{summary.activityDates.join(" · ") || "수업일 정보가 없어요."}</p></>}
-      <button className="outline" onClick={() => onNavigate("rounds")}>{activeRound ? "진행 회차 자세히 보기" : "새 회차 준비하기"}</button>
+      <div className="overview-next-action"><button className="outline" onClick={() => onNavigate("rounds")}>{activeRound ? "진행 회차 자세히 보기" : "새 회차 준비하기"}</button></div>
     </div>}
 
     {view === "rounds" && !creating && !current && <div className="round-list">

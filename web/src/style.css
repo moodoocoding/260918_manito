@@ -32,6 +32,7 @@ button[aria-busy="true"]{cursor:wait}
 .teacher-context h1{margin:0;font-size:clamp(1.55rem,3vw,2rem)}
 .teacher-context p{margin:3px 0;color:#546177}
 .teacher-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.overview-next-action{margin-top:24px}
 .task-card{display:block;border:1px solid #e5d4c8;border-radius:14px;padding:20px;background:#fffaf3;color:#283449;text-align:left;min-width:0}
 .task-card strong{display:block;font-size:1.1rem}
 .task-card span{display:block;color:#52647a;margin-top:8px}
@@ -39,6 +40,7 @@ button[aria-busy="true"]{cursor:wait}
 .page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .page-header h2{margin:0}
 .page-header p{margin:8px 0 0;color:#546177}
+.teacher-main .page-header + .class-code{margin-top:24px}
 .page-actions{display:flex;gap:8px;flex-wrap:wrap}
 .teacher-main .page-actions label{display:grid;gap:6px;flex:1 1 140px;min-width:0;font-weight:700;color:#354158}
 .teacher-main .page-actions input,.teacher-main .page-actions select{width:100%;min-width:0;min-height:44px;padding:9px 10px;border:1px solid #a8aeb8;border-radius:10px;background:#fff;color:#283449}
