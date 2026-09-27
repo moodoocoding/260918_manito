@@ -263,3 +263,9 @@
 - TypeScript 함수·웹 빌드, 함수 단위 테스트 4개, Firestore Rules 테스트 9개, Emulator 통합 흐름 1개를 통과했다. 빈 공개 환경 변수와 테스트 API 키를 둔 배포형 웹 빌드도 통과했다. `git diff --check`를 통과했다.
 - Firebase 개발 프로젝트 `manito-938cc`의 함수 9개를 갱신 배포했다. 배포된 `loginStudent`에 잘못된 가상 카드로 App Check 없이 호출했을 때 Firebase가 카드 오류 `UNAUTHENTICATED`를 반환해 App Check 선행 거절 없이 함수 코드까지 실행됨을 확인했다. 실제 학생 데이터는 사용하지 않았다.
 - 남은 작업: GitHub 변경 푸시와 Vercel 빌드·화면 확인, Google 로그인 제공업체·허용 도메인 설정, 개발 클라우드의 Custom Token 서명·로그인 검증. D2~D6 기능과 실제 학생 도입 정책은 별도 작업이다.
+
+## 2026-09-27 — GitHub와 Vercel 웹 배포 확인
+
+- App Check 제거와 문서 변경을 커밋 `a229d5f`로 GitHub `moodoocoding/260918_manito`의 `main`에 푸시했다. Firebase 함수 배포와 GitHub 푸시는 각각 성공으로 확인했다.
+- 이 커밋으로 시작된 Vercel `manito` 프로덕션 배포가 Ready 상태가 됐다. `https://manito-one-blond.vercel.app/teacher`에서 선생님 방, `/student`에서 학생 입장 화면이 렌더링됨을 확인했다. 가상 학급·카드 코드를 제출하면 입장 정보 오류가 표시돼 웹에서 개발 Firebase 함수까지 연결됨을 확인했다.
+- 남은 작업: Firebase Auth의 Google 제공업체와 Vercel 허용 도메인, 확인된 가상 교사 계정으로 학급 발급부터 실제 가상 카드 로그인까지 클라우드 검증. D2~D6과 실제 학생 도입 정책은 아직 미완료다.

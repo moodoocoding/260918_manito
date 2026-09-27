@@ -1,6 +1,6 @@
 # 우리 반 비밀친구
 
-초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. D1 첫 입장 웹은 로컬에서 구현·검증해 GitHub에 푸시했고, Firebase 개발 프로젝트에는 계정·학급 함수 9개와 Firestore Rules·인덱스를 배포했다. Vercel 웹 배포는 설정 중이다.
+초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. D1 첫 입장 웹은 [Vercel 개발 사이트](https://manito-one-blond.vercel.app)에 배포했고, Firebase 개발 프로젝트에는 계정·학급 함수 9개와 Firestore Rules·인덱스를 배포했다. 실제 학생 대상 운영과 회차 기능은 아직 준비 중이다.
 
 ## 현재 구성
 
@@ -35,7 +35,7 @@ Firestore 에뮬레이터는 Java가 필요하다. `.firebaserc`의 `demo-manitt
 
 ## Vercel 배포 준비
 
-Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 루트 디렉터리를 저장소 루트로 설정했다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. `VITE_FIREBASE_API_KEY`는 Vercel의 Production·Preview에 Config 변수로 등록했다. 개발 Firebase 프로젝트의 공개 `authDomain`·`projectId`·`appId`는 코드의 기본값을 사용한다. 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`로 모두 설정해야 한다. App Check와 reCAPTCHA 설정은 요구하지 않는다. 교사 로그인에는 Vercel 도메인을 Firebase Auth 허용 도메인에 추가하고 Google 로그인 제공업체를 켜야 한다.
+Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 `main`의 `a229d5f` 배포가 Ready 상태다. [학생 입장](https://manito-one-blond.vercel.app/student)과 [선생님 방](https://manito-one-blond.vercel.app/teacher)의 렌더링, 가상 카드의 오류 응답을 확인했다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. 개발 Firebase 웹 앱 `manito-web-dev`의 `VITE_FIREBASE_API_KEY`는 Vercel Production·Preview의 Config 변수로 등록했다. 개발 프로젝트의 공개 `authDomain`·`projectId`·`appId`는 코드의 기본값을 사용한다. 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`로 모두 설정해야 한다. App Check와 reCAPTCHA 설정은 요구하지 않는다. 교사 로그인에는 Vercel 도메인을 Firebase Auth 허용 도메인에 추가하고 Google 로그인 제공업체를 켜야 한다.
 
 ## 다음 구현 순서
 
@@ -46,4 +46,4 @@ Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 루트 디렉�
 5. D5: 공개·감사·회고·다음 회차·보관·삭제와 학생 도입 준비
 6. D6: 가상 학급 두 회차 E2E, 공용기기·접근성·장애 검증 후 비공개 시범 준비
 
-첫 시연 목표는 **교사 승인 → 학급·학생 등록 → 카드 인쇄 → 학생 로그인 → 준비 안내 → 안전한 로그아웃**이다. 로컬 Emulator에서 학생 입장·로그아웃을 확인했다. Vercel 웹 배포, Google 로그인 설정, 개발 클라우드의 토큰 서명 권한 검증은 아직 남아 있다.
+첫 시연 목표는 **교사 승인 → 학급·학생 등록 → 카드 인쇄 → 학생 로그인 → 준비 안내 → 안전한 로그아웃**이다. 로컬 Emulator에서 학생 입장·로그아웃을 확인했다. Vercel 화면은 배포됐으며 Google 로그인 설정, 개발 클라우드의 토큰 서명 권한과 실제 카드 로그인 검증은 아직 남아 있다.

@@ -89,7 +89,7 @@ Firebase Console에서도 아래 항목을 확인한다.
 
 ## 5. 프런트엔드 연결 전 필요한 작업
 
-백엔드 배포만으로 사용자가 접속할 웹사이트가 생기지는 않는다. 교사용·학생용 첫 입장 웹은 `web/`에 로컬 구현했으며, 배포 대상은 Vercel이다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. 공개할 Vercel 도메인을 Firebase Auth 허용 도메인에 추가한 뒤 가상 계정으로 확인한다. 현재 Vercel과 Firebase 개발 클라우드의 연결은 아직 검증하지 않았다.
+교사용·학생용 첫 입장 웹은 `web/`에 구현해 [Vercel 개발 사이트](https://manito-one-blond.vercel.app)에 배포했다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. 화면 렌더링과 가상 카드 오류 응답은 확인했다. 교사 로그인을 위한 Google 제공업체와 Firebase Auth 허용 도메인, 개발 클라우드 Custom Token 서명은 아직 확인해야 한다.
 
 프로덕션 공개 전에는 개발 프로젝트의 전체 흐름을 검증한 뒤 별도 운영 프로젝트를 만들고 같은 방식으로 배포한다. 개발 데이터와 실제 학생 데이터를 한 프로젝트에 섞지 않는다.
 
