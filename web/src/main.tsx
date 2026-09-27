@@ -26,6 +26,7 @@ function errorText(error: unknown): string {
     if (code.includes("unavailable")) return "연결을 확인하고 다시 시도해 주세요.";
     if (code.includes("unauthenticated")) return "입장 정보를 다시 확인해 주세요.";
     if (code.includes("already-exists")) return "같은 요청 번호가 다른 작업에 사용되었어요. 다시 시작해 주세요.";
+    if (code.includes("internal")) return "서비스에 문제가 생겼어요. 잠시 뒤 다시 시도하거나 선생님께 알려 주세요.";
   }
   return error instanceof Error ? error.message : "처리하지 못했어요. 다시 시도해 주세요.";
 }
