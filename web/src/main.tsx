@@ -42,6 +42,7 @@ function App() {
   const [selected, setSelected] = useState<ClassInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
+  const [visibleCardUid, setVisibleCardUid] = useState<string | null>(null);
   const [printCard, setPrintCard] = useState<Card | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
   const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([]);
@@ -62,7 +63,7 @@ function App() {
   const clearPrivate = useCallback(() => {
     generation.current += 1;
     setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
-    setCards([]); setPrintCard(null); setHome(null); setTargetVisible(false);
+    setCards([]); setPrintCard(null); setVisibleCardUid(null); setHome(null); setTargetVisible(false);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
     setCardCodeInput(""); setClassCodeInput("");
   }, []);
@@ -154,6 +155,13 @@ function App() {
     return () => { document.removeEventListener("visibilitychange", resume); window.removeEventListener("pageshow", resume); };
   }, [role, loadStudent, exit]);
 
+  useEffect(() => {
+    if (role !== "teacher") return;
+    const hideCard = () => { if (document.visibilityState !== "visible") setVisibleCardUid(null); };
+    document.addEventListener("visibilitychange", hideCard);
+    return () => document.removeEventListener("visibilitychange", hideCard);
+  }, [role]);
+
   function navigate(next: "student" | "teacher") {
     history.pushState(null, "", next === "teacher" ? "/teacher" : "/student");
     setRoute(next); setError(""); setNotice(""); setTargetVisible(false);
@@ -168,7 +176,7 @@ function App() {
   async function selectClass(classId: string) {
     await task(async () => {
       const current = generation.current;
-      setCards([]); setPrintCard(null); setDeleteName("");
+      setCards([]); setPrintCard(null); setVisibleCardUid(null); setDeleteName("");
       const info = await call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
       const result = await getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey")));
       if (current !== generation.current) return;
@@ -208,7 +216,7 @@ function App() {
       });
       pendingRegistration.current = null;
       setCards(result.students); setNamesInput("");
-      await selectClass(selected.classId);
+      await loadTeacher(); await selectClass(selected.classId);
       setCards(result.students);
       setNotice(result.requiresCredentialRotation ? "등록은 완료됐지만 카드 원문을 다시 볼 수 없어요. 학생별로 재발급해 주세요." : "학생을 등록했어요. 카드는 지금 개별 인쇄해 주세요.");
     });
@@ -223,6 +231,7 @@ function App() {
       setCards((old) => [...old.filter((card) => card.studentUid !== member.studentUid), {
         studentUid: member.studentUid, displayName: member.displayName, cardCode: result.cardCode,
       }]);
+      setVisibleCardUid(null);
       setNotice(`${member.displayName} 학생의 카드를 재발급했어요. 이전 카드는 사용할 수 없어요.`);
     });
   }
@@ -267,6 +276,9 @@ function App() {
     </header>
 
     <main className="content no-print">
+      <div className="message development-notice" role="note">
+        개발 검증 중인 사이트입니다. 개인정보 처리방침과 학교 운영 절차가 확정되기 전에는 실제 학생의 이름·활동 내용을 입력하지 마세요.
+      </div>
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
@@ -315,7 +327,7 @@ function App() {
               <h3>학생 등록</h3><form onSubmit={(event) => void register(event)} className="stack"><label>이름을 한 줄에 한 명씩<textarea rows={5} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>
               <h3>학생 카드 관리</h3>{members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요.</p> : <ul className="member-list">{members.map((member) => {
                 const card = cards.find((item) => item.studentUid === member.studentUid);
-                return <li key={member.studentUid}><span>{member.displayName}<small>{member.accessStatus === "active" ? "입장 가능" : "입장 제한"}</small></span><div>{card?.cardCode && <button className="small outline" onClick={() => print(card)}>카드 인쇄</button>}<button className="small outline" disabled={busy} onClick={() => void rotate(member)}>재발급</button><button className="small outline" disabled={busy} onClick={() => void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div></li>;
+                return <li key={member.studentUid}><span>{member.displayName}<small>{member.accessStatus === "active" ? "입장 가능" : "입장 제한"}</small>{card?.cardCode && visibleCardUid === member.studentUid && <code className="card-secret">{card.cardCode}</code>}</span><div>{card?.cardCode && <><button className="small outline" onClick={() => setVisibleCardUid((current) => current === member.studentUid ? null : member.studentUid)}>{visibleCardUid === member.studentUid ? "코드 가리기" : "코드 확인"}</button><button className="small outline" onClick={() => print(card)}>카드 인쇄</button></>}<button className="small outline" disabled={busy} onClick={() => void rotate(member)}>재발급</button><button className="small outline" disabled={busy} onClick={() => void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div></li>;
               })}</ul>}
               {cards.length > 0 && <p className="help">카드 코드는 이 화면을 떠나면 다시 볼 수 없어요. 분실하면 새 카드로 재발급해 주세요.</p>}
             </> : <p className="muted">왼쪽에서 학급을 선택하거나 새로 만들어 주세요.</p>}
