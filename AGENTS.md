@@ -113,7 +113,7 @@
 
 ## 현재 구현 범위
 
-2026-09-27 기준 개발 프로젝트 `manito-938cc`에는 D1~D5와 추가 안전·정보 요청 접수 함수 총 40개, Firestore Rules·인덱스가 배포돼 있다. 웹의 최신 화면은 GitHub 푸시 후 Vercel 배포 상태를 별도로 확인한다. 가상 학급 두 회차와 40명 매칭은 로컬 에뮬레이터에서 검증했다. 배포·검증 상태는 작업일지 최신 항목을 확인한다.
+2026-09-27 기준 개발 프로젝트 `manito-938cc`에는 D1~D5와 추가 안전·정보 요청 접수 함수 총 40개, Firestore Rules·인덱스가 배포돼 있다. 최신 웹 커밋은 GitHub `main`과 Vercel Production에서 확인했다. 가상 학급 두 회차와 40명 매칭, 인증 후 학생 브라우저 흐름은 로컬 에뮬레이터에서 검증했다. 배포·검증 상태는 작업일지 최신 항목을 확인한다.
 
 - 구현·배포 완료: Firestore 스키마·규칙·인덱스, 기존 함수 4개와 `getTeacherStatus`, `listClasses`, `getClassAccessInfo`, `getStudentHome`, `setStudentAccess`. 개발 Firebase 웹 앱도 등록했다.
 - 웹 코드: 교사·학생 첫 입장, 학급·카드 관리, 학생 홈과 로그아웃, B-01~03·05 보강, Vercel 정적 배포 설정. 로컬 Emulator에서 검증했으며 개발 클라우드와 웹 연결은 미검증이다.
