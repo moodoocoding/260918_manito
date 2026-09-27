@@ -73,10 +73,10 @@ export function parseRoundInput(value: unknown): {
     throw new HttpsError("invalid-argument", "자유 쪽지 허용 여부를 정해 주세요.");
   }
   const missionIds = input.missionIds === undefined ? [] : input.missionIds;
-  if (!Array.isArray(missionIds) || ![0, 3].includes(missionIds.length)
+  if (!Array.isArray(missionIds) || missionIds.length > 80
     || new Set(missionIds).size !== missionIds.length
     || missionIds.some((id) => typeof id !== "string" || !/^[A-Za-z0-9_-]{3,40}$/.test(id))) {
-    throw new HttpsError("invalid-argument", "서로 다른 미션 3개를 선택해 주세요.");
+    throw new HttpsError("invalid-argument", "서로 다른 미션을 1~80개 선택해 주세요.");
   }
   return {
     title, startsAt, endsAt, activityDates, participantIds, excludedPairs,

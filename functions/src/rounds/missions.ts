@@ -146,11 +146,15 @@ export const setMissionStatus = onCall(async (request) => {
     const [round, participant, mission] = await Promise.all([
       tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)), tx.get(missionRef),
     ]);
+    const planned = (round.get("missionPlan") as Array<{missionId: string; text: string}> | undefined)
+      ?.find((item) => item.missionId === missionId);
     if (round.get("status") !== "active" || round.get("endsAt").toDate() <= new Date()
-      || participant.get("participationStatus") !== "active" || !mission.exists) {
+      || participant.get("participationStatus") !== "active" || (!mission.exists && !planned)) {
       throw new HttpsError("failed-precondition", "이 미션을 변경할 수 없어요.");
     }
-    tx.update(missionRef, { status: input.status, updatedAt: FieldValue.serverTimestamp() });
+    if (mission.exists) tx.update(missionRef, {status: input.status, updatedAt: FieldValue.serverTimestamp()});
+    else tx.create(missionRef, {text: planned!.text, status: input.status, replacementCount: 0,
+      createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
     return { missionId, status: input.status };
   });
 });
@@ -174,19 +178,25 @@ export const replaceMission = onCall(async (request) => {
       assertSameCommand(command.data(), "replaceMission", student.uid, fingerprint);
       return command.get("result") as { missionId: string; text: string };
     }
+    const plan = round.get("missionPlan") as Array<{missionId: string; text: string}> | undefined;
+    const planned = plan?.find((item) => item.missionId === missionId);
+    const status = mission.exists ? mission.get("status") : planned ? "todo" : null;
+    const replacementCount = Number(mission.exists ? mission.get("replacementCount") ?? 0 : 0);
     if (round.get("status") !== "active" || round.get("endsAt").toDate() <= new Date()
-      || participant.get("participationStatus") !== "active" || !mission.exists
-      || mission.get("status") !== "todo" || Number(mission.get("replacementCount") ?? 0) >= 2) {
+      || participant.get("participationStatus") !== "active" || status !== "todo"
+      || replacementCount >= 2) {
       throw new HttpsError("failed-precondition", "이 미션은 더 바꿀 수 없어요.");
     }
-    const used = new Set(all.docs.map((doc) => doc.id));
+    const used = new Set([...(plan?.map((item) => item.missionId) ?? []), ...all.docs.map((doc) => doc.id)]);
     const candidate = builtInMissions(gradeBand).map((item) => item.missionId)
       .find((id) => !used.has(id));
     if (!candidate) throw new HttpsError("failed-precondition", "교체할 미션이 없어요.");
     const text = missionText(gradeBand, candidate)!;
     const result = { missionId: candidate, text };
-    tx.update(missionRef, { status: "replaced", updatedAt: FieldValue.serverTimestamp() });
-    tx.create(missionRef.parent.doc(candidate), { text, status: "todo", replacementCount: Number(mission.get("replacementCount") ?? 0) + 1,
+    if (mission.exists) tx.update(missionRef, {status: "replaced", updatedAt: FieldValue.serverTimestamp()});
+    else tx.create(missionRef, {text: planned!.text, status: "replaced", replacementCount: 0,
+      createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
+    tx.create(missionRef.parent.doc(candidate), { text, status: "todo", replacementCount: replacementCount + 1,
       assignedDate: koreaDate(), createdAt: FieldValue.serverTimestamp() });
     tx.create(commandRef, { type: "replaceMission", requestedBy: student.uid,
       inputFingerprint: fingerprint, missionId, result, createdAt: FieldValue.serverTimestamp() });

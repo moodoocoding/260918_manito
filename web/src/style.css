@@ -71,6 +71,8 @@ button[aria-busy="true"]{cursor:wait}
 .review-summary>div{min-width:0;padding:16px;background:#fffaf4;border:1px solid #eadfd3;border-radius:14px}
 .review-summary dt{font-size:.88rem;color:#52647a;font-weight:700;margin:0 0 7px}
 .review-summary dd{min-width:0;margin:0;color:#283449;line-height:1.5;overflow-wrap:anywhere}
+.mission-review-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin:10px 0 0;padding-left:24px}
+.mission-review-list li{min-width:0;padding-left:2px}
 .review-summary>div:first-child,.review-summary>div:nth-child(6),.review-summary>div:last-child{grid-column:1/-1}
 .monitored-list{display:grid;gap:10px}
 .monitored-list .review-card{margin:0}
@@ -149,7 +151,7 @@ button[aria-busy="true"]{cursor:wait}
 .mobile-teacher-menu{display:none}
 @media(max-width:900px){.teacher-shell{grid-template-columns:1fr}.teacher-sidebar{display:none}.mobile-teacher-menu{display:block}.mobile-teacher-menu summary{padding:14px;border:1px solid #dbcabc;border-radius:12px;background:white;font-weight:700;cursor:pointer}.mobile-teacher-menu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;background:white}.teacher-overview-grid{grid-template-columns:1fr}.participant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.student-card-list{grid-template-columns:1fr}}
-@media(max-width:600px){.topbar{gap:8px}.content{padding-inline:16px}.panel{padding:20px;border-radius:20px}.teacher-layout>.panel{padding:18px}.teacher-page-form .form-grid,.participant-grid,.mission-grid,.review-summary{grid-template-columns:1fr}.review-summary>div{grid-column:1/-1}.section-heading h1{font-size:1.8rem}.student-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.student-nav button{padding-inline:5px}.student-hero{padding:18px}.student-grid .panel{padding:18px}.teacher-context{align-items:flex-start}.action-row button{flex-grow:1}}
+@media(max-width:600px){.topbar{gap:8px}.content{padding-inline:16px}.panel{padding:20px;border-radius:20px}.teacher-layout>.panel{padding:18px}.teacher-page-form .form-grid,.participant-grid,.mission-grid,.mission-review-list,.review-summary{grid-template-columns:1fr}.review-summary>div{grid-column:1/-1}.section-heading h1{font-size:1.8rem}.student-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.student-nav button{padding-inline:5px}.student-hero{padding:18px}.student-grid .panel{padding:18px}.teacher-context{align-items:flex-start}.action-row button{flex-grow:1}}
 @media(max-width:360px){.brand{white-space:normal}.topbar{padding-inline:14px}.content{padding-inline:12px}.student-nav button{font-size:.9rem}}
 @media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}
 @page{size:A4;margin:14mm}

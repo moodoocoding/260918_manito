@@ -32,6 +32,14 @@ export const getStudentActivity = onCall(async (request) => {
     student.roundRef.collection("thankYouSecrets").doc(student.uid).get(),
   ]);
   const activityDates = student.roundDoc.get("activityDates") as string[];
+  const missionPlan = student.roundDoc.get("missionPlan") as Array<{missionId: string; text: string}> | undefined;
+  const missionRecords = new Map(missions.docs.map((doc) => [doc.id, doc]));
+  const visibleMissions = missionPlan
+    ? [...missionPlan.map(({missionId, text}) => ({missionId, text,
+      status: missionRecords.get(missionId)?.get("status") ?? "todo"})),
+      ...missions.docs.filter((doc) => !missionPlan.some((item) => item.missionId === doc.id))
+        .map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}))]
+    : missions.docs.map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}));
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
     title: student.roundDoc.get("title"),
@@ -49,7 +57,7 @@ export const getStudentActivity = onCall(async (request) => {
     thankYouSent: thankYou.exists,
     allowFreeTextMessages: student.roundDoc.get("allowFreeTextMessages") === true,
     presetMessages,
-    missions: missions.docs.map((doc) => ({ missionId: doc.id, text: doc.get("text"), status: doc.get("status") })),
+    missions: visibleMissions,
     inbox: inbox.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
       reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true,

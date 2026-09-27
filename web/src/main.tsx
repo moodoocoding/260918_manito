@@ -13,7 +13,7 @@ type TeacherPage = "classes" | "overview" | "students" | "rounds" | "safety" | "
 type StudentPage = "today" | "mail" | "help" | "history";
 const teacherPages: Array<{id: TeacherPage; label: string}> = [
   {id:"overview",label:"운영 요약"},{id:"rounds",label:"시즌 설정"},
-  {id:"students",label:"학생·입장 카드"},{id:"safety",label:"안전 확인"},
+  {id:"students",label:"입장 카드"},{id:"safety",label:"안전 확인"},
   {id:"history",label:"지난 활동"},{id:"settings",label:"학급 설정"},
 ];
 function teacherLocation(path: string): {classId: string | null; page: TeacherPage} {
@@ -516,7 +516,7 @@ function App() {
             <div className="teacher-main">
               <div className="teacher-context"><div><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
               <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
-              {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>학생·입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
+              {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
                 <div className="class-code"><span>학급 코드</span><strong>{selected.classCode}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
                 {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
                   : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
@@ -547,7 +547,7 @@ function App() {
         </section> : null}
     </main>
 
-    {printCards.length > 0 && selected && <div className="print-only">{printCards.map((card) => <div className="printed-card" key={card.studentUid}><span>💌 우리 반 비밀친구</span><h1>{card.displayName} 학생 입장 카드</h1><p>접속 주소: {window.location.origin}/student</p><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p><p>나만 쓰는 코드예요. 친구에게 보여주지 마세요.</p></div>)}</div>}
+    {printCards.length > 0 && selected && <div className="print-only">{printCards.map((card) => <div className="printed-card" key={card.studentUid}><span>💌 우리 반 비밀친구</span><h1>{card.displayName} 입장 카드</h1><p>접속 주소: {window.location.origin}/student</p><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p><p>나만 쓰는 코드예요. 친구에게 보여주지 마세요.</p></div>)}</div>}
   </div>;
 }
 

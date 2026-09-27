@@ -131,7 +131,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
         text: customMission.trim(), requestId: crypto.randomUUID()});
       setCatalog((old) => [...old, result]);
       setCustomMission("");
-      if (missionIds.length < 3) setMissionIds((old) => [...old, result.missionId]);
+      setMissionIds((old) => [...old, result.missionId]);
       markChanged();
       setNotice("우리 반 미션을 추가했어요.");
     });
@@ -215,7 +215,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
     event.preventDefault();
     await run(async () => {
       const payload = formData();
-      if (missionIds.length !== 3) throw new Error("미션 3개를 선택해 주세요.");
+      if (missionIds.length < 1) throw new Error("미션을 한 개 이상 선택해 주세요.");
       const key = JSON.stringify([current?.roundId ?? null, payload]);
       if (pendingSave.current?.key !== key) pendingSave.current = {key, requestId: crypto.randomUUID()};
       const result = current && ["draft", "ready"].includes(current.status)
@@ -328,7 +328,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       || excludedPairs.some((pair) => !participants.includes(pair.a) || !participants.includes(pair.b)))) {
       setStepError("참가 학생 4~40명과 참가자 사이의 제외 관계를 확인해 주세요."); return;
     }
-    if (step === 3 && missionIds.length !== 3) { setStepError("미션을 정확히 3개 선택해 주세요."); return; }
+    if (step === 3 && missionIds.length < 1) { setStepError("미션을 한 개 이상 선택해 주세요."); return; }
     setStep((value) => Math.min(5, value + 1)); window.scrollTo(0,0);
   }
   function askAction(name: string, studentUid?: string) { setConfirmAction({name, studentUid}); }
@@ -393,14 +393,13 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
             <select aria-label="두 번째 참가자" value={pairB} onChange={(e) => setPairB(e.target.value)}><option value="">두 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
             <button type="button" className="small outline" disabled={!pairA || !pairB || pairA === pairB} onClick={() => { if (!excludedPairs.some((p) => [p.a,p.b].includes(pairA) && [p.a,p.b].includes(pairB))) { setExcludedPairs((old) => [...old,{a:pairA,b:pairB}]); markChanged(); } setPairA(""); setPairB(""); }}>제외 추가</button></div>
           <ul>{excludedPairs.map((p) => <li key={`${p.a}_${p.b}`}>{members.find((m) => m.studentUid === p.a)?.displayName} ↔ {members.find((m) => m.studentUid === p.b)?.displayName} <button type="button" className="small outline" onClick={() => { setExcludedPairs((old) => old.filter((pair) => pair !== p)); markChanged(); }}>제거</button></li>)}</ul></fieldset></>}
-      {step === 3 && <><h3>3. 미션</h3><p>이번 시즌에 사용할 미션을 3개 골라 주세요. <strong>선택 {missionIds.length}/3</strong></p>
+      {step === 3 && <><h3>3. 미션</h3><p>기간 안에 할 미션을 원하는 만큼 골라 주세요. 학생은 원하는 순서로 진행하거나 쉬어 갈 수 있어요. <strong>선택 {missionIds.length}개</strong></p>
         {catalogError && <p className="message error" role="alert">미션 목록을 불러오지 못했어요. <button type="button" className="small outline" onClick={() => void loadCatalog()}>다시 시도</button></p>}
-        {missionCategoryNames.filter((category) => catalog.some((mission) => mission.category === category)).map((category) => <section className="mission-category" key={category} aria-label={category}><h4>{category} <span>{catalog.filter((mission) => mission.category === category).length}개</span></h4><div className="mission-grid">{catalog.filter((mission) => mission.category === category).map((m) => <CheckboxRow key={m.missionId} checked={missionIds.includes(m.missionId)} disabled={missionIds.length >= 3 && !missionIds.includes(m.missionId)} onChange={(checked) => { setMissionIds((old) => checked ? [...old,m.missionId] : old.filter((id) => id !== m.missionId)); markChanged(); }}>{m.text}</CheckboxRow>)}</div></section>)}
-        {missionIds.length >= 3 && <p className="field-help">세 개를 골랐어요. 다른 미션을 선택하려면 먼저 하나를 해제해 주세요.</p>}
+        {missionCategoryNames.filter((category) => catalog.some((mission) => mission.category === category)).map((category) => <section className="mission-category" key={category} aria-label={category}><h4>{category} <span>{catalog.filter((mission) => mission.category === category).length}개</span></h4><div className="mission-grid">{catalog.filter((mission) => mission.category === category).map((m) => <CheckboxRow key={m.missionId} checked={missionIds.includes(m.missionId)} onChange={(checked) => { setMissionIds((old) => checked ? [...old,m.missionId] : old.filter((id) => id !== m.missionId)); markChanged(); }}>{m.text}</CheckboxRow>)}</div></section>)}
         <div className="custom-mission-form"><h4>우리 반 미션 추가</h4><p className="field-help">학교에서 돈 없이 안전하게 할 수 있는 행동을 적어 주세요. 외모·성적·신체 접촉·구매·개인정보 질문은 제외해 주세요.</p><label>새 미션 내용<input maxLength={100} value={customMission} onChange={(event) => setCustomMission(event.target.value)} placeholder="예: 친구의 의견을 끝까지 들어주기" /></label><button type="button" className="outline" disabled={busy || !customMission.trim()} onClick={() => void addCustomMission()}>미션 추가</button></div></>}
       {step === 4 && <><h3>4. 쪽지</h3><p>학생은 배정된 친구에게 쪽지를 보내고, 받은 쪽지에는 익명으로 답장할 수 있어요.</p><div className="review-card"><strong>바로 전달</strong><p>준비된 문구와 직접 쓴 쪽지가 선생님 승인 없이 전달돼요. 학생끼리는 발신자 이름이 보이지 않고, 선생님은 안전 확인에서 대화를 보고 문제가 있는 쪽지를 숨길 수 있어요.</p><p className="field-help">수업일마다 학생 한 명이 최대 10건, 한 건에 200자까지 보낼 수 있어요. 학생은 받은 쪽지를 숨기거나 선생님께 알릴 수 있어요.</p></div></>}
       {step === 5 && <><h3>5. 준비 내용 확인</h3><p>여기서 저장하면 시즌 초안이 만들어져요. 시작은 조건 확인 뒤 별도로 진행합니다.</p>
-        <dl className="review-summary"><div><dt>주제</dt><dd>{title}</dd></div><div><dt>기간</dt><dd>{start} ~ {end}</dd></div><div><dt>활동일</dt><dd>평일 {selectedDates.length}일</dd></div><div><dt>참가자</dt><dd>{participants.length}명</dd></div><div><dt>필수 제외</dt><dd>{excludedPairs.length}쌍</dd></div><div><dt>미션</dt><dd>{missionIds.map((id) => catalog.find((mission) => mission.missionId === id)?.text ?? "미션 확인 필요").join(" · ")}</dd></div><div><dt>쪽지</dt><dd>자유 입력·익명 답장 즉시 전달 · 교사 모니터링</dd></div></dl></>}
+        <dl className="review-summary"><div><dt>주제</dt><dd>{title}</dd></div><div><dt>기간</dt><dd>{start} ~ {end}</dd></div><div><dt>활동일</dt><dd>평일 {selectedDates.length}일</dd></div><div><dt>참가자</dt><dd>{participants.length}명</dd></div><div><dt>필수 제외</dt><dd>{excludedPairs.length}쌍</dd></div><div><dt>미션</dt><dd>{missionIds.length}개 선택<ol className="mission-review-list">{missionIds.map((id) => <li key={id}>{catalog.find((mission) => mission.missionId === id)?.text ?? "미션 확인 필요"}</li>)}</ol></dd></div><div><dt>쪽지</dt><dd>자유 입력·익명 답장 즉시 전달 · 교사 모니터링</dd></div></dl></>}
       {stepError && <p id="round-step-error" className="field-error" role="alert">{stepError}</p>}
       <div className="action-row">{step > 1 && <button type="button" className="outline" onClick={() => { setStep((value) => value - 1); setError(""); setStepError(""); }}>이전</button>}
         {step < 5 ? <button type="button" onClick={(event) => {event.preventDefault(); nextStep();}}>다음</button> : <button type="submit" disabled={busy || catalogError}>{busy ? "저장 중…" : "준비 내용 저장"}</button>}</div>

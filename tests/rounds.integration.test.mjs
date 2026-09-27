@@ -242,10 +242,12 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const copiedSettings = await teacher.call("getRoundSettingsForTeacher", {classId,roundId:second.roundId});
   assert.deepEqual(copiedSettings.participantIds,ids);
   assert.equal((await adminDb.collection(`classes/${classId}/rounds/${second.roundId}/assignmentSecrets`).get()).size,0);
-  await teacher.call("updateRound", {...roundInput(classId,ids,"두 번째 작전"),roundId:second.roundId});
+  await teacher.call("updateRound", {...roundInput(classId,ids,"두 번째 작전"),
+    missionIds:["middle-01"],roundId:second.roundId});
   const ready2 = await teacher.call("prepareRound",{classId,roundId:second.roundId});
   await teacher.call("startRound",{classId,roundId:second.roundId,
     rosterVersion:ready2.rosterVersion,requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",{roundId:second.roundId})).missions.length,1);
   await teacher.call("changeRoundStatus",{classId,roundId,action:"archive",requestId:rid()});
   assert.equal((await adminDb.doc(`classes/${classId}`).get()).get("activeRoundId"),second.roundId);
   assert.equal((await students[0].call("getStudentActivity",{roundId})).roundId,roundId);
@@ -272,7 +274,7 @@ test("four students complete two isolated rounds with review, help, reveal and h
 });
 
 test("forty students start as one atomic one-to-one round", async () => {
-  const {classId} = await teacher.call("createClass", {name:"정원 검증반",
+  const {classId,classCode} = await teacher.call("createClass", {name:"정원 검증반",
     schoolYear:new Date().getUTCFullYear(), gradeBand:"middle", requestId:rid()});
   const registration = await teacher.call("registerStudents", {classId,
     displayNames:Array.from({length:40},(_,i)=>`가상학생${i+1}`),requestId:rid()});
@@ -297,11 +299,27 @@ test("forty students start as one atomic one-to-one round", async () => {
     .filter((date)=>![0,6].includes(date.getUTCDay()))
     .map((date)=>new Intl.DateTimeFormat("sv-SE", {timeZone:"Asia/Seoul",year:"numeric",
       month:"2-digit",day:"2-digit"}).format(date));
+  const tenMissionIds = Array.from({length:10},(_,i)=>`middle-${String(i+1).padStart(2,"0")}`);
   const {roundId} = await teacher.call("createRound",{...roundInput(classId,ids,"정원 검증"),
-    endsAt:new Date(Date.now()+20*86400_000).toISOString(),activityDates});
+    endsAt:new Date(Date.now()+20*86400_000).toISOString(),activityDates,
+    missionIds:tenMissionIds});
   assert.ok(activityDates.length >= 14, "20-day season should accept more than 10 school days");
   const ready = await teacher.call("prepareRound",{classId,roundId});
   await teacher.call("startRound",{classId,roundId,rosterVersion:ready.rosterVersion,requestId:rid()});
+  assert.equal((await adminDb.doc(`classes/${classId}/rounds/${roundId}`).get()).get("missionPlan").length,10);
+  assert.equal((await adminDb.collection(`classes/${classId}/rounds/${roundId}/studentData/${ids[0]}/missions`).get()).size,0);
+  const login = await students[0].call("loginStudent",{classCode,cardCode:reprintedCards.cards[0].cardCode});
+  await signInWithCustomToken(students[0].auth,login.customToken);
+  const tenMissions = await students[0].call("getStudentActivity",null);
+  assert.equal(tenMissions.missions.length,10);
+  await students[0].call("setMissionStatus",{missionId:tenMissionIds[0],status:"done"});
+  assert.equal((await students[0].call("getStudentActivity",null)).missions[0].status,"done");
+  const replacement = await students[0].call("replaceMission",{missionId:tenMissionIds[1],requestId:rid()});
+  assert.equal(tenMissionIds.includes(replacement.missionId),false);
+  assert.equal((await students[0].call("getStudentActivity",null)).missions
+    .filter((mission)=>mission.status!=="replaced").length,10);
+  assert.equal((await teacher.call("getTeacherRoundOverview",{classId,roundId})).participation
+    .find((item)=>item.studentUid===ids[0]).hasActivity,true);
   const assignments = (await teacher.call("getAssignmentsForTeacher",{classId,roundId})).assignments;
   assert.equal(assignments.length,40);
   assert.equal(new Set(assignments.map((a)=>a.receiverUid)).size,40);

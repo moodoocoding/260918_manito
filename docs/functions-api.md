@@ -150,7 +150,7 @@ response: {
 | `listMyRightsRequests` | `null` | 학생 본인이 접수한 요청의 종류·상태만 조회 |
 | `getRightsRequestsForTeacher` | `{classId}` | 담당 교사가 요청 원문과 학생 이름을 비공개 조회. 매번 감사 기록 |
 
-`excludedPairs` 요청은 `[[studentUid,studentUid], ...]`, 저장값은 Firestore 중첩 배열 제한에 맞춘 `[{a,b}, ...]`다. `missionIds`는 비워 기본 3개를 사용하거나 서로 다른 3개를 고른다. 학급 전용 미션 ID는 해당 학급의 서버 전용 문서에 실제로 존재해야 준비·시작할 수 있다. 학생에게 내려주는 쪽지에는 발신 UID와 원본 작성 시각을 넣지 않는다. `failed-precondition`은 시즌 상태·수업일·일일 한도·제외 조건·미처리 안전 사안에 사용하고, 소속·세션·교사 권한 위반은 `permission-denied`다.
+`excludedPairs` 요청은 `[[studentUid,studentUid], ...]`, 저장값은 Firestore 중첩 배열 제한에 맞춘 `[{a,b}, ...]`다. 새 시즌의 `missionIds`는 서로 다른 1~80개를 선택한다. 이전 클라이언트·저장 초안의 빈 배열은 기본 3개로 시작하는 호환 경로다. 학급 전용 미션 ID는 해당 학급의 서버 전용 문서에 실제로 존재해야 준비·시작할 수 있다. 시작 때 선택 ID·원문을 `round.missionPlan`에 고정하고 학생별 완료·쉬기·교체는 필요할 때만 미션 문서에 기록한다. 이전 시즌의 학생별 미션 문서는 그대로 지원한다. 학생에게 내려주는 쪽지에는 발신 UID와 원본 작성 시각을 넣지 않는다. `failed-precondition`은 시즌 상태·수업일·일일 한도·제외 조건·미처리 안전 사안에 사용하고, 소속·세션·교사 권한 위반은 `permission-denied`다.
 
 ## 카드 재출력 API (2026-09-27)
 

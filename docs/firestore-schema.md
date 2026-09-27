@@ -49,19 +49,19 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 
 ## 문서별 책임
 
-2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
+2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. 새 시즌의 `rounds/{roundId}.missionPlan`은 시작 때 확정한 1~80개 미션 ID와 원문 배열이다. 참가 학생이 같은 미션을 읽으며 배정 관계·개별 활동 상태는 포함하지 않는다. `studentData/{uid}/missions`는 완료·쉬기·교체할 때만 생기는 개인 상태 문서다. 과거 시즌의 시작 시 전부 만든 미션 문서는 계속 읽는다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
 
 | 경로 | 책임 | 학생 직접 읽기 | 교사 직접 읽기 | 직접 쓰기 |
 |---|---|---:|---:|---:|
 | `teachers/{uid}` | 교사 프로필·확인 상태 | 아니요 | 본인만 | 아니요 |
 | `classes/{classId}` | 학급·학년도·담당 교사·진행 회차 잠금 | 아니요 | 담당 교사 | 아니요 |
 | `members/{studentUid}` | 표시 이름·접근 상태·세션 버전·마지막 로그인 시각·카드 재출력 가능 표시 | 본인 | 담당 교사 | 아니요 |
-| `customMissions/{missionId}` | 담당 교사가 추가한 미션 원문. 시즌 시작 때 개인 미션에 스냅샷 | 아니요 | 함수로만 조회 | 서버만 |
+| `customMissions/{missionId}` | 담당 교사가 추가한 미션 원문. 시즌 시작 때 공통 미션 계획에 스냅샷 | 아니요 | 함수로만 조회 | 서버만 |
 | `rightsRequests`, `rightsCommands` | 정보 열람·정정·삭제 요청의 종류·내용·상태와 멱등 명령 | 아니요 | 감사 기록을 남기는 함수로 조회 | 서버만 |
-| `rounds/{roundId}` | 회차 일정·상태·메시지 정책 | 참가 회차 | 담당 교사 | 아니요 |
+| `rounds/{roundId}` | 회차 일정·상태·메시지 정책·공통 미션 계획 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
 | `studentData/{studentUid}` | 본인에게 공개할 상대·공개 결과 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
-| `missions` | 미션 내용 스냅샷과 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `missions` | 학생이 변경한 미션 내용 스냅샷·상태. 과거 시즌에는 초기 미션도 보관 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `inboxItems` | 즉시 전달된 수신 쪽지·답장 연결·숨김/신고 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `sentMessages` | 발신자에게 보여줄 본인 쪽지·전달/교사 숨김 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `helpRequests` | 도움 요청과 교사 처리 상태 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |

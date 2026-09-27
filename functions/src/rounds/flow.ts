@@ -225,9 +225,10 @@ export const startRound = onCall(async (request) => {
     if (!assignments) throw new HttpsError("failed-precondition", "제외 조건을 만족하는 배정이 없어요.");
     const names = new Map(members.map((doc) => [doc.id, doc.get("displayName") as string]));
     const gradeBand = classDoc.get("gradeBand") as string;
-    const missionIds = settings.missionIds.length === 3 ? settings.missionIds
+    const missionIds = settings.missionIds.length > 0 ? settings.missionIds
       : [1, 2, 3].map((index) => `${gradeBand}-${String(index).padStart(2, "0")}`);
     const missionTexts = await selectedMissionTexts(tx, classRef, gradeBand, missionIds);
+    const missionPlan = missionIds.map((missionId) => ({missionId, text: missionTexts.get(missionId)!}));
     for (const [giverUid, receiverUid] of assignments) {
       tx.create(roundRef.collection("assignmentSecrets").doc(giverUid), {
         giverUid, receiverUid, createdAt: FieldValue.serverTimestamp(),
@@ -239,18 +240,12 @@ export const startRound = onCall(async (request) => {
         targetDisplayName: names.get(receiverUid), incomingDisplayName: null,
         createdAt: FieldValue.serverTimestamp(),
       });
-      for (const missionId of missionIds) {
-        const text = missionTexts.get(missionId)!;
-        tx.create(roundRef.collection("studentData").doc(giverUid).collection("missions").doc(missionId), {
-          text, status: "todo", replacementCount: 0, createdAt: FieldValue.serverTimestamp(),
-        });
-      }
       const historyRef = classRef.collection("pairHistory").doc(Buffer.from(pairKey(giverUid, receiverUid)).toString("base64url"));
       const prior = history.find((item) => item.giverUid === giverUid && item.receiverUid === receiverUid);
       tx.set(historyRef, { giverUid, receiverUid, count: (prior?.count ?? 0) + 1,
         lastRoundId: roundId, updatedAt: FieldValue.serverTimestamp() });
     }
-    tx.update(roundRef, { status: "active", startedAt: FieldValue.serverTimestamp(),
+    tx.update(roundRef, { status: "active", missionPlan, startedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp() });
     tx.update(classRef, { activeRoundId: roundId, lastRoundId: roundId,
       updatedAt: FieldValue.serverTimestamp() });
