@@ -47,7 +47,8 @@ service cloud.firestore {
 
     function isRoundParticipant(classId, roundId, studentUid) {
       return isActiveClassStudent(classId, studentUid)
-        && exists(/databases/$(database)/documents/classes/$(classId)/rounds/$(roundId)/participants/$(studentUid));
+        && exists(/databases/$(database)/documents/classes/$(classId)/rounds/$(roundId)/participants/$(studentUid))
+        && get(/databases/$(database)/documents/classes/$(classId)/rounds/$(roundId)/participants/$(studentUid)).data.participationStatus == 'active';
     }
 
     // All application writes go through Cloud Functions. The Admin SDK bypasses
@@ -81,33 +82,36 @@ service cloud.firestore {
         }
 
         match /studentData/{studentUid} {
-          allow read: if isClassTeacher(classId)
-            || isRoundParticipant(classId, roundId, studentUid);
+          allow read: if isRoundParticipant(classId, roundId, studentUid);
           allow write: if false;
 
           match /missions/{missionId} {
-            allow read: if isClassTeacher(classId)
-              || isRoundParticipant(classId, roundId, studentUid);
+            allow read: if isRoundParticipant(classId, roundId, studentUid);
             allow write: if false;
           }
 
           match /inboxItems/{messageId} {
-            allow read: if isClassTeacher(classId)
-              || isRoundParticipant(classId, roundId, studentUid);
+            allow read: if isRoundParticipant(classId, roundId, studentUid);
             allow write: if false;
           }
 
           match /sentMessages/{messageId} {
-            allow read: if isClassTeacher(classId)
-              || isRoundParticipant(classId, roundId, studentUid);
+            allow read: if isRoundParticipant(classId, roundId, studentUid);
             allow write: if false;
           }
 
           match /helpRequests/{requestId} {
-            allow read: if isClassTeacher(classId)
-              || isActiveClassStudent(classId, studentUid);
+            allow read: if isRoundParticipant(classId, roundId, studentUid);
             allow write: if false;
           }
+          match /reflection/{reflectionId} {
+            allow read: if isRoundParticipant(classId, roundId, studentUid);
+            allow write: if false;
+          }
+        }
+
+        match /{privateCollection}/{privateId} {
+          allow read, write: if false;
         }
 
         // These collections contain relationship information that must never be
@@ -123,6 +127,10 @@ service cloud.firestore {
       }
 
       match /pairHistory/{pairId} {
+        allow read, write: if false;
+      }
+
+      match /roundSettings/{roundId} {
         allow read, write: if false;
       }
 

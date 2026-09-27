@@ -15,6 +15,8 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/
 
 const projectId = "demo-manitto";
 const region = "asia-northeast3";
+const teacherUid = `teacher-integration-${crypto.randomUUID().slice(0, 8)}`;
+const otherTeacherUid = `teacher-other-${crypto.randomUUID().slice(0, 8)}`;
 let teacherApp;
 let studentApp;
 let otherTeacherApp;
@@ -34,8 +36,7 @@ before(async () => {
   adminAuth = getAdminAuth();
   adminDb = getAdminFirestore();
 
-  const teacherUid = "teacher-integration";
-  await adminAuth.createUser({ uid: teacherUid, email: "teacher@example.test" }).catch((error) => {
+  await adminAuth.createUser({ uid: teacherUid, email: `${teacherUid}@example.test` }).catch((error) => {
     if (error.code !== "auth/uid-already-exists") throw error;
   });
   await adminAuth.setCustomUserClaims(teacherUid, {
@@ -48,11 +49,11 @@ before(async () => {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
-  await adminAuth.createUser({ uid: "teacher-other", email: "other@example.test" }).catch((error) => {
+  await adminAuth.createUser({ uid: otherTeacherUid, email: `${otherTeacherUid}@example.test` }).catch((error) => {
     if (error.code !== "auth/uid-already-exists") throw error;
   });
-  await adminAuth.setCustomUserClaims("teacher-other", { role: "teacher", teacherVerified: true });
-  await adminDb.doc("teachers/teacher-other").set({ verificationStatus: "verified" });
+  await adminAuth.setCustomUserClaims(otherTeacherUid, { role: "teacher", teacherVerified: true });
+  await adminDb.doc(`teachers/${otherTeacherUid}`).set({ verificationStatus: "verified" });
 
   teacherApp = initializeApp({ projectId, apiKey: "demo-key" }, "teacher-test");
   studentApp = initializeApp({ projectId, apiKey: "demo-key" }, "student-test");
@@ -77,7 +78,7 @@ before(async () => {
     teacherVerified: true,
   });
   await signInWithCustomToken(teacherAuth, teacherToken);
-  await signInWithCustomToken(otherTeacherAuth, await adminAuth.createCustomToken("teacher-other", {
+  await signInWithCustomToken(otherTeacherAuth, await adminAuth.createCustomToken(otherTeacherUid, {
     role: "teacher", teacherVerified: true,
   }));
 });
@@ -193,7 +194,7 @@ test("teacher creates a class, registers students, and rotates a student card", 
   await signInWithCustomToken(studentAuth, resumed.data.customToken);
   assert.equal((await getStudentHome()).data.displayName, "가람");
 
-  await adminDb.doc("teachers/teacher-integration").update({ verificationStatus: "suspended" });
+  await adminDb.doc(`teachers/${teacherUid}`).update({ verificationStatus: "suspended" });
   assert.equal((await httpsCallable(teacherFunctions, "getTeacherStatus")()).data.status, "suspended");
   await assert.rejects(httpsCallable(teacherFunctions, "listClasses")(), {
     code: "functions/permission-denied",

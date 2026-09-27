@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
+import { TeacherRounds } from "./TeacherRounds";
+import { StudentRound } from "./StudentRound";
 import "./style.css";
 
 type TeacherStatus = { status: "pending" | "verified" | "suspended"; displayName: string };
@@ -11,7 +13,8 @@ type ClassInfo = ClassItem & { classCode: string };
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Card = { studentUid: string; displayName: string; cardCode: string };
 type StudentHome = { displayName: string; className: string; round: null | {
-  title: string; status: string; targetDisplayName: string | null;
+  roundId: string; title: string; status: string; targetDisplayName: string | null;
+  incomingDisplayName: string | null;
 } };
 
 function errorText(error: unknown): string {
@@ -46,6 +49,7 @@ function App() {
   const [newYear, setNewYear] = useState(new Date().getFullYear());
   const [newGrade, setNewGrade] = useState("middle");
   const [namesInput, setNamesInput] = useState("");
+  const [deleteName, setDeleteName] = useState("");
   const generation = useRef(0);
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
   const pendingRegistration = useRef<{ key: string; requestId: string } | null>(null);
@@ -157,7 +161,7 @@ function App() {
   async function selectClass(classId: string) {
     await task(async () => {
       const current = generation.current;
-      setCards([]); setPrintCard(null);
+      setCards([]); setPrintCard(null); setDeleteName("");
       const info = await call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
       const result = await getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey")));
       if (current !== generation.current) return;
@@ -229,6 +233,16 @@ function App() {
     });
   }
 
+  async function deleteClass() {
+    if (!selected || deleteName !== selected.name) return;
+    if (!window.confirm(`${selected.name} 학급의 회차·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
+    await task(async () => {
+      await call<object, object>("deleteClassData", {classId: selected.classId, requestId: crypto.randomUUID()});
+      setSelected(null); setMembers([]); setCards([]); setPrintCard(null); setDeleteName("");
+      await loadTeacher(); setNotice("학급 데이터를 삭제했어요.");
+    });
+  }
+
   function print(card: Card) {
     setPrintCard(card);
     window.setTimeout(() => window.print(), 100);
@@ -256,6 +270,8 @@ function App() {
             {home.round.targetDisplayName ? <><p>내가 챙겨줄 친구</p><div className="secret-name">{targetVisible ? home.round.targetDisplayName : "•••"}</div>
               <button onClick={() => setTargetVisible(!targetVisible)}>{targetVisible ? "다시 가리기" : "친구 보기"}</button></> : <p>선생님이 준비하고 있어요.</p>}
           </section> : <section className="panel empty"><div className="big-icon">💌</div><h2>선생님이 작전을 준비하고 있어요</h2><p>새 회차가 시작되면 여기에서 내 활동을 볼 수 있어요.</p></section>}
+          {home?.round && <StudentRound roundId={home.round.roundId} status={home.round.status} incomingDisplayName={home.round.incomingDisplayName} />}
+          <button className="wide outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button>
           <button className="wide secondary" onClick={() => void exit()}>활동 끝내고 다음 친구에게 넘기기</button>
         </section> : route === "student" && role === "none" ? <section className="entry-layout">
           <div className="hero"><span className="eyebrow">학생 입장</span><h1>비밀친구 작전,<br />시작해 볼까요?</h1><p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p><div className="envelope">💌</div></div>
@@ -277,7 +293,7 @@ function App() {
           <p>학급 정보는 확인이 끝난 계정에서만 볼 수 있어요.</p>
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
         </section> : role === "teacher" ? <section className="teacher-layout">
-          <div className="section-heading"><div><span className="eyebrow">선생님 방</span><h1>내 학급</h1></div><p>도움 요청 → 검토할 쪽지 → 활동 확인 → 일정 순서로 회차 화면을 준비하고 있어요.</p></div>
+          <div className="section-heading"><div><span className="eyebrow">선생님 방</span><h1>내 학급</h1></div><p>도움 요청 → 검토할 쪽지 → 활동 확인 → 일정을 살펴보세요.</p></div>
           <div className="teacher-columns"><section className="panel"><h2>학급 목록</h2>
             {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button onClick={() => void selectClass(item.classId)}>{item.name}<small>{item.schoolYear} · {item.memberCount}명</small></button></li>)}</ul>}
             <form onSubmit={(event) => void createClass(event)} className="stack"><h3>새 학급 만들기</h3><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
@@ -295,6 +311,8 @@ function App() {
               {cards.length > 0 && <p className="help">카드 코드는 이 화면을 떠나면 다시 볼 수 없어요. 분실하면 새 카드로 재발급해 주세요.</p>}
             </> : <p className="muted">왼쪽에서 학급을 선택하거나 새로 만들어 주세요.</p>}
           </section></div>
+          {selected && <TeacherRounds classId={selected.classId} gradeBand={selected.gradeBand} members={members} />}
+          {selected && <section className="panel"><h2>학급 데이터 삭제</h2><p>모든 회차를 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="outline" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section>}
         </section> : null}
     </main>
 

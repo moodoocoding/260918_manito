@@ -8,7 +8,7 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { readFile } from "node:fs/promises";
 
-const projectId = "demo-manitto";
+const projectId = "demo-manitto-rules";
 let testEnv;
 
 before(async () => {
@@ -95,10 +95,10 @@ test("signed-out users cannot read a class", async () => {
   await assertFails(getDoc(doc(db, "classes/class-a")));
 });
 
-test("the assigned teacher can read the class and its student data", async () => {
+test("the assigned teacher can read the class but private student data needs an audited function", async () => {
   const db = teacherDb("teacher-a");
   await assertSucceeds(getDoc(doc(db, "classes/class-a")));
-  await assertSucceeds(
+  await assertFails(
     getDoc(doc(db, "classes/class-a/rounds/round-a/studentData/student-a")),
   );
 });
@@ -132,6 +132,15 @@ test("an outdated student session cannot read student data", async () => {
   await assertFails(
     getDoc(doc(db, "classes/class-a/rounds/round-a/studentData/student-a")),
   );
+});
+
+test("a stopped participant cannot keep reading their round data", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "classes/class-a/rounds/round-a/participants/student-a"), {
+      participationStatus: "stopped",
+    });
+  });
+  await assertFails(getDoc(doc(studentDb("student-a"), "classes/class-a/rounds/round-a/studentData/student-a")));
 });
 
 test("relationship secrets are denied even to a classroom teacher", async () => {

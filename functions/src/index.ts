@@ -16,3 +16,11 @@ export { getTeacherStatus } from "./teachers/getTeacherStatus.js";
 export { getClassAccessInfo, listClasses } from "./classes/getClassAccessInfo.js";
 export { getStudentHome } from "./students/getStudentHome.js";
 export { setStudentAccess } from "./students/setStudentAccess.js";
+export { deleteClassData } from "./classes/deleteClassData.js";
+export { listRounds, getRoundSettingsForTeacher, createRound, updateRound, prepareRound, startRound,
+  changeRoundStatus, getAssignmentsForTeacher } from "./rounds/flow.js";
+export { getMissionCatalog, setMissionStatus, replaceMission } from "./rounds/missions.js";
+export { getStudentActivity, sendMessage, reviewMessage, hideMessage,
+  createHelpRequest, resolveHelpRequest, getTeacherRoundOverview } from "./rounds/activity.js";
+export { stopRoundParticipation, revealRound, sendThankYou,
+  saveReflection, copyRoundSettings } from "./rounds/reveal.js";

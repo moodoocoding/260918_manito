@@ -1,4 +1,4 @@
-# Firestore 데이터 계약 v0.1
+# Firestore 데이터 계약 v0.2
 
 이 문서는 [서비스 개발 계획서](./manitto-development-plan.md)의 논리 모델을 실제 Firestore 경로와 권한 경계로 구체화한다. 첫 구현 단계에서는 브라우저의 직접 쓰기를 모두 차단하고 Cloud Functions가 쓰기와 업무 규칙을 담당한다.
 
@@ -24,16 +24,24 @@ classes/{classId}
       inboxItems/{messageId}
       sentMessages/{messageId}
       helpRequests/{requestId}
+      reflection/mine
     assignmentSecrets/{studentUid}      # 서버 전용
     messageSecrets/{messageId}          # 서버 전용
-  pairHistory/{giverUid_receiverUid}    # 서버 전용
+    helpSecrets/{helpId}                # 서버 전용
+    messageDays/{studentUid_yyyy-mm-dd} # 서버 전용
+    studentCommands/{studentUid_requestId} # 서버 전용
+    thankYouSecrets/{studentUid}        # 서버 전용
+  roundSettings/{roundId}               # 참가자·제외 관계·미션 선택, 서버 전용
+  commands/{requestId}                  # 회차·학급 명령 중복 방지
+  pairHistory/{encodedPairKey}           # 서버 전용
   auditLogs/{logId}
 studentCredentials/{studentUid}         # 서버 전용
 studentCredentialLookups/{lookupDigest} # 서버 전용
 classCodes/{classCode}                   # 서버 전용
 teacherCommands/{teacherUid_requestId}  # 서버 전용
 operatorAuditLogs/{logId}                # 서버 전용
-missionCatalog/{missionId}
+missionCatalog/{missionId}              # 예약 경로; 현재 카탈로그는 함수 코드에 내장
+deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 ```
 
 ## 문서별 책임
@@ -45,11 +53,13 @@ missionCatalog/{missionId}
 | `members/{studentUid}` | 표시 이름·접근 상태·세션 버전 | 본인 | 담당 교사 | 아니요 |
 | `rounds/{roundId}` | 회차 일정·상태·메시지 정책 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
-| `studentData/{studentUid}` | 본인에게 공개할 상대·공개 결과 | 본인 | 담당 교사 | 아니요 |
-| `missions` | 미션 내용 스냅샷과 상태 | 본인 | 담당 교사 | 아니요 |
-| `inboxItems` | 승인되어 수신자에게 보여줄 쪽지 | 본인 | 담당 교사 | 아니요 |
-| `sentMessages` | 발신자에게 보여줄 검토·전달 상태 | 본인 | 담당 교사 | 아니요 |
-| `helpRequests` | 도움 요청과 교사 처리 상태 | 본인 | 담당 교사 | 아니요 |
+| `studentData/{studentUid}` | 본인에게 공개할 상대·공개 결과 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
+| `missions` | 미션 내용 스냅샷과 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `inboxItems` | 승인되어 수신자에게 보여줄 쪽지 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `sentMessages` | 발신자에게 보여줄 검토·전달 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `helpRequests` | 도움 요청과 교사 처리 상태 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
+| `roundSettings` | 참가자·제외 관계·미션 선택·명단 버전 | 아니요 | 함수로 감사 후 조회 | 서버만 |
+| `helpSecrets`, `messageDays`, `studentCommands`, `thankYouSecrets` | 안전 원문·하루 한도·중복 명령·감사 전달 | 아니요 | 함수로 감사 후 조회 | 서버만 |
 | `assignmentSecrets` | 전체 방향 관계 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `messageSecrets` | 원문·발신자·수신자·검토 정보 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `pairHistory` | 과거 방향별 배정 횟수 | 아니요 | 아니요 | 서버만 |
@@ -71,7 +81,7 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 5. `inboxItems`에는 발신 UID와 정확한 원본 작성 시각을 넣지 않는다.
 6. 로그인 카드 재발급·계정 차단 시 `members.sessionVersion`과 인증 클레임의 값이 달라져 기존 세션 읽기가 즉시 거절된다.
 7. 회차 중단 학생과 연결된 대기 쪽지는 승인하지 않으며 정체 공개·감사 카드 대상에서도 제외한다.
-8. 모든 재시도 가능한 명령은 `requestId`를 받아 동일 요청이 중복 문서를 만들지 않게 한다.
+8. 회차 시작·쪽지·검토·공개·설정 복사·삭제 등 재시도 가능한 명령은 `requestId`를 받아 동일 요청이 중복 문서를 만들지 않게 한다.
 9. `teacherCommands`와 `classes/{classId}/commands`에는 명령 종류, 요청자, 입력 fingerprint를 기록한다. 재사용한 ID가 다른 입력 또는 작업을 뜻하면 거절한다. 등록 재시도 시 담당 학급 권한을 먼저 확인한다.
 10. 교사 직접 읽기는 Claims의 `teacherVerified`와 `teachers/{uid}.verificationStatus == verified`가 모두 맞아야 한다. 교사 상태가 `suspended`면 직접 읽기와 함수 실행을 거절한다.
 
@@ -94,6 +104,6 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 4. 개발·검증·운영 프로젝트를 분리하고 운영 데이터로 로컬 테스트하지 않는다.
 5. 실제 학생 데이터를 넣기 전에 개인정보 처리 근거·동의·보관·삭제 절차를 확정한다.
 
-## v2 계획서와 연결되는 미구현 보강
+## 현재 구현과 남은 운영 조건
 
-이 문서의 경로는 기반 계약이며 회차 이후 쓰기 기능은 아직 구현되지 않았다. [개발 계획서](./manitto-development-plan.md) 12.6~12.8절 중 학생 홈 최소 조회와 정지 교사 읽기 차단은 D1 로컬 코드에 반영했다. 교사 활동 요약과 개인 비밀 보기 분리, 참여 중단·보관 정책, 실제 학생 활성화 준비는 담당 단계에서 구현한다. 특히 현재 Rules는 교사가 `studentData`를 직접 읽는 구조이므로 모든 배정 열람이 감사된다고 간주하지 않는다. 새 경로·필드와 Rules 변경은 구현 단계에서 이 계약에 함께 반영한다.
+회차·미션·쪽지·도움·공개·설정 복사와 학급 삭제 경로를 로컬에 구현했다. 교사는 학생 개인 데이터를 직접 읽지 않고 감사 기록을 남기는 함수로 안전 현황과 배정을 조회한다. 배정은 `assignmentSecrets`, 제외 관계는 `roundSettings`에만 저장한다. `roundSettings.excludedPairs`는 Firestore의 중첩 배열 제한 때문에 `{a,b}` 객체 배열이다. 실제 학생 활성화에는 개인정보 처리 근거, 학교·보호자 안내, 보존 기간과 권리 요청 운영 절차의 확정이 남아 있다.

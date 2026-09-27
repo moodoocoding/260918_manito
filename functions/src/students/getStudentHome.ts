@@ -41,6 +41,9 @@ export const getStudentHome = onCall( async (request) => {
       status: roundStatus,
       targetDisplayName: ["active", "paused", "reveal_pending", "revealed"].includes(roundStatus) && view.exists
         ? (view.get("targetDisplayName") as string | null) : null,
+      incomingDisplayName: roundStatus === "revealed" && view.exists
+        ? (view.get("incomingDisplayName") as string | null) : null,
+      roundId,
     },
   };
 });

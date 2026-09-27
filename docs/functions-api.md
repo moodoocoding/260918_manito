@@ -108,3 +108,38 @@ response: {
 | `setStudentAccess` | `{ classId, studentUid, status: "active" \| "blocked", requestId }` | `{ studentUid, status }` | 담당 교사만 변경, 세션 버전 증가, 감사 기록. 같은 요청 재시도는 동일 결과 |
 
 `scripts/manage-teacher.mjs`는 Callable이 아닌 신뢰된 관리자 실행 환경의 도구다. ADC의 Firebase Auth·Firestore 관리 권한이 있는 운영자만 사용한다. `--project=manito-938cc --uid=... --status=verified|suspended --operator=...`를 명시한다. 승인 시 교사 문서를 `pending`으로 먼저 두고 Claims를 설정한 뒤 `verified`로 바꾼다. 중지는 문서를 먼저 `suspended`로 바꾼다. 중간 실패는 접근 거절 상태로 남으며 같은 명령을 재실행해 복구할 수 있다. 실행 감사 기록은 `operatorAuditLogs`에 남긴다. 실제 학생 데이터 도입 전 관리자 식별·권한 운영 절차를 확정한다.
+
+## D2~D5 회차·활동 API (2026-09-27 로컬 구현)
+
+아래 함수는 로컬 코드와 `demo-manitto` 에뮬레이터의 가상 학급 두 회차에서 검증하고 개발 Firebase `manito-938cc`에 배포했다. 클라우드 로그인 전체 흐름 검증은 별도다. 모든 교사용 함수는 확인된 교사와 담당 학급을 검사한다. 학생용 함수는 Custom Token의 `classId`, `memberId`, `sessionVersion`, 활성 참여와 회차 상태를 검사한다.
+
+| 함수 | 주요 입력 | 반환·상태 제한 |
+|---|---|---|
+| `listRounds` | `{classId}` | 회차 목록과 명부. 담당 교사만 |
+| `getRoundSettingsForTeacher` | `{classId,roundId}` | 참가 UID·제외 관계·미션·수업일. 감사 기록 |
+| `createRound` | `{classId,title,startsAt,endsAt,activityDates,participantIds,excludedPairs,allowFreeTextMessages,missionIds,requestId}` | `{roundId}`. 4~40명, 5/10일, 기간 30일 이내, 명단 활성 상태 |
+| `updateRound` | 위 필드와 `roundId` | 초안·준비 완료 상태만 수정, `rosterVersion` 증가·준비 상태 해제 |
+| `prepareRound` | `{classId,roundId}` | 배정 가능성·참가 상태·미션 검증 뒤 `{status:"ready",rosterVersion}` |
+| `startRound` | `{classId,roundId,rosterVersion,requestId}` | 학급 잠금과 배정 전체를 단일 트랜잭션으로 확정. 활성 회차 중복 시작 거절 |
+| `changeRoundStatus` | `{classId,roundId,action,requestId}` | `pause`, `resume`, `end`, `cancel`, `archive` 전이. `resume`은 종료 전만 |
+| `stopRoundParticipation` | `{classId,roundId,studentUid,requestId}` | 학생 제출·공개 차단, 감사 기록 |
+| `getAssignmentsForTeacher` | `{classId,roundId}` | 안전 대응용 전체 관계. 매 열람 감사 |
+| `getMissionCatalog` | `{gradeBand}` | 해당 학년군에서 검토된 미션 10개 |
+| `getStudentActivity` | `null` | 본인 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태 |
+| `setMissionStatus` | `{missionId,status:"done"\|"skipped"}` | 진행 중 회차에서 본인 미션 변경 |
+| `replaceMission` | `{missionId,requestId}` | 같은 학년군의 미사용 미션으로 교체, 연속 2회 한도 |
+| `sendMessage` | `{kind:"preset"\|"free",text,requestId}` | 서버 배정 수신자에게만. 한국 날짜 수업일 합계 1건. 자유형은 대기 |
+| `reviewMessage` | `{classId,roundId,messageId,decision:"approve"\|"reject",requestId}` | 활성 양쪽 참가자만 전달, 감사 기록 |
+| `hideMessage` | `{messageId}` | 수신자 본인 쪽지 숨김 |
+| `createHelpRequest` | `{category,note?,messageId?,requestId}` | 본인 도움 요청. `messageId`는 본인 수신함 항목만 |
+| `resolveHelpRequest` | `{classId,roundId,helpId,resolution,requestId}` | 교사 처리, 감사 기록 |
+| `getTeacherRoundOverview` | `{classId,roundId}` | 도움 요청 → 대기 쪽지 → 참가 상태 → 일정. 감사 기록 |
+| `revealRound` | `{classId,roundId,requestId}` | 공개 대기·미처리 도움/쪽지 0건일 때 활성 관계만 공개 |
+| `sendThankYou` | `{text,requestId}` | 공개 후 준비된 감사 문구 1건 |
+| `saveReflection` | `{text}` | 공개 후 본인 돌아보기 최대 300자 |
+| `copyRoundSettings` | `{classId,sourceRoundId,title,startsAt,endsAt,requestId}` | 종료 회차에서 설정만 새 초안으로 복사. 새 수업일 확인·저장 필요 |
+| `deleteClassData` | `{classId,requestId}` | 모든 회차 종료 후 학급 소유 교사만. 재시도 가능한 삭제 작업으로 학급 하위 문서, 카드 자격, 코드 조회, 학생 Auth 계정을 삭제 |
+
+`excludedPairs` 요청은 `[[studentUid,studentUid], ...]`, 저장값은 Firestore 중첩 배열 제한에 맞춘 `[{a,b}, ...]`다. `missionIds`는 비워 기본 3개를 사용하거나 서로 다른 3개를 고른다. 학생에게 내려주는 쪽지에는 발신 UID와 원본 작성 시각을 넣지 않는다. `failed-precondition`은 회차 상태·수업일·일일 한도·제외 조건·미처리 안전 사안에 사용하고, 소속·세션·교사 권한 위반은 `permission-denied`다.
+
+실제 학생의 권리 요청 접수와 보존·백업 처리 절차는 운영 정책 확정 전이다. `deleteClassData`는 학급 전체 삭제를 검증하는 개발 기능이며 실제 학생 운영에 대한 법적 준비 완료를 뜻하지 않는다.
