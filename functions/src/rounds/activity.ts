@@ -11,6 +11,7 @@ const presetMessages = [
   "오늘도 응원해!", "함께해서 즐거웠어.", "네 생각이 참 좋았어.",
   "고마워!", "잘하고 있어!", "오늘 수고했어.",
 ];
+const dailyMessageLimit = 10;
 
 function activeForSubmission(round: FirebaseFirestore.DocumentSnapshot): boolean {
   return round.get("status") === "active" && round.get("endsAt")?.toDate() > new Date();
@@ -39,17 +40,24 @@ export const getStudentActivity = onCall(async (request) => {
     activityDates,
     canSubmit: activeForSubmission(student.roundDoc),
     koreaDate: today,
-    canSendMessage: activeForSubmission(student.roundDoc) && activityDates.includes(today) && !day.exists,
+    canSendMessage: activeForSubmission(student.roundDoc) && activityDates.includes(today)
+      && Number(day.exists ? day.get("count") ?? 1 : 0) < dailyMessageLimit,
+    messagesSentToday: Number(day.exists ? day.get("count") ?? 1 : 0),
+    dailyMessageLimit,
     nextActivityDate: activityDates.filter((date) => date > today).sort()[0] ?? null,
     reflectionText: reflection.exists ? reflection.get("text") as string : null,
     thankYouSent: thankYou.exists,
     allowFreeTextMessages: student.roundDoc.get("allowFreeTextMessages") === true,
     presetMessages,
     missions: missions.docs.map((doc) => ({ missionId: doc.id, text: doc.get("text"), status: doc.get("status") })),
-    inbox: inbox.docs.map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
-      reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true })),
-    sent: sent.docs.map((doc) => ({ messageId: doc.id, text: doc.get("text"), status: doc.get("status"),
-      date: doc.get("date"), reacted: doc.get("reacted") === true })),
+    inbox: inbox.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
+      - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
+      reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true,
+      replyToMessageId: doc.get("replyToMessageId") ?? null })),
+    sent: sent.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
+      - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), status: doc.get("status"),
+      date: doc.get("date"), reacted: doc.get("reacted") === true,
+      replyToMessageId: doc.get("replyToMessageId") ?? null })),
     help: help.docs.map((doc) => ({ helpId: doc.id, status: doc.get("status"),
       category: doc.get("category"), createdAt: doc.get("createdAt")?.toDate()?.toISOString() })),
   };
@@ -61,6 +69,8 @@ export const sendMessage = onCall(async (request) => {
   const kind = input.kind;
   if (kind !== "preset" && kind !== "free") throw new HttpsError("invalid-argument", "쪽지 방식이 올바르지 않아요.");
   const text = requireText(input.text, "쪽지", kind === "free" ? 200 : 30);
+  const replyToMessageId = input.replyToMessageId === undefined ? null
+    : requireDocumentId(input.replyToMessageId, "답장할 쪽지");
   if (kind === "preset" && !presetMessages.includes(text)) {
     throw new HttpsError("invalid-argument", "검토된 문구를 선택해 주세요.");
   }
@@ -70,12 +80,17 @@ export const sendMessage = onCall(async (request) => {
   const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
   const messageRef = student.roundRef.collection("messageSecrets").doc();
   const assignmentRef = student.roundRef.collection("assignmentSecrets").doc(student.uid);
-  const fingerprint = inputFingerprint({ kind, text, date });
+  const parentRef = replyToMessageId ? student.roundRef.collection("messageSecrets").doc(replyToMessageId) : null;
+  const parentInboxRef = replyToMessageId ? student.roundRef.collection("studentData").doc(student.uid)
+    .collection("inboxItems").doc(replyToMessageId) : null;
+  const fingerprint = inputFingerprint({ kind, text, date, replyToMessageId });
   return db.runTransaction(async (tx) => {
     await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
-    const [round, participant, assignment, command, day] = await Promise.all([
+    const [round, participant, assignment, command, day, parent, parentInbox] = await Promise.all([
       tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
       tx.get(assignmentRef), tx.get(commandRef), tx.get(dayRef),
+      parentRef ? tx.get(parentRef) : Promise.resolve(null),
+      parentInboxRef ? tx.get(parentInboxRef) : Promise.resolve(null),
     ]);
     if (command.exists) {
       assertSameCommand(command.data(), "sendMessage", student.uid, fingerprint);
@@ -85,31 +100,35 @@ export const sendMessage = onCall(async (request) => {
       || !(round.get("activityDates") as string[]).includes(date)) {
       throw new HttpsError("failed-precondition", "오늘은 쪽지를 보낼 수 있는 수업일이 아니에요.");
     }
-    if (kind === "free" && round.get("allowFreeTextMessages") !== true) {
-      throw new HttpsError("permission-denied", "이 회차는 선택형 쪽지만 사용할 수 있어요.");
+    if (!assignment.exists || Number(day.exists ? day.get("count") ?? 1 : 0) >= dailyMessageLimit) {
+      throw new HttpsError("failed-precondition", "오늘 보낼 수 있는 쪽지 수를 모두 사용했어요.");
     }
-    if (!assignment.exists || day.exists) {
-      throw new HttpsError("failed-precondition", "오늘의 쪽지는 이미 보냈거나 배정을 확인할 수 없어요.");
+    if (replyToMessageId && (!parent?.exists || parent.get("receiverUid") !== student.uid
+      || parent.get("status") !== "delivered" || !parentInbox?.exists
+      || parentInbox.get("hidden") === true || parentInbox.get("reported") === true)) {
+      throw new HttpsError("permission-denied", "받은 쪽지에만 답장할 수 있어요.");
     }
-    const receiverUid = assignment.get("receiverUid") as string;
+    const receiverUid = replyToMessageId ? parent!.get("senderUid") as string
+      : assignment.get("receiverUid") as string;
     const receiver = await tx.get(student.roundRef.collection("participants").doc(receiverUid));
     if (receiver.get("participationStatus") !== "active") {
       throw new HttpsError("failed-precondition", "쪽지를 전달할 수 없어요. 선생님께 알려 주세요.");
     }
-    const status = kind === "free" ? "pending" : "delivered";
+    const status = "delivered";
     const result = { messageId: messageRef.id, status };
-    tx.create(dayRef, { senderUid: student.uid, date, messageId: messageRef.id,
+    if (day.exists) tx.update(dayRef, {count: Number(day.get("count") ?? 1) + 1,
+      lastMessageId: messageRef.id, updatedAt: FieldValue.serverTimestamp()});
+    else tx.create(dayRef, { senderUid: student.uid, date, count: 1, lastMessageId: messageRef.id,
       createdAt: FieldValue.serverTimestamp() });
     tx.create(messageRef, { senderUid: student.uid, receiverUid, text, kind, status,
-      date, createdAt: FieldValue.serverTimestamp() });
+      date, replyToMessageId, createdAt: FieldValue.serverTimestamp() });
     tx.create(student.roundRef.collection("studentData").doc(student.uid).collection("sentMessages").doc(messageRef.id), {
-      text, kind, status, date, createdAt: FieldValue.serverTimestamp(),
+      text, kind, status, date, replyToMessageId, createdAt: FieldValue.serverTimestamp(),
     });
-    if (status === "delivered") {
-      tx.create(student.roundRef.collection("studentData").doc(receiverUid).collection("inboxItems").doc(messageRef.id), {
-        text, type: "encouragement", hidden: false, reported: false, createdAt: FieldValue.serverTimestamp(),
-      });
-    }
+    tx.create(student.roundRef.collection("studentData").doc(receiverUid).collection("inboxItems").doc(messageRef.id), {
+      text, type: "encouragement", replyToMessageId, hidden: false, reported: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
     tx.create(commandRef, { type: "sendMessage", requestedBy: student.uid,
       inputFingerprint: fingerprint, result, createdAt: FieldValue.serverTimestamp() });
     return result;
@@ -312,7 +331,7 @@ export const getTeacherRoundOverview = onCall(async (request) => {
       helpCount: helps.size, pendingMessageCount: messages.size, participantCount: participants.size };
   }
   const [helps, messages, participants, members] = await Promise.all([
-    roundRef.collection("helpSecrets").get(), roundRef.collection("messageSecrets").get(),
+    roundRef.collection("helpSecrets").get(), roundRef.collection("messageSecrets").where("status", "==", "pending").get(),
     roundRef.collection("participants").get(), classRef.collection("members").get(),
   ]);
   const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
@@ -364,4 +383,71 @@ export const getMessageForReview = onCall(async (request) => {
     status: message.get("status"), senderUid: message.get("senderUid"),
     senderName: names.get(message.get("senderUid")), receiverUid: message.get("receiverUid"),
     receiverName: names.get(message.get("receiverUid")) };
+});
+
+export const listTeacherMessages = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "시즌");
+  const {classRef, roundRef} = await requireTeacherRound(teacherUid, classId, roundId);
+  let query = roundRef.collection("messageSecrets").orderBy("createdAt", "desc").limit(51);
+  if (input.cursor !== undefined) {
+    const cursorId = requireDocumentId(input.cursor, "쪽지 위치");
+    const cursor = await roundRef.collection("messageSecrets").doc(cursorId).get();
+    if (!cursor.exists) throw new HttpsError("invalid-argument", "쪽지 목록 위치가 바뀌었어요.");
+    query = query.startAfter(cursor);
+  }
+  const [messages, members] = await Promise.all([query.get(), classRef.collection("members").get()]);
+  const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
+  const page = messages.docs.slice(0, 50);
+  await classRef.collection("auditLogs").add({action:"message.teacher_list",actorUid:teacherUid,
+    roundId, count:page.length, createdAt:FieldValue.serverTimestamp()});
+  return {messages:page.map((doc) => ({messageId:doc.id,
+    senderName:names.get(doc.get("senderUid")) ?? "등록 해제 학생",
+    receiverName:names.get(doc.get("receiverUid")) ?? "등록 해제 학생",
+    date:doc.get("date"), status:doc.get("status"), kind:doc.get("kind"),
+    replyToMessageId:doc.get("replyToMessageId") ?? null})),
+    nextCursor:messages.size > 50 ? page.at(-1)!.id : null};
+});
+
+export const moderateMessage = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "시즌");
+  const messageId = requireDocumentId(input.messageId, "쪽지");
+  const requestId = requireRequestId(input.requestId);
+  const {classRef, roundRef} = await requireTeacherRound(teacherUid, classId, roundId);
+  const messageRef = roundRef.collection("messageSecrets").doc(messageId);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  const fingerprint = inputFingerprint({classId, roundId, messageId});
+  return db.runTransaction(async (tx) => {
+    const [classDoc, message, command] = await Promise.all([
+      tx.get(classRef), tx.get(messageRef), tx.get(commandRef)]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "moderateMessage", teacherUid, fingerprint);
+      return {messageId, status:"moderated"};
+    }
+    if (!message.exists || message.get("status") !== "delivered") {
+      throw new HttpsError("failed-precondition", "전달된 쪽지만 숨길 수 있어요.");
+    }
+    const receiverUid = message.get("receiverUid") as string;
+    const senderUid = message.get("senderUid") as string;
+    const inboxRef = roundRef.collection("studentData").doc(receiverUid).collection("inboxItems").doc(messageId);
+    const sentRef = roundRef.collection("studentData").doc(senderUid).collection("sentMessages").doc(messageId);
+    const [inbox, sent] = await Promise.all([tx.get(inboxRef), tx.get(sentRef)]);
+    if (!inbox.exists || !sent.exists) throw new HttpsError("failed-precondition", "쪽지 사본을 찾을 수 없어요.");
+    tx.update(messageRef, {status:"moderated", moderatedBy:teacherUid,
+      moderatedAt:FieldValue.serverTimestamp()});
+    tx.update(inboxRef, {hidden:true, moderated:true});
+    tx.update(sentRef, {status:"moderated"});
+    tx.create(commandRef, {type:"moderateMessage", requestedBy:teacherUid,
+      inputFingerprint:fingerprint, result:{messageId,status:"moderated"},
+      createdAt:FieldValue.serverTimestamp()});
+    tx.create(classRef.collection("auditLogs").doc(), {action:"message.moderated",
+      actorUid:teacherUid, roundId, messageId, requestId, createdAt:FieldValue.serverTimestamp()});
+    return {messageId,status:"moderated"};
+  });
 });

@@ -75,7 +75,7 @@ export function parseRoundInput(value: unknown): {
   const missionIds = input.missionIds === undefined ? [] : input.missionIds;
   if (!Array.isArray(missionIds) || ![0, 3].includes(missionIds.length)
     || new Set(missionIds).size !== missionIds.length
-    || missionIds.some((id) => typeof id !== "string" || !/^[a-z0-9_-]{3,40}$/.test(id))) {
+    || missionIds.some((id) => typeof id !== "string" || !/^[A-Za-z0-9_-]{3,40}$/.test(id))) {
     throw new HttpsError("invalid-argument", "서로 다른 미션 3개를 선택해 주세요.");
   }
   return {

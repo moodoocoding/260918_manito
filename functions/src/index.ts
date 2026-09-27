@@ -21,8 +21,9 @@ export { deleteClassData } from "./classes/deleteClassData.js";
 export { createRightsRequest, listMyRightsRequests, getRightsRequestsForTeacher } from "./classes/rightsRequests.js";
 export { listRounds, getRoundSettingsForTeacher, createRound, updateRound, prepareRound, startRound,
   changeRoundStatus, extendRound, getAssignmentsForTeacher } from "./rounds/flow.js";
-export { getMissionCatalog, setMissionStatus, replaceMission } from "./rounds/missions.js";
+export { getMissionCatalog, createCustomMission, setMissionStatus, replaceMission } from "./rounds/missions.js";
 export { getStudentActivity, sendMessage, reviewMessage, hideMessage, reactToMessage,
-  createHelpRequest, resolveHelpRequest, getTeacherRoundOverview, getMessageForReview } from "./rounds/activity.js";
+  createHelpRequest, resolveHelpRequest, getTeacherRoundOverview, getMessageForReview,
+  listTeacherMessages, moderateMessage } from "./rounds/activity.js";
 export { stopRoundParticipation, revealRound, sendThankYou,
   saveReflection, copyRoundSettings } from "./rounds/reveal.js";

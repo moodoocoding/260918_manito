@@ -62,6 +62,10 @@ function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selected, setSelected] = useState<ClassInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [cardCodes, setCardCodes] = useState<Record<string, string>>({});
+  const [cardCodesLoading, setCardCodesLoading] = useState(false);
+  const [cardCodesError, setCardCodesError] = useState(false);
+  const [cardCodesHidden, setCardCodesHidden] = useState(false);
   const [printCards, setPrintCards] = useState<Card[]>([]);
   const [selectedCardUids, setSelectedCardUids] = useState<string[]>([]);
   const [pendingPrint, setPendingPrint] = useState<{studentUids: string[]; missingStudentUids: string[]} | null>(null);
@@ -88,6 +92,8 @@ function App() {
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
   const pendingRegistration = useRef<{ key: string; requestId: string } | null>(null);
   const printTimeout = useRef<number | null>(null);
+  const cardCodeTimeout = useRef<number | null>(null);
+  const cardReadVersion = useRef(0);
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
 
@@ -95,6 +101,8 @@ function App() {
     generation.current += 1;
     setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
     setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setHome(null); setTargetVisible(false);
+    cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(false);
+    if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
@@ -406,6 +414,40 @@ function App() {
 
   const activeMemberUids = members.filter((member) => member.accessStatus === "active")
     .map((member) => member.studentUid);
+  const loadCardCodes = useCallback(async () => {
+    if (!selected || teacherPage !== "students" || role !== "teacher") return;
+    const studentUids = members.filter((member) => member.accessStatus === "active")
+      .map((member) => member.studentUid);
+    const version = ++cardReadVersion.current;
+    setCardCodes({}); setCardCodesHidden(false); setCardCodesError(false);
+    if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
+    if (!studentUids.length) return;
+    setCardCodesLoading(true);
+    try {
+      const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
+        {classId: selected.classId, studentUids});
+      if (version !== cardReadVersion.current || document.visibilityState !== "visible") return;
+      setCardCodes(Object.fromEntries(result.cards.map((card) => [card.studentUid, card.cardCode])));
+      cardCodeTimeout.current = window.setTimeout(() => {
+        cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(true);
+      }, 5 * 60_000);
+    } catch {
+      if (version === cardReadVersion.current) setCardCodesError(true);
+    } finally {
+      if (version === cardReadVersion.current) setCardCodesLoading(false);
+    }
+  }, [selected?.classId, teacherPage, role, members]);
+  useEffect(() => {
+    if (teacherPage === "students" && selected && role === "teacher") void loadCardCodes();
+    else {cardReadVersion.current++; setCardCodes({}); setCardCodesLoading(false);}
+    const hide = () => {if (document.visibilityState !== "visible") {
+      cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(true); setCardCodesLoading(false);
+      if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
+    }};
+    document.addEventListener("visibilitychange", hide);
+    return () => {document.removeEventListener("visibilitychange", hide);
+      if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);};
+  }, [loadCardCodes, teacherPage, selected?.classId, role]);
   const filteredMembers = members.filter((member) => member.displayName.includes(memberSearch)
     && (memberFilter === "all" || member.accessStatus === memberFilter));
 
@@ -480,6 +522,8 @@ function App() {
                   : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
                 <div className="card-list-heading"><div><h3>학생 명단 · {members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
                   <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button></div>
+                <div className="card-code-notice"><span>개인 코드는 선생님에게만 표시돼요. 다른 화면으로 이동하거나 5분이 지나면 가려집니다.</span><button type="button" className="small outline" disabled={cardCodesLoading || activeMemberUids.length === 0} onClick={() => void loadCardCodes()}>{cardCodesLoading ? "코드 확인 중…" : cardCodesHidden ? "코드 다시 보기" : "코드 새로고침"}</button></div>
+                {cardCodesError && <p className="message error" role="alert">개인 코드를 불러오지 못했어요. 코드 새로고침을 눌러 다시 시도해 주세요.</p>}
                 <div className="page-actions card-filters"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 불가</option></select></label></div>
                 <div className="card-selection-toolbar"><button type="button" className="small outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setSelectedCardUids(activeMemberUids)}>전체 선택</button><button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setSelectedCardUids([])}>선택 해제</button><button type="button" disabled={busy || selectedCardUids.length === 0} onClick={() => void preparePrint(selectedCardUids)}>선택한 카드 {selectedCardUids.length}장 출력</button></div>
                 {members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요. 학생을 등록하면 입장 카드를 출력할 수 있어요.</p> :
@@ -488,6 +532,7 @@ function App() {
                       const checked = selectedCardUids.includes(member.studentUid);
                       return <li key={member.studentUid} className={`student-card-row${checked ? " is-selected" : ""}`}>
                         <label className="student-card-choice"><input type="checkbox" checked={checked} disabled={member.accessStatus !== "active"} onChange={(event) => setSelectedCardUids((old) => event.target.checked ? [...old, member.studentUid] : old.filter((uid) => uid !== member.studentUid))} /><span className="student-card-number">{members.indexOf(member) + 1}</span><strong>{member.displayName}</strong></label>
+                        <div className="student-card-code">개인 코드 <code>{member.accessStatus !== "active" ? "입장 불가" : cardCodes[member.studentUid] ?? (cardCodesLoading ? "확인 중…" : cardCodesHidden ? "가려짐" : member.printableCardAvailable ? "코드 확인 필요" : "이전 카드 · 재발급 필요")}</code></div>
                         <div className="student-card-actions"><span className="student-card-status">{member.accessStatus !== "active" ? "입장 불가" : member.printableCardAvailable ? "입장 가능 · 출력 가능" : "입장 가능 · 첫 출력 때 재발급"}</span>
                           <button type="button" className="small outline" disabled={busy || member.accessStatus !== "active"} onClick={() => setConfirmMember({member,action:"rotate"})}>재발급</button>
                           <button type="button" className="small outline" disabled={busy} onClick={() => member.accessStatus === "active" ? setConfirmMember({member,action:"block"}) : void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div>

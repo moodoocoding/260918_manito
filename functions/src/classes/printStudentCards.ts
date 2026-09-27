@@ -59,7 +59,7 @@ export const getPrintableCards = onCall({ secrets: [cardPrintKey] }, async (requ
       actorUid: teacherUid, studentUids, studentCount: studentUids.length,
       createdAt: FieldValue.serverTimestamp(),
     });
-    return missingStudentUids.length ? {cards: [], missingStudentUids} : {cards, missingStudentUids: []};
+    return {cards, missingStudentUids};
   });
 });
 

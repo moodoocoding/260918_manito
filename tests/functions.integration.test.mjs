@@ -159,7 +159,8 @@ test("teacher creates a class, registers students, and rotates a student card", 
     printableCardAvailable: false,
   });
   const unavailable = await printCards({classId, studentUids: [firstStudent.studentUid, secondStudent.studentUid]});
-  assert.deepEqual(unavailable.data.cards, [], "partial card codes must not be returned");
+  assert.deepEqual(unavailable.data.cards.map((card) => card.studentUid), [firstStudent.studentUid],
+    "teacher list keeps valid codes visible beside a legacy card");
   assert.deepEqual(unavailable.data.missingStudentUids, [secondStudent.studentUid]);
   const reissueMissing = httpsCallable(teacherFunctions, "reissueMissingCards");
   await assert.rejects(httpsCallable(otherTeacherFunctions, "reissueMissingCards")({

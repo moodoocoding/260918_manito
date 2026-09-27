@@ -3,6 +3,9 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { assertStudentTransaction, requireStudentRound } from "../shared/student.js";
 import { requireRecord, requireRequestId } from "../shared/validation.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
+import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
+import { db } from "../shared/firebase.js";
+import { requireDocumentId, requireText } from "../shared/validation.js";
 import { koreaDate } from "./common.js";
 
 export const missionCatalog: Record<string, string[]> = {
@@ -28,29 +31,103 @@ export const missionCatalog: Record<string, string[]> = {
   ],
 };
 
+export const missionCategories = ["인사와 칭찬", "경청과 대화", "협력과 배려", "감사와 응원"] as const;
+const originalCategories: Record<string, number[]> = {
+  lower: [0, 1, 3, 2, 3, 2, 0, 1, 2, 2],
+  middle: [1, 0, 1, 2, 3, 2, 2, 0, 2, 3],
+  upper: [1, 0, 1, 2, 3, 2, 1, 2, 1, 3],
+};
+const extraMissions: string[][] = [
+  ["친구에게 먼저 밝게 인사하기", "친구가 새로 시도한 일을 알아봐 주기", "친구의 좋은 생각 하나를 말해 주기",
+    "친구가 노력한 과정을 칭찬하기", "친구의 장점을 구체적으로 한 가지 전하기", "친구의 발표에서 좋았던 점 말하기",
+    "친구가 해낸 작은 일을 함께 기뻐하기", "친구가 배려한 순간을 찾아 알려주기", "친구의 의견 중 마음에 남은 점 말하기",
+    "친구에게 오늘 잘한 점을 한 가지 전하기"],
+  ["친구가 말하는 동안 끼어들지 않기", "친구의 의견을 듣고 다시 확인하기", "친구에게 오늘 즐거웠던 일을 물어보기",
+    "친구가 고른 놀이 방법을 들어보기", "모둠에서 친구가 말할 차례를 기다리기", "친구가 전한 생각을 한 문장으로 되짚기",
+    "친구에게 어떤 도움이 편한지 물어보기", "친구가 제안한 방법을 먼저 들어보기", "친구가 말할 때 눈을 맞추고 듣기",
+    "친구의 이야기에 질문 한 가지로 관심 보이기"],
+  ["함께 쓰는 자리를 사용 뒤 정리하기", "모둠에서 친구의 역할을 존중하기", "친구가 원하면 정리할 일을 함께 나누기",
+    "공용 물건을 다음 친구가 쓰기 좋게 두기", "친구가 어려워하는 일을 도와도 되는지 먼저 묻기",
+    "함께 할 수 있는 작은 교실 일을 찾아보기", "놀이 규칙을 모두가 이해하도록 다시 말하기",
+    "친구가 참여할 수 있는 순서를 함께 정하기", "모둠 활동에서 친구의 아이디어를 활용하기",
+    "친구가 부담 없이 도움을 거절할 수 있게 제안하기"],
+  ["친구에게 고마웠던 순간을 말하기", "친구가 해 준 일을 떠올려 감사 전하기", "친구에게 응원 한마디 건네기",
+    "친구에게 힘이 된 말을 한 문장 적기", "친구의 다음 도전을 응원하기", "친구가 어려운 일을 마친 뒤 수고했다고 말하기",
+    "친구의 친절한 행동에 고맙다고 말하기", "친구에게 편안한 하루를 바라는 말 전하기",
+    "친구의 노력에 힘이 되는 표현 골라 전하기", "친구가 도와준 이유를 떠올려 감사하기"],
+];
+
+export function builtInMissions(gradeBand: string): Array<{missionId: string; text: string; category: string}> {
+  const originals = missionCatalog[gradeBand];
+  if (!originals) return [];
+  const entries = originals.map((text, index) => ({missionId: `${gradeBand}-${String(index + 1).padStart(2, "0")}`,
+    text, category: missionCategories[originalCategories[gradeBand][index]]}));
+  for (let category = 0; category < missionCategories.length; category++) {
+    const needed = 10 - entries.filter((item) => item.category === missionCategories[category]).length;
+    for (const text of extraMissions[category].slice(0, needed)) {
+      entries.push({missionId: `${gradeBand}-${String(entries.length + 1).padStart(2, "0")}`,
+        text, category: missionCategories[category]});
+    }
+  }
+  return entries;
+}
+
 export function missionText(gradeBand: string, missionId: string): string | null {
   const match = /^(lower|middle|upper)-(\d{2})$/.exec(missionId);
   if (!match || match[1] !== gradeBand) return null;
-  return missionCatalog[gradeBand]?.[Number(match[2]) - 1] ?? null;
+  return builtInMissions(gradeBand)[Number(match[2]) - 1]?.text ?? null;
 }
 
 function requireMissionId(value: unknown): string {
-  if (typeof value !== "string" || !/^(lower|middle|upper)-\d{2}$/.test(value)) {
+  if (typeof value !== "string" || !/^(?:(?:lower|middle|upper)-\d{2}|custom_[A-Za-z0-9]{20})$/.test(value)) {
     throw new HttpsError("invalid-argument", "미션 값이 올바르지 않아요.");
   }
   return value;
 }
 
 export const getMissionCatalog = onCall(async (request) => {
-  const { requireVerifiedTeacher } = await import("../shared/authorization.js");
-  await requireVerifiedTeacher(request);
+  const teacherUid = await requireVerifiedTeacher(request);
   const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
   if (input.gradeBand !== "lower" && input.gradeBand !== "middle" && input.gradeBand !== "upper") {
     throw new HttpsError("invalid-argument", "학년군을 선택해 주세요.");
   }
-  return { missions: missionCatalog[input.gradeBand].map((text, index) => ({
-    missionId: `${input.gradeBand}-${String(index + 1).padStart(2, "0")}`, text,
-  })) };
+  const classRef = db.doc(`classes/${classId}`);
+  const classDoc = await classRef.get();
+  assertClassTeacher(classDoc.data(), teacherUid);
+  if (classDoc.get("gradeBand") !== input.gradeBand) throw new HttpsError("invalid-argument", "학급 학년군이 달라요.");
+  const custom = await classRef.collection("customMissions").get();
+  return {categories: missionCategories, missions: [...builtInMissions(input.gradeBand),
+    ...custom.docs.map((doc) => ({missionId: `custom_${doc.id}`, text: doc.get("text") as string,
+      category: "우리 반 미션"}))]};
+});
+
+export const createCustomMission = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const text = requireText(input.text, "미션", 100);
+  const requestId = requireRequestId(input.requestId);
+  const classRef = db.doc(`classes/${classId}`);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  const missionRef = classRef.collection("customMissions").doc();
+  const fingerprint = inputFingerprint({classId, text});
+  return db.runTransaction(async (tx) => {
+    const [classDoc, command] = await Promise.all([tx.get(classRef), tx.get(commandRef)]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "createCustomMission", teacherUid, fingerprint);
+      return command.get("result") as {missionId: string; text: string; category: string};
+    }
+    const count = Number(classDoc.get("customMissionCount") ?? 0);
+    if (count >= 40) throw new HttpsError("resource-exhausted", "우리 반 미션은 40개까지 추가할 수 있어요.");
+    const result = {missionId: `custom_${missionRef.id}`, text, category: "우리 반 미션"};
+    tx.create(missionRef, {text, createdBy: teacherUid, createdAt: FieldValue.serverTimestamp()});
+    tx.update(classRef, {customMissionCount: count + 1, updatedAt: FieldValue.serverTimestamp()});
+    tx.create(commandRef, {type:"createCustomMission", requestedBy:teacherUid, inputFingerprint:fingerprint,
+      result, createdAt:FieldValue.serverTimestamp()});
+    return result;
+  });
 });
 
 export const setMissionStatus = onCall(async (request) => {
@@ -103,7 +180,7 @@ export const replaceMission = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "이 미션은 더 바꿀 수 없어요.");
     }
     const used = new Set(all.docs.map((doc) => doc.id));
-    const candidate = missionCatalog[gradeBand]?.map((_, index) => `${gradeBand}-${String(index + 1).padStart(2, "0")}`)
+    const candidate = builtInMissions(gradeBand).map((item) => item.missionId)
       .find((id) => !used.has(id));
     if (!candidate) throw new HttpsError("failed-precondition", "교체할 미션이 없어요.");
     const text = missionText(gradeBand, candidate)!;

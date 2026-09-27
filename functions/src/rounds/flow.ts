@@ -14,6 +14,24 @@ function roundRefs(classId: string, roundId: string) {
   return { classRef, roundRef, settingsRef: classRef.collection("roundSettings").doc(roundId) };
 }
 
+async function selectedMissionTexts(
+  tx: FirebaseFirestore.Transaction, classRef: FirebaseFirestore.DocumentReference,
+  gradeBand: string, missionIds: string[],
+): Promise<Map<string, string>> {
+  const texts = new Map<string, string>();
+  for (const id of missionIds) {
+    const builtIn = missionText(gradeBand, id);
+    if (builtIn) { texts.set(id, builtIn); continue; }
+    if (!/^custom_[A-Za-z0-9]{20}$/.test(id)) {
+      throw new HttpsError("invalid-argument", "학년군에 맞는 미션을 선택해 주세요.");
+    }
+    const custom = await tx.get(classRef.collection("customMissions").doc(id.slice(7)));
+    if (!custom.exists) throw new HttpsError("invalid-argument", "우리 반 미션을 찾을 수 없어요.");
+    texts.set(id, custom.get("text") as string);
+  }
+  return texts;
+}
+
 export const listRounds = onCall(async (request) => {
   const teacherUid = await requireVerifiedTeacher(request);
   const input = requireRecord(request.data);
@@ -155,9 +173,7 @@ export const prepareRound = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "이 제외 조건으로는 모두를 배정할 수 없어요.");
     }
     const gradeBand = classDoc.get("gradeBand") as string;
-    if (settings.missionIds.some((id) => !missionText(gradeBand, id))) {
-      throw new HttpsError("invalid-argument", "학년군에 맞는 미션을 선택해 주세요.");
-    }
+    await selectedMissionTexts(tx, classRef, gradeBand, settings.missionIds);
     tx.update(roundRef, { status: "ready", rosterVersion: settings.rosterVersion,
       updatedAt: FieldValue.serverTimestamp() });
     return { roundId, status: "ready", rosterVersion: settings.rosterVersion };
@@ -211,6 +227,7 @@ export const startRound = onCall(async (request) => {
     const gradeBand = classDoc.get("gradeBand") as string;
     const missionIds = settings.missionIds.length === 3 ? settings.missionIds
       : [1, 2, 3].map((index) => `${gradeBand}-${String(index).padStart(2, "0")}`);
+    const missionTexts = await selectedMissionTexts(tx, classRef, gradeBand, missionIds);
     for (const [giverUid, receiverUid] of assignments) {
       tx.create(roundRef.collection("assignmentSecrets").doc(giverUid), {
         giverUid, receiverUid, createdAt: FieldValue.serverTimestamp(),
@@ -223,8 +240,7 @@ export const startRound = onCall(async (request) => {
         createdAt: FieldValue.serverTimestamp(),
       });
       for (const missionId of missionIds) {
-        const text = missionText(gradeBand, missionId);
-        if (!text) throw new HttpsError("invalid-argument", "미션 선택이 올바르지 않아요.");
+        const text = missionTexts.get(missionId)!;
         tx.create(roundRef.collection("studentData").doc(giverUid).collection("missions").doc(missionId), {
           text, status: "todo", replacementCount: 0, createdAt: FieldValue.serverTimestamp(),
         });

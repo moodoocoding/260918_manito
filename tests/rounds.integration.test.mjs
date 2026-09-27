@@ -73,6 +73,22 @@ test("four students complete two isolated rounds with review, help, reveal and h
     displayNames:["가람","나래","다온","라온"], requestId:rid()});
   const cards = registration.students;
   const ids = cards.map((c) => c.studentUid);
+  const catalog = await teacher.call("getMissionCatalog",{classId,gradeBand:"middle"});
+  assert.equal(catalog.missions.length,40);
+  for (const category of catalog.categories) {
+    assert.equal(catalog.missions.filter((mission)=>mission.category===category).length,10);
+  }
+  assert.equal(catalog.missions.find((mission)=>mission.missionId==="middle-01")?.category,"경청과 대화");
+  assert.equal(catalog.missions.find((mission)=>mission.missionId==="middle-02")?.category,"인사와 칭찬");
+  await assert.rejects(other.call("getMissionCatalog",{classId,gradeBand:"middle"}),
+    {code:"functions/permission-denied"});
+  const customRequestId = rid();
+  const custom = await teacher.call("createCustomMission",{classId,
+    text:"친구의 의견을 차분히 들어주기",requestId:customRequestId});
+  assert.deepEqual(await teacher.call("createCustomMission",{classId,
+    text:"친구의 의견을 차분히 들어주기",requestId:customRequestId}),custom);
+  await assert.rejects(other.call("createCustomMission",{classId,text:"다른 미션",requestId:rid()}),
+    {code:"functions/permission-denied"});
   for (let i=0;i<4;i++) {
     const login = await students[i].call("loginStudent", {classCode, cardCode:cards[i].cardCode});
     await signInWithCustomToken(students[i].auth, login.customToken);
@@ -104,7 +120,8 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await assert.rejects(teacher.call("startRound",{classId,roundId:future.roundId,
     rosterVersion:futureReady.rosterVersion,requestId:rid()}),{code:"functions/failed-precondition"});
   await teacher.call("changeRoundStatus",{classId,roundId:future.roundId,action:"cancel",requestId:rid()});
-  const first = await teacher.call("createRound", roundInput(classId, ids, "첫 번째 작전"));
+  const first = await teacher.call("createRound", {...roundInput(classId, ids, "첫 번째 작전"),
+    missionIds:[custom.missionId,"middle-02","middle-03"]});
   const roundId = first.roundId;
   assert.equal((await students[0].call("getStudentHome", null)).round, null);
   const badPairs = ids.slice(1).map((id) => [ids[0], id]);
@@ -132,6 +149,7 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await assert.rejects(getDoc(doc(teacher.db,ownDataPath)));
   const activity = await students[0].call("getStudentActivity",null);
   assert.equal(activity.missions.length,3);
+  assert.ok(activity.missions.some((mission)=>mission.text===custom.text));
   assert.equal(activity.thankYouSent,false);
   assert.equal(activity.reflectionText,null);
   assert.equal(typeof activity.koreaDate,"string");
@@ -142,28 +160,49 @@ test("four students complete two isolated rounds with review, help, reveal and h
     requestId:replaceId}), {code:"functions/already-exists"});
   const firstMsg = await students[0].call("sendMessage", {kind:"preset",text:"오늘도 응원해!",requestId:rid()});
   assert.equal(firstMsg.status,"delivered");
-  await assert.rejects(students[0].call("sendMessage", {kind:"preset",text:"고마워!",requestId:rid()}),
-    {code:"functions/failed-precondition"});
+  assert.equal((await students[0].call("sendMessage", {kind:"preset",text:"고마워!",requestId:rid()})).status,"delivered");
   const target0 = assignments.find((a)=>a.giverUid===ids[0]).receiverUid;
   const receiver0 = students[ids.indexOf(target0)];
-  assert.equal((await receiver0.call("getStudentActivity",null)).inbox.length,1);
+  const stranger = students[ids.findIndex((id)=>id!==ids[0] && id!==target0)];
+  assert.equal((await receiver0.call("getStudentActivity",null)).inbox.length,2);
+  const reply = await receiver0.call("sendMessage",{kind:"free",text:"응원 고마워!",
+    replyToMessageId:firstMsg.messageId,requestId:rid()});
+  assert.equal(reply.status,"delivered");
+  assert.ok((await students[0].call("getStudentActivity",null)).inbox.some((m)=>m.messageId===reply.messageId));
+  await assert.rejects(stranger.call("sendMessage",{kind:"free",text:"허용되지 않은 답장",
+    replyToMessageId:firstMsg.messageId,requestId:rid()}),{code:"functions/permission-denied"});
+  const monitored = await teacher.call("listTeacherMessages",{classId,roundId});
+  assert.ok(monitored.messages.some((item)=>item.messageId===reply.messageId));
+  assert.equal(JSON.stringify(monitored).includes("응원 고마워!"),false);
+  await assert.rejects(other.call("listTeacherMessages",{classId,roundId}),
+    {code:"functions/permission-denied"});
+  await teacher.call("moderateMessage",{classId,roundId,messageId:reply.messageId,requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",null)).inbox.find((m)=>m.messageId===reply.messageId).hidden,true);
+  await assert.rejects(students[0].call("sendMessage",{kind:"free",text:"숨긴 쪽지 답장",
+    replyToMessageId:reply.messageId,requestId:rid()}),{code:"functions/permission-denied"});
+  for (let i=0;i<8;i++) await students[0].call("sendMessage",{
+    kind:"preset",text:"고마워!",requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",null)).messagesSentToday,10);
+  await assert.rejects(students[0].call("sendMessage",{kind:"preset",text:"고마워!",requestId:rid()}),
+    {code:"functions/failed-precondition"});
   await receiver0.call("reactToMessage",{messageId:firstMsg.messageId,requestId:rid()});
-  assert.equal((await students[0].call("getStudentActivity",null)).sent[0].reacted,true);
+  assert.equal((await students[0].call("getStudentActivity",null)).sent.find((m)=>m.messageId===firstMsg.messageId).reacted,true);
   await assert.rejects(receiver0.call("reactToMessage",{messageId:firstMsg.messageId,requestId:rid()}),
     {code:"functions/failed-precondition"});
   const free = await students[1].call("sendMessage", {kind:"free",text:"좋은 생각을 알려줘서 고마워.",requestId:rid()});
-  assert.equal(free.status,"pending");
+  assert.equal(free.status,"delivered");
   const overview = await teacher.call("getTeacherRoundOverview", {classId,roundId});
-  assert.equal(overview.pendingMessages.length,1);
+  assert.equal(overview.pendingMessages.length,0);
   assert.ok(overview.participation.every((item) => item.lastLoginAt));
   const summary = await teacher.call("getTeacherRoundOverview", {classId,roundId,summaryOnly:true});
-  assert.equal(summary.pendingMessageCount,1);
+  assert.equal(summary.pendingMessageCount,0);
   assert.equal(summary.participantCount,4);
   assert.equal(JSON.stringify(summary).includes("좋은 생각을 알려줘서"),false);
   assert.equal("pendingMessages" in summary,false);
   await assert.rejects(other.call("getTeacherRoundOverview",{classId,roundId,summaryOnly:true}),
     {code:"functions/permission-denied"});
-  await teacher.call("reviewMessage",{classId,roundId,messageId:free.messageId,decision:"approve",requestId:rid()});
+  await assert.rejects(teacher.call("reviewMessage",{classId,roundId,messageId:free.messageId,
+    decision:"approve",requestId:rid()}),{code:"functions/failed-precondition"});
   await receiver0.call("createHelpRequest", {category:"message",messageId:firstMsg.messageId,requestId:rid()});
   const reported = await teacher.call("getMessageForReview",{classId,roundId,messageId:firstMsg.messageId});
   assert.equal(reported.senderUid,ids[0]);

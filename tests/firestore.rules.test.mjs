@@ -159,6 +159,16 @@ test("login credentials and class-code lookups are server-only", async () => {
   await assertFails(getDoc(doc(db, "classCodes/ABCDEFGH")));
 });
 
+test("teacher-created mission text is available only through audited functions", async () => {
+  const path = "classes/class-a/customMissions/mission-a";
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), path), {text:"가상 미션"});
+  });
+  await assertFails(getDoc(doc(teacherDb("teacher-a"), path)));
+  await assertFails(getDoc(doc(studentDb("student-a"), path)));
+  await assertFails(setDoc(doc(teacherDb("teacher-a"), path), {text:"바꾼 미션"}));
+});
+
 test("student rights requests are available only through audited functions", async () => {
   const path = "classes/class-a/rightsRequests/request-a";
   await assertFails(getDoc(doc(studentDb("student-a"), path)));

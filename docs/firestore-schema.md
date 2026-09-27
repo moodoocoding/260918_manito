@@ -17,6 +17,7 @@
 teachers/{teacherUid}
 classes/{classId}
   members/{studentUid}
+  customMissions/{missionId}              # 교사가 추가한 학급 미션, 서버 전용
   rightsRequests/{rightsRequestId}       # 학생 정보 열람·정정·삭제 요청, 서버 전용
   rightsCommands/{studentUid_requestId} # 요청 접수 중복 방지, 서버 전용
   rounds/{roundId}
@@ -30,7 +31,7 @@ classes/{classId}
     assignmentSecrets/{studentUid}      # 서버 전용
     messageSecrets/{messageId}          # 서버 전용
     helpSecrets/{helpId}                # 서버 전용
-    messageDays/{studentUid_yyyy-mm-dd} # 서버 전용
+    messageDays/{studentUid_yyyy-mm-dd} # 서버 전용, `count` 1~10
     studentCommands/{studentUid_requestId} # 서버 전용
     thankYouSecrets/{studentUid}        # 서버 전용
   roundSettings/{roundId}               # 참가자·제외 관계·미션 선택, 서버 전용
@@ -48,23 +49,26 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 
 ## 문서별 책임
 
+2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
+
 | 경로 | 책임 | 학생 직접 읽기 | 교사 직접 읽기 | 직접 쓰기 |
 |---|---|---:|---:|---:|
 | `teachers/{uid}` | 교사 프로필·확인 상태 | 아니요 | 본인만 | 아니요 |
 | `classes/{classId}` | 학급·학년도·담당 교사·진행 회차 잠금 | 아니요 | 담당 교사 | 아니요 |
 | `members/{studentUid}` | 표시 이름·접근 상태·세션 버전·마지막 로그인 시각·카드 재출력 가능 표시 | 본인 | 담당 교사 | 아니요 |
+| `customMissions/{missionId}` | 담당 교사가 추가한 미션 원문. 시즌 시작 때 개인 미션에 스냅샷 | 아니요 | 함수로만 조회 | 서버만 |
 | `rightsRequests`, `rightsCommands` | 정보 열람·정정·삭제 요청의 종류·내용·상태와 멱등 명령 | 아니요 | 감사 기록을 남기는 함수로 조회 | 서버만 |
 | `rounds/{roundId}` | 회차 일정·상태·메시지 정책 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
 | `studentData/{studentUid}` | 본인에게 공개할 상대·공개 결과 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
 | `missions` | 미션 내용 스냅샷과 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
-| `inboxItems` | 승인되어 수신자에게 보여줄 쪽지 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
-| `sentMessages` | 발신자에게 보여줄 검토·전달 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `inboxItems` | 즉시 전달된 수신 쪽지·답장 연결·숨김/신고 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
+| `sentMessages` | 발신자에게 보여줄 본인 쪽지·전달/교사 숨김 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `helpRequests` | 도움 요청과 교사 처리 상태 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
 | `roundSettings` | 참가자·제외 관계·미션 선택·명단 버전 | 아니요 | 함수로 감사 후 조회 | 서버만 |
 | `helpSecrets`, `messageDays`, `studentCommands`, `thankYouSecrets` | 안전 원문·하루 한도·중복 명령·감사 전달 | 아니요 | 함수로 감사 후 조회 | 서버만 |
 | `assignmentSecrets` | 전체 방향 관계 | 아니요 | 함수로 감사 후 열람 | 서버만 |
-| `messageSecrets` | 원문·발신자·수신자·검토 정보 | 아니요 | 함수로 감사 후 열람 | 서버만 |
+| `messageSecrets` | 원문·발신자·수신자·`replyToMessageId`·전달/교사 숨김 상태 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `pairHistory` | 과거 방향별 배정 횟수 | 아니요 | 아니요 | 서버만 |
 | `studentCredentials` | 로그인 코드 해시·잠금·`encryptedCardCode`(AES-256-GCM 암호문, 신규/재발급 카드) | 아니요 | 아니요 | 서버만 |
 | `studentCredentialLookups` | 카드 로그인 ID를 학생 UID로 연결 | 아니요 | 아니요 | 서버만 |
