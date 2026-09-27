@@ -49,6 +49,12 @@ button[aria-busy="true"]{cursor:wait}
 .round-nav{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none;margin:0 0 18px}
 .round-nav li{padding:9px 13px;border-radius:20px;background:#f5eee6;color:#546177;font-weight:700}
 .round-nav li[aria-current="step"]{background:#b94440;color:#fff}
+.season-presets{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:4px 0 22px}
+.season-presets span{color:#52647a;font-weight:650;margin-right:4px}
+.season-presets button{min-width:58px}
+.teacher-page-form .date-add-row{align-items:flex-end;margin:16px 0}
+.teacher-page-form .date-add-row label{margin:0;min-width:180px}
+.teacher-page-form .date-add-row button{align-self:flex-end}
 .round-list{display:grid;gap:12px}
 .round-list button{text-align:left;background:#fff8ef;color:#283449;border:1px solid #ead9c9}
 .round-list button strong,.round-list button small{display:block}
@@ -99,8 +105,27 @@ button[aria-busy="true"]{cursor:wait}
 .student-registration summary{padding:14px 16px;font-weight:700;cursor:pointer}
 .student-registration summary:focus-visible,.mobile-teacher-menu summary:focus-visible{outline:3px solid #557dc5;outline-offset:3px}
 .student-registration form{padding:0 16px 18px}
+.student-cards-panel .class-code{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;padding:12px 16px;margin-bottom:20px}
+.student-cards-panel .class-code strong{font-size:1.15rem;margin:0;letter-spacing:.08em}
+.student-cards-panel .class-code small{flex:1 1 220px}
+.card-list-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:22px}
+.card-list-heading h3{margin:0 0 4px}
+.card-list-heading p{margin:0}
+.card-filters{margin-top:16px}
+.card-selection-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:16px 0}
+.student-card-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;list-style:none;padding:0;margin:0}
+.student-card-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:14px;border:1px solid #e2d6cc;border-radius:14px;min-width:0;background:#fffdf9}
+.student-card-row.is-selected{border-color:#b94440;background:#fff5ee}
+.student-card-choice{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 150px;cursor:pointer;font-weight:700}
+.student-card-choice input{flex:none;width:20px;height:20px;margin:0;accent-color:#b94440}
+.student-card-choice strong{min-width:0;overflow-wrap:anywhere}
+.student-card-number{color:#52647a;font-weight:700;min-width:1.4em}
+.student-card-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;flex:1 1 190px}
+.student-card-actions button{padding-inline:11px}
+.student-card-status{order:3;flex:0 0 100%;font-size:.85rem;color:#52647a;text-align:right}
 .mobile-teacher-menu{display:none}
 @media(max-width:900px){.teacher-shell{grid-template-columns:1fr}.teacher-sidebar{display:none}.mobile-teacher-menu{display:block}.mobile-teacher-menu summary{padding:14px;border:1px solid #dbcabc;border-radius:12px;background:white;font-weight:700;cursor:pointer}.mobile-teacher-menu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;background:white}.teacher-overview-grid{grid-template-columns:1fr}.participant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.student-card-list{grid-template-columns:1fr}}
 @media(max-width:600px){.topbar{gap:8px}.content{padding-inline:16px}.panel{padding:20px;border-radius:20px}.teacher-layout>.panel{padding:18px}.teacher-page-form .form-grid,.participant-grid,.mission-grid{grid-template-columns:1fr}.section-heading h1{font-size:1.8rem}.student-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.student-nav button{padding-inline:5px}.student-hero{padding:18px}.student-grid .panel{padding:18px}.teacher-context{align-items:flex-start}.action-row button{flex-grow:1}}
 @media(max-width:360px){.brand{white-space:normal}.topbar{padding-inline:14px}.content{padding-inline:12px}.student-nav button{font-size:.9rem}}
 @media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}

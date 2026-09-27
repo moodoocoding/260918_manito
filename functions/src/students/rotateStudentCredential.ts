@@ -5,6 +5,7 @@ import {
   generateStudentCard,
   hashSecret,
 } from "../auth/codes.js";
+import { cardPrintKey, encryptCardCode } from "../auth/printableCards.js";
 import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
 import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
@@ -15,6 +16,7 @@ import {
 } from "../shared/validation.js";
 
 export const rotateStudentCredential = onCall(
+  { secrets: [cardPrintKey] },
   async (request): Promise<{ studentUid: string; cardCode: string }> => {
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
@@ -40,6 +42,7 @@ export const rotateStudentCredential = onCall(
     const card = generateStudentCard();
     const lookupDigest = credentialLookupDigest(classId, card.loginId);
     const { secretHash, secretSalt } = await hashSecret(card.secret);
+    const encryptedCardCode = encryptCardCode(card.cardCode);
     const newLookupRef = db.doc(`studentCredentialLookups/${lookupDigest}`);
 
     await db.runTransaction(async (transaction) => {
@@ -75,6 +78,7 @@ export const rotateStudentCredential = onCall(
         lookupDigest,
         secretHash,
         secretSalt,
+        encryptedCardCode,
         codeVersion: Number(credentialSnapshot.get("codeVersion") ?? 1) + 1,
         failedAttempts: 0,
         lockedUntil: null,
@@ -83,6 +87,7 @@ export const rotateStudentCredential = onCall(
       });
       transaction.update(memberRef, {
         sessionVersion: nextSessionVersion,
+        printableCardAvailable: true,
         updatedAt: FieldValue.serverTimestamp(),
       });
       transaction.create(commandRef, {

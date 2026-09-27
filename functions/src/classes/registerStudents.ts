@@ -6,6 +6,7 @@ import {
   generateStudentCard,
   hashSecret,
 } from "../auth/codes.js";
+import { cardPrintKey, encryptCardCode } from "../auth/printableCards.js";
 import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
 import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
@@ -23,7 +24,7 @@ interface StudentCardResult {
 }
 
 export const registerStudents = onCall(
-  { timeoutSeconds: 60 },
+  { timeoutSeconds: 60, secrets: [cardPrintKey] },
   async (request): Promise<{ students: StudentCardResult[]; requiresCredentialRotation: boolean }> => {
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
@@ -64,6 +65,7 @@ export const registerStudents = onCall(
       lookupDigest: string;
       secretHash: string;
       secretSalt: string;
+      encryptedCardCode: string;
     }> = [];
     // scrypt is deliberately memory-hard. Hash sequentially so a 40-student
     // import stays within the function's memory limit.
@@ -72,7 +74,8 @@ export const registerStudents = onCall(
       const card = cards[index];
       const lookupDigest = credentialLookupDigest(classId, card.loginId);
       const hashes = await hashSecret(card.secret);
-      plans.push({ studentUid, displayName, card, lookupDigest, ...hashes });
+      plans.push({ studentUid, displayName, card, lookupDigest,
+        encryptedCardCode: encryptCardCode(card.cardCode), ...hashes });
     }
 
     await db.runTransaction(async (transaction) => {
@@ -101,6 +104,7 @@ export const registerStudents = onCall(
           displayNameSortKey: plan.displayName.toLocaleLowerCase("ko-KR"),
           accessStatus: "active",
           sessionVersion: 1,
+          printableCardAvailable: true,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -110,6 +114,7 @@ export const registerStudents = onCall(
           lookupDigest: plan.lookupDigest,
           secretHash: plan.secretHash,
           secretSalt: plan.secretSalt,
+          encryptedCardCode: plan.encryptedCardCode,
           codeVersion: 1,
           failedAttempts: 0,
           lockedUntil: null,

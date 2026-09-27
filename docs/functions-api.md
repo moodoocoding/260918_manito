@@ -6,8 +6,8 @@
 
 - `requestId`는 클라이언트가 한 사용자 행동마다 생성하는 8~64자의 영문·숫자·`_`·`-` 문자열이다.
 - 같은 `requestId`를 네트워크 재시도로 다시 보내도 학급이나 학생이 중복 생성되지 않는다.
-- 학생 카드 원문은 최초 등록·재발급 응답에서 한 번만 반환되고 DB에는 저장되지 않는다.
-- 카드 응답을 잃으면 기존 카드를 조회할 수 없으므로 교사가 재발급한다.
+- 신규·재발급 카드 코드는 검증용 해시와 별도로 AES-256-GCM 암호문으로 서버 전용 `studentCredentials`에 보관한다. `CARD_PRINT_KEY`는 Firebase Secret Manager에서 관련 함수에만 바인딩하며 Firestore 직접 읽기는 모든 클라이언트에 금지한다.
+- 담당 교사는 감사 기록을 남기는 `getPrintableCards`로 입장 가능한 학생의 카드를 다시 출력할 수 있다. 기존 암호문이 없는 카드는 원문 복원이 불가능하므로 명시적 확인 뒤 `reissueMissingCards`로 교체한다. 브라우저에는 인쇄 순간만 코드를 둔다.
 - 학생 카드 재발급은 `sessionVersion`을 올려 기존 로그인 세션도 즉시 읽기 권한을 잃게 한다.
 - 재시도 명령은 작업 종류·요청자·정규화한 입력의 fingerprint가 같을 때만 같은 `requestId`를 인정한다. 다른 입력 또는 다른 명령으로 재사용하면 `already-exists`다.
 - 업무 재시도에는 같은 `requestId`를 사용한다. App Check 토큰은 요구하지 않는다.
@@ -50,7 +50,7 @@ response: {
 ```
 
 `scrypt` 해시는 메모리 사용 급증을 막기 위해 학생별로 순차 처리한다.
-재시도 시 학급 소유권을 다시 확인한다. 같은 명령의 응답을 잃은 경우 등록 학생 ID와 이름을 반환하되 카드 원문은 반환하지 않고 `requiresCredentialRotation: true`로 안내한다.
+재시도 시 학급 소유권을 다시 확인한다. 같은 명령의 응답을 잃은 경우 등록 학생 ID와 이름을 반환하되 카드 원문은 반환하지 않고 `requiresCredentialRotation: true`로 안내한다. 등록된 새 카드는 `getPrintableCards`로 재조회할 수 있다.
 
 ## `loginStudent`
 
@@ -72,7 +72,7 @@ response: {
 
 ## `rotateStudentCredential`
 
-담당 교사가 분실·노출된 학생 카드를 교체한다. 같은 요청의 응답을 잃은 경우 새 `requestId`로 다시 재발급한다.
+담당 교사가 분실·노출된 학생 카드를 교체한다. 교체된 카드는 `getPrintableCards`로 재조회할 수 있다. 같은 요청의 응답을 잃은 경우 해당 함수로 출력하고, 같은 `requestId`의 재발급 호출은 거절한다.
 
 ```ts
 request: {
@@ -117,7 +117,7 @@ response: {
 |---|---|---|
 | `listRounds` | `{classId}` | 회차 목록과 명부. 담당 교사만 |
 | `getRoundSettingsForTeacher` | `{classId,roundId}` | 참가 UID·제외 관계·미션·수업일. 감사 기록 |
-| `createRound` | `{classId,title,startsAt,endsAt,activityDates,participantIds,excludedPairs,allowFreeTextMessages,missionIds,requestId}` | `{roundId}`. 4~40명, 5/10일, 기간 30일 이내, 명단 활성 상태 |
+| `createRound` | `{classId,title,startsAt,endsAt,activityDates,participantIds,excludedPairs,allowFreeTextMessages,missionIds,requestId}` | `{roundId}`. 4~40명, 서로 다른 수업일 3~20개, 기간 30일 이내, 명단 활성 상태 |
 | `updateRound` | 위 필드와 `roundId` | 초안·준비 완료 상태만 수정, `rosterVersion` 증가·준비 상태 해제 |
 | `prepareRound` | `{classId,roundId}` | 배정 가능성·참가 상태·미션 검증 뒤 `{status:"ready",rosterVersion}` |
 | `startRound` | `{classId,roundId,rosterVersion,requestId}` | 학급 잠금과 배정 전체를 단일 트랜잭션으로 확정. 활성 회차 중복 시작 거절 |
@@ -148,5 +148,17 @@ response: {
 | `getRightsRequestsForTeacher` | `{classId}` | 담당 교사가 요청 원문과 학생 이름을 비공개 조회. 매번 감사 기록 |
 
 `excludedPairs` 요청은 `[[studentUid,studentUid], ...]`, 저장값은 Firestore 중첩 배열 제한에 맞춘 `[{a,b}, ...]`다. `missionIds`는 비워 기본 3개를 사용하거나 서로 다른 3개를 고른다. 학생에게 내려주는 쪽지에는 발신 UID와 원본 작성 시각을 넣지 않는다. `failed-precondition`은 회차 상태·수업일·일일 한도·제외 조건·미처리 안전 사안에 사용하고, 소속·세션·교사 권한 위반은 `permission-denied`다.
+
+## 카드 재출력 API (2026-09-27)
+
+| 함수 | 요청 | 응답 | 권한·상태 |
+|---|---|---|---|
+| `getPrintableCards` | `{classId,studentUids:string[]}` (1~40명, 중복 없음) | `{cards:[{studentUid,displayName,cardCode}],missingStudentUids:string[]}` | 확인된 담당 교사, 활성 학생과 자격·세션 버전 일치. 한 명이라도 암호문이 없으면 **코드 전체를 반환하지 않고** 누락 UID만 알린다. 모든 요청을 감사 기록 |
+| `reissueMissingCards` | `{classId,studentUids:string[],requestId}` (1~40명, 중복 없음) | `{studentUids}` | 확인된 담당 교사만. 암호문이 없는 기존 카드만 원자적으로 교체하고 `sessionVersion` 증가·기존 조회 키 삭제·감사 기록. 동일 요청 재시도는 중복 재발급 없음 |
+
+카드 코드는 HTTPS Callable 응답과 인쇄 DOM에서만 다루며 URL·분석·오류 로그·영구 브라우저 저장소에 넣지 않는다. 비밀 키를 잃으면 암호문을 복원할 수 없으므로 개발/운영 프로젝트별 Secret Manager 접근·백업 정책이 필요하다. 기존 카드 재발급은 이전 카드와 로그인 세션을 무효화한다.
+
+교사 시즌 날짜 화면은 한국 날짜의 시작일 00:00과 종료일 23:59:59.999를 각각 ISO 시각으로 변환해 기존 `startsAt`·`endsAt` 필드에 전달한다. 5/10/15/20일 빠른 선택은 시작일을 포함한 달력 일수이며, 월~금 수업일을 자동 제안한다. 서버는 시각을 기준으로 시작·종료 상태를 판정한다.
+`startRound`는 서버 시각이 `startsAt`보다 이르면 `failed-precondition`으로 거절한다. 시작일 전에 배정·학생 화면이 공개되지 않는다.
 
 권리 요청은 현재 접수와 비공개 조회까지만 구현했다. 본인 확인, 처리 기한, 개별 정정·삭제 및 백업 처리 절차는 운영 정책 확정 전이다. `deleteClassData`는 학급 전체 삭제를 검증하는 개발 기능이며 실제 학생 운영에 대한 법적 준비 완료를 뜻하지 않는다.

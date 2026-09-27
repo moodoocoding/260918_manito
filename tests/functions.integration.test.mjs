@@ -134,6 +134,48 @@ test("teacher creates a class, registers students, and rotates a student card", 
   assert.equal(registration.data.requiresCredentialRotation, false);
   const firstStudent = registration.data.students[0];
   assert.match(firstStudent.cardCode, /^[A-Z2-9]{4}-[A-Z2-9]{8}$/);
+  const secondStudent = registration.data.students[1];
+  const printCards = httpsCallable(teacherFunctions, "getPrintableCards");
+  const printable = await printCards({classId, studentUids: [firstStudent.studentUid, secondStudent.studentUid]});
+  assert.deepEqual(printable.data.cards.map((card) => card.cardCode),
+    registration.data.students.map((student) => student.cardCode));
+  assert.deepEqual(printable.data.missingStudentUids, []);
+  const cardAudits = await adminDb.collection(`classes/${classId}/auditLogs`).get();
+  assert.ok(cardAudits.docs.some((entry) => entry.get("action") === "student.cards_print_read"
+    && entry.get("studentUids")?.includes(firstStudent.studentUid)));
+  await assert.rejects(httpsCallable(otherTeacherFunctions, "getPrintableCards")({
+    classId, studentUids: [firstStudent.studentUid],
+  }), {code: "functions/permission-denied"});
+  await assert.rejects(getDoc(doc(getFirestore(studentApp), `studentCredentials/${firstStudent.studentUid}`)));
+  const storedCode = (await adminDb.doc(`studentCredentials/${firstStudent.studentUid}`).get())
+    .get("encryptedCardCode");
+  assert.match(storedCode, /^v1:/);
+  assert.ok(!storedCode.includes(firstStudent.cardCode));
+
+  await adminDb.doc(`studentCredentials/${secondStudent.studentUid}`).update({
+    encryptedCardCode: FieldValue.delete(),
+  });
+  await adminDb.doc(`classes/${classId}/members/${secondStudent.studentUid}`).update({
+    printableCardAvailable: false,
+  });
+  const unavailable = await printCards({classId, studentUids: [firstStudent.studentUid, secondStudent.studentUid]});
+  assert.deepEqual(unavailable.data.cards, [], "partial card codes must not be returned");
+  assert.deepEqual(unavailable.data.missingStudentUids, [secondStudent.studentUid]);
+  const reissueMissing = httpsCallable(teacherFunctions, "reissueMissingCards");
+  await assert.rejects(httpsCallable(otherTeacherFunctions, "reissueMissingCards")({
+    classId, studentUids: [secondStudent.studentUid], requestId: "legacy_reissue_denied",
+  }), {code: "functions/permission-denied"});
+  await reissueMissing({classId, studentUids: [secondStudent.studentUid], requestId: "legacy_reissue_001"});
+  const reprinted = await printCards({classId, studentUids: [secondStudent.studentUid]});
+  assert.equal(reprinted.data.cards.length, 1);
+  assert.notEqual(reprinted.data.cards[0].cardCode, secondStudent.cardCode);
+  await assert.rejects(httpsCallable(studentFunctions, "loginStudent")({
+    classCode, cardCode: secondStudent.cardCode,
+  }));
+  assert.equal((await reissueMissing({classId, studentUids: [secondStudent.studentUid],
+    requestId: "legacy_reissue_001"})).data.studentUids[0], secondStudent.studentUid);
+  assert.equal((await printCards({classId, studentUids: [secondStudent.studentUid]}))
+    .data.cards[0].cardCode, reprinted.data.cards[0].cardCode, "retry must keep the same card");
   const repeatedRegistration = await registerStudents({
     classId,
     displayNames: ["가람", "나래"],

@@ -192,6 +192,9 @@ export const startRound = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "준비 상태, 명단 버전 또는 진행 중인 회차를 확인해 주세요.");
     }
     const now = new Date();
+    if (roundDoc.get("startsAt").toDate() > now) {
+      throw new HttpsError("failed-precondition", "시작일이 되면 시즌을 시작할 수 있어요.");
+    }
     if (roundDoc.get("endsAt").toDate() <= now) {
       throw new HttpsError("failed-precondition", "종료 시각이 지난 회차는 시작할 수 없어요.");
     }
@@ -304,7 +307,7 @@ export const extendRound = onCall(async (request) => {
   const requestId = requireRequestId(input.requestId);
   const endsAt = new Date(String(input.endsAt));
   if (!Number.isFinite(endsAt.getTime()) || !Array.isArray(input.activityDates)
-    || ![5, 10].includes(input.activityDates.length)
+    || input.activityDates.length < 3 || input.activityDates.length > 20
     || input.activityDates.some((date) => typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)
       || !Number.isFinite(new Date(`${date}T00:00:00Z`).getTime())
       || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)

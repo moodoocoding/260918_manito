@@ -12,8 +12,8 @@ import "./style.css";
 type TeacherPage = "classes" | "overview" | "students" | "rounds" | "safety" | "history" | "settings";
 type StudentPage = "today" | "mail" | "help" | "history";
 const teacherPages: Array<{id: TeacherPage; label: string}> = [
-  {id:"overview",label:"운영 요약"},{id:"students",label:"학생·입장 카드"},
-  {id:"rounds",label:"회차"},{id:"safety",label:"안전 확인"},
+  {id:"overview",label:"운영 요약"},{id:"rounds",label:"시즌 설정"},
+  {id:"students",label:"학생·입장 카드"},{id:"safety",label:"안전 확인"},
   {id:"history",label:"지난 활동"},{id:"settings",label:"학급 설정"},
 ];
 function teacherLocation(path: string): {classId: string | null; page: TeacherPage} {
@@ -26,7 +26,7 @@ function teacherLocation(path: string): {classId: string | null; page: TeacherPa
 type TeacherStatus = { status: "pending" | "verified" | "suspended"; displayName: string };
 type ClassItem = { classId: string; name: string; schoolYear: number; gradeBand: string; memberCount: number };
 type ClassInfo = ClassItem & { classCode: string };
-type Member = { studentUid: string; displayName: string; accessStatus: string };
+type Member = { studentUid: string; displayName: string; accessStatus: string; printableCardAvailable: boolean };
 type Card = { studentUid: string; displayName: string; cardCode: string };
 type StudentHome = { displayName: string; className: string; gradeBand?: string; round: null | {
   roundId: string; title: string; status: string; targetDisplayName: string | null;
@@ -62,10 +62,9 @@ function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selected, setSelected] = useState<ClassInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [visibleCardUid, setVisibleCardUid] = useState<string | null>(null);
   const [printCards, setPrintCards] = useState<Card[]>([]);
   const [selectedCardUids, setSelectedCardUids] = useState<string[]>([]);
+  const [pendingPrint, setPendingPrint] = useState<{studentUids: string[]; missingStudentUids: string[]} | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
   const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([]);
   const [studentRefreshVersion, setStudentRefreshVersion] = useState(0);
@@ -88,13 +87,14 @@ function App() {
   const lastTeacherPath = useRef(window.location.pathname);
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
   const pendingRegistration = useRef<{ key: string; requestId: string } | null>(null);
+  const printTimeout = useRef<number | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
 
   const clearPrivate = useCallback(() => {
     generation.current += 1;
     setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
-    setCards([]); setPrintCards([]); setSelectedCardUids([]); setVisibleCardUid(null); setHome(null); setTargetVisible(false);
+    setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setHome(null); setTargetVisible(false);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
@@ -119,7 +119,7 @@ function App() {
       if (current !== generation.current) return;
       setClasses(result.classes);
     } else {
-      setClasses([]); setSelected(null); setMembers([]); setCards([]);
+      setClasses([]); setSelected(null); setMembers([]);
     }
   }, []);
 
@@ -143,7 +143,7 @@ function App() {
     };
     const onPop = () => {
       const path = window.location.pathname;
-      if (roundDirty.current && !window.confirm("저장하지 않은 회차 준비 내용이 있어요. 입력을 버리고 이동할까요?")) {
+      if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) {
         history.pushState(null, "", lastTeacherPath.current);
         return;
       }
@@ -224,13 +224,6 @@ function App() {
   }, [role, loadStudent, exit]);
 
   useEffect(() => {
-    if (role !== "teacher") return;
-    const hideCard = () => { if (document.visibilityState !== "visible") setVisibleCardUid(null); };
-    document.addEventListener("visibilitychange", hideCard);
-    return () => document.removeEventListener("visibilitychange", hideCard);
-  }, [role]);
-
-  useEffect(() => {
     if (mobileTeacherMenu.current) mobileTeacherMenu.current.open = false;
   }, [teacherPage]);
 
@@ -242,20 +235,20 @@ function App() {
 
   function openTeacherPage(page: TeacherPage) {
     if (!selected) return;
-    if (page !== teacherPage && roundDirty.current && !window.confirm("저장하지 않은 회차 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
+    if (page !== teacherPage && roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
     if (page !== teacherPage) roundDirty.current = false;
     setTeacherPage(page); setError(""); setNotice("");
-    setVisibleCardUid(null); setPrintCards([]);
-    if (page !== "students") { setCards([]); setSelectedCardUids([]); }
+    setPrintCards([]); setPendingPrint(null);
+    if (page !== "students") setSelectedCardUids([]);
     history.pushState(null, "", `/teacher/classes/${selected.classId}/${page}`);
     lastTeacherPath.current = window.location.pathname;
     window.scrollTo(0, 0);
   }
 
   function openClasses() {
-    if (roundDirty.current && !window.confirm("저장하지 않은 회차 준비 내용이 있어요. 입력을 버리고 학급 목록으로 이동할까요?")) return;
+    if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급 목록으로 이동할까요?")) return;
     roundDirty.current = false;
-    setTeacherPage("classes"); setVisibleCardUid(null); setCards([]); setSelectedCardUids([]);
+    setTeacherPage("classes"); setPrintCards([]); setPendingPrint(null); setSelectedCardUids([]);
     history.pushState(null, "", "/teacher");
     lastTeacherPath.current = "/teacher";
     window.scrollTo(0, 0);
@@ -275,16 +268,17 @@ function App() {
   }
 
   async function selectClass(classId: string, page: TeacherPage = "overview", recordHistory = true) {
-    if (roundDirty.current && !window.confirm("저장하지 않은 회차 준비 내용이 있어요. 입력을 버리고 학급을 바꿀까요?")) return;
+    if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급을 바꿀까요?")) return;
     roundDirty.current = false;
     await task(async () => {
       const current = generation.current;
-      setCards([]); setPrintCards([]); setSelectedCardUids([]); setVisibleCardUid(null); setDeleteName("");
+      setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
       const info = await call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
       const result = await getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey")));
       if (current !== generation.current) return;
       setSelected(info);
-      setMembers(result.docs.map((item) => ({ studentUid: item.id, displayName: String(item.get("displayName")), accessStatus: String(item.get("accessStatus")) })));
+      setMembers(result.docs.map((item) => ({ studentUid: item.id, displayName: String(item.get("displayName")),
+        accessStatus: String(item.get("accessStatus")), printableCardAvailable: item.get("printableCardAvailable") === true })));
       setTeacherPage(page);
       if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
       lastTeacherPath.current = window.location.pathname;
@@ -322,10 +316,9 @@ function App() {
         classId: selected.classId, displayNames, requestId: pendingRegistration.current.requestId,
       });
       pendingRegistration.current = null;
-      setCards(result.students); setNamesInput("");
+      setNamesInput("");
       await loadTeacher(); await selectClass(selected.classId, "students");
-      setCards(result.students);
-      setNotice(result.requiresCredentialRotation ? "등록은 완료됐지만 카드 원문을 다시 볼 수 없어요. 학생별로 재발급해 주세요." : "학생을 등록했어요. 카드는 지금 개별 인쇄해 주세요.");
+      setNotice(result.requiresCredentialRotation ? "학생 등록은 완료됐어요. 출력을 눌러 카드를 확인해 주세요." : "학생을 등록했어요. 전체 또는 원하는 학생의 카드를 출력해 주세요.");
     });
   }
 
@@ -335,11 +328,10 @@ function App() {
       const result = await call<object, { studentUid: string; cardCode: string }>("rotateStudentCredential", {
         classId: selected.classId, studentUid: member.studentUid, requestId: crypto.randomUUID(),
       });
-      setCards((old) => [...old.filter((card) => card.studentUid !== member.studentUid), {
-        studentUid: member.studentUid, displayName: member.displayName, cardCode: result.cardCode,
-      }]);
-      setVisibleCardUid(null);
-      setNotice(`${member.displayName} 학생의 카드를 재발급했어요. 이전 카드는 사용할 수 없어요.`);
+      setMembers((old) => old.map((item) => item.studentUid === member.studentUid
+        ? {...item, printableCardAvailable: true} : item));
+      print([{studentUid: member.studentUid, displayName: member.displayName, cardCode: result.cardCode}]);
+      setNotice(`${member.displayName} 학생의 새 카드를 출력합니다. 이전 카드는 사용할 수 없어요.`);
     });
   }
 
@@ -352,25 +344,70 @@ function App() {
         status, requestId: crypto.randomUUID(),
       });
       setMembers((old) => old.map((item) => item.studentUid === member.studentUid ? { ...item, accessStatus: status } : item));
+      if (status === "blocked") setSelectedCardUids((old) => old.filter((uid) => uid !== member.studentUid));
       setNotice(status === "blocked" ? `${member.displayName} 학생의 입장을 차단했어요.` : `${member.displayName} 학생이 다시 입장할 수 있어요.`);
     });
   }
 
   async function deleteClass() {
     if (!selected || deleteName !== selected.name) return;
-    if (!window.confirm(`${selected.name} 학급의 회차·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
+    if (!window.confirm(`${selected.name} 학급의 시즌·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
     await task(async () => {
       await call<object, object>("deleteClassData", {classId: selected.classId, requestId: crypto.randomUUID()});
-      setSelected(null); setMembers([]); setCards([]); setPrintCards([]); setSelectedCardUids([]); setDeleteName("");
+      setSelected(null); setMembers([]); setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
       await loadTeacher(); setNotice("학급 데이터를 삭제했어요.");
     });
   }
 
   function print(cardsToPrint: Card[]) {
+    if (!cardsToPrint.length) return;
+    if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
+    const clear = () => {
+      setPrintCards([]);
+      if (window.onafterprint === clear) window.onafterprint = null;
+      if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
+      printTimeout.current = null;
+    };
+    window.onafterprint = clear;
+    printTimeout.current = window.setTimeout(clear, 2 * 60_000);
     setPrintCards(cardsToPrint);
     window.setTimeout(() => window.print(), 100);
-    window.onafterprint = () => { setPrintCards([]); window.onafterprint = null; };
   }
+
+  async function preparePrint(studentUids: string[]) {
+    if (!selected || !studentUids.length) return;
+    await task(async () => {
+      const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
+        {classId: selected.classId, studentUids});
+      if (result.missingStudentUids.length) {
+        setPendingPrint({studentUids, missingStudentUids: result.missingStudentUids});
+      } else {
+        print(result.cards);
+      }
+    });
+  }
+
+  async function reissueAndPrint() {
+    if (!selected || !pendingPrint) return;
+    const target = pendingPrint;
+    setPendingPrint(null);
+    await task(async () => {
+      await call<object, object>("reissueMissingCards", {classId: selected.classId,
+        studentUids: target.missingStudentUids, requestId: crypto.randomUUID()});
+      setMembers((old) => old.map((member) => target.missingStudentUids.includes(member.studentUid)
+        ? {...member, printableCardAvailable: true} : member));
+      const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
+        {classId: selected.classId, studentUids: target.studentUids});
+      if (result.missingStudentUids.length) throw new Error("카드 준비가 끝나지 않았어요. 다시 출력해 주세요.");
+      print(result.cards);
+      setNotice("새 카드로 발급했어요. 이전 카드는 사용할 수 없어요.");
+    });
+  }
+
+  const activeMemberUids = members.filter((member) => member.accessStatus === "active")
+    .map((member) => member.studentUid);
+  const filteredMembers = members.filter((member) => member.displayName.includes(memberSearch)
+    && (memberFilter === "all" || member.accessStatus === memberFilter));
 
   return <div className="app-shell">
     <header className="topbar no-print">
@@ -437,22 +474,31 @@ function App() {
             <div className="teacher-main">
               <div className="teacher-context"><div><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
               <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
-              {teacherPage === "students" && <section className="panel"><div className="page-header"><div><h2>학생·입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
+              {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>학생·입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
                 <div className="class-code"><span>학급 코드</span><strong>{selected.classCode}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
                 {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
                   : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
-                <h3>학생 카드 관리 · {members.length}명</h3><div className="page-actions"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 제한</option></select></label></div>
-                {cards.length > 0 && <div className="action-row"><button className="small outline" onClick={() => setSelectedCardUids(cards.map((card) => card.studentUid))}>발급된 카드 전체 선택</button><button className="small outline" onClick={() => setSelectedCardUids([])}>선택 해제</button><button disabled={selectedCardUids.length === 0} onClick={() => print(cards.filter((card) => selectedCardUids.includes(card.studentUid)))}>선택한 카드 {selectedCardUids.length}장 인쇄</button></div>}
-                {members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요.</p> : <ul className="member-list">{members.filter((m) => m.displayName.includes(memberSearch) && (memberFilter === "all" || m.accessStatus === memberFilter)).map((member) => {
-                  const card = cards.find((item) => item.studentUid === member.studentUid);
-                  return <li key={member.studentUid}><div className="member-primary">{card?.cardCode && <CheckboxRow checked={selectedCardUids.includes(member.studentUid)} onChange={(checked) => setSelectedCardUids((old) => checked ? [...old, member.studentUid] : old.filter((id) => id !== member.studentUid))}>인쇄 선택 · {member.displayName}</CheckboxRow>}{!card && member.displayName}<small>{member.accessStatus === "active" ? "입장 가능" : "입장 제한"}</small>{card?.cardCode && visibleCardUid === member.studentUid && <code className="card-secret">{card.cardCode}</code>}</div><div>{card?.cardCode && <><button className="small outline" onClick={() => setVisibleCardUid((current) => current === member.studentUid ? null : member.studentUid)}>{visibleCardUid === member.studentUid ? "코드 가리기" : "코드 확인"}</button><button className="small outline" onClick={() => print([card])}>카드 인쇄</button></>}<button className="small outline" disabled={busy} onClick={() => setConfirmMember({member,action:"rotate"})}>재발급</button><button className="small outline" disabled={busy} onClick={() => member.accessStatus === "active" ? setConfirmMember({member,action:"block"}) : void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div></li>;
-                })}</ul>}
-                {cards.length > 0 && <p className="help">새 카드 코드는 이 화면을 떠나면 다시 볼 수 없어요. 필요한 카드를 인쇄해 주세요.</p>}
+                <div className="card-list-heading"><div><h3>학생 명단 · {members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
+                  <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button></div>
+                <div className="page-actions card-filters"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 불가</option></select></label></div>
+                <div className="card-selection-toolbar"><button type="button" className="small outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setSelectedCardUids(activeMemberUids)}>전체 선택</button><button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setSelectedCardUids([])}>선택 해제</button><button type="button" disabled={busy || selectedCardUids.length === 0} onClick={() => void preparePrint(selectedCardUids)}>선택한 카드 {selectedCardUids.length}장 출력</button></div>
+                {members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요. 학생을 등록하면 입장 카드를 출력할 수 있어요.</p> :
+                  filteredMembers.length === 0 ? <p className="muted">조건에 맞는 학생이 없어요.</p> :
+                    <ol className="student-card-list">{filteredMembers.map((member) => {
+                      const checked = selectedCardUids.includes(member.studentUid);
+                      return <li key={member.studentUid} className={`student-card-row${checked ? " is-selected" : ""}`}>
+                        <label className="student-card-choice"><input type="checkbox" checked={checked} disabled={member.accessStatus !== "active"} onChange={(event) => setSelectedCardUids((old) => event.target.checked ? [...old, member.studentUid] : old.filter((uid) => uid !== member.studentUid))} /><span className="student-card-number">{members.indexOf(member) + 1}</span><strong>{member.displayName}</strong></label>
+                        <div className="student-card-actions"><span className="student-card-status">{member.accessStatus !== "active" ? "입장 불가" : member.printableCardAvailable ? "입장 가능 · 출력 가능" : "입장 가능 · 첫 출력 때 재발급"}</span>
+                          <button type="button" className="small outline" disabled={busy || member.accessStatus !== "active"} onClick={() => setConfirmMember({member,action:"rotate"})}>재발급</button>
+                          <button type="button" className="small outline" disabled={busy} onClick={() => member.accessStatus === "active" ? setConfirmMember({member,action:"block"}) : void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div>
+                      </li>;
+                    })}</ol>}
               </section>}
               {(["overview","rounds","safety","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "safety" | "history"} onNavigate={(page) => openTeacherPage(page)} onDirtyChange={(value) => { roundDirty.current = value; }} />}
-              {teacherPage === "settings" && <><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 회차를 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
+              {teacherPage === "settings" && <><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
-          {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드는 발급 직후 인쇄해 주세요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "새 카드 발급" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else void changeAccess(target.member); }} />}
+          {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else void changeAccess(target.member); }} />}
+          {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}
         </section> : null}
     </main>
 

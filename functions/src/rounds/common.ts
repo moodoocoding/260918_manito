@@ -35,12 +35,12 @@ export function parseRoundInput(value: unknown): {
     || endsAt <= startsAt || endsAt.getTime() - startsAt.getTime() > 30 * 86400_000) {
     throw new HttpsError("invalid-argument", "회차 기간은 30일 이내로 정해 주세요.");
   }
-  if (!Array.isArray(input.activityDates) || ![5, 10].includes(input.activityDates.length)
+  if (!Array.isArray(input.activityDates) || input.activityDates.length < 3 || input.activityDates.length > 20
     || input.activityDates.some((date) => typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date))
     || input.activityDates.some((date) => !Number.isFinite(new Date(`${date}T00:00:00Z`).getTime())
       || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)
     || new Set(input.activityDates).size !== input.activityDates.length) {
-    throw new HttpsError("invalid-argument", "서로 다른 수업일 5일 또는 10일을 선택해 주세요.");
+    throw new HttpsError("invalid-argument", "서로 다른 수업일을 3~20일 선택해 주세요.");
   }
   const activityDates = [...input.activityDates].sort() as string[];
   if (activityDates[0] < koreaDate(startsAt) || activityDates.at(-1)! > koreaDate(endsAt)) {

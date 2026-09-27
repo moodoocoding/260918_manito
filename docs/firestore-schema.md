@@ -52,7 +52,7 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 |---|---|---:|---:|---:|
 | `teachers/{uid}` | 교사 프로필·확인 상태 | 아니요 | 본인만 | 아니요 |
 | `classes/{classId}` | 학급·학년도·담당 교사·진행 회차 잠금 | 아니요 | 담당 교사 | 아니요 |
-| `members/{studentUid}` | 표시 이름·접근 상태·세션 버전·마지막 로그인 시각 | 본인 | 담당 교사 | 아니요 |
+| `members/{studentUid}` | 표시 이름·접근 상태·세션 버전·마지막 로그인 시각·카드 재출력 가능 표시 | 본인 | 담당 교사 | 아니요 |
 | `rightsRequests`, `rightsCommands` | 정보 열람·정정·삭제 요청의 종류·내용·상태와 멱등 명령 | 아니요 | 감사 기록을 남기는 함수로 조회 | 서버만 |
 | `rounds/{roundId}` | 회차 일정·상태·메시지 정책 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
@@ -66,7 +66,7 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 | `assignmentSecrets` | 전체 방향 관계 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `messageSecrets` | 원문·발신자·수신자·검토 정보 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `pairHistory` | 과거 방향별 배정 횟수 | 아니요 | 아니요 | 서버만 |
-| `studentCredentials` | 로그인 코드 검증·잠금 | 아니요 | 아니요 | 서버만 |
+| `studentCredentials` | 로그인 코드 해시·잠금·`encryptedCardCode`(AES-256-GCM 암호문, 신규/재발급 카드) | 아니요 | 아니요 | 서버만 |
 | `studentCredentialLookups` | 카드 로그인 ID를 학생 UID로 연결 | 아니요 | 아니요 | 서버만 |
 | `classCodes` | 8자리 학급 코드를 학급 ID로 연결 | 아니요 | 아니요 | 서버만 |
 | `teacherCommands` | 학급 생성 명령의 중복 실행 방지 | 아니요 | 아니요 | 서버만 |
@@ -110,3 +110,5 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 ## 현재 구현과 남은 운영 조건
 
 회차·미션·쪽지·도움·공개·설정 복사, 학급 삭제, 학생 정보 요청 접수 경로를 구현했다. 교사는 학생 개인 데이터를 직접 읽지 않고 감사 기록을 남기는 함수로 안전 현황·배정·요청을 조회한다. 배정은 `assignmentSecrets`, 제외 관계는 `roundSettings`에만 저장한다. `roundSettings.excludedPairs`는 Firestore의 중첩 배열 제한 때문에 `{a,b}` 객체 배열이다. 실제 학생 활성화에는 개인정보 처리 근거, 학교·보호자 안내, 보존 기간과 요청 처리·백업 삭제 절차의 확정이 남아 있다.
+
+카드 출력은 담당 교사 확인 후 `getPrintableCards`를 통해서만 허용하고 대상 학생 UID·교사 UID·시각을 감사한다. `members.printableCardAvailable`은 목록 표시용으로 기존 문서에는 없을 수 있으며, 실제 출력 가능 여부는 서버 전용 자격 문서의 `encryptedCardCode`를 기준으로 재검증한다. 암호화 키 `CARD_PRINT_KEY`는 문서에 저장하지 않는다. 이전 카드에 암호문이 없을 때만 `reissueMissingCards`가 조회 키·해시·세션 버전·암호문·표시 상태를 단일 트랜잭션에서 교체한다. `rounds.startsAt`은 한국 시작일 00:00, `endsAt`은 한국 종료일 23:59:59.999의 ISO 시각을 저장한다.

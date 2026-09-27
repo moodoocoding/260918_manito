@@ -91,7 +91,9 @@ Firebase Console에서도 아래 항목을 확인한다.
 
 교사용·학생용 웹은 `web/`에 구현해 [Vercel 개발 사이트](https://manito-one-blond.vercel.app)에 배포했다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. Google 교사 로그인, 가상 학급·카드 발급, 서버 회차 시작과 가상 학생 로그인·공개·다음 회차를 배포 웹에서 확인했다.
 
-실제 학생 데이터 도입 전에는 [개인정보 처리방침 초안](privacy-policy-draft.md)의 미확정 항목과 별도 운영 프로젝트, 학교·보호자 안내, 권리 요청 처리 절차를 확정한다. 현재 공개 웹은 개발 검증 안내를 표시한다.
+실제 학생 데이터 도입 전에는 [개인정보 처리방침 초안](privacy-policy-draft.md)의 미확정 항목과 별도 운영 프로젝트, 학교·보호자 안내, 권리 요청 처리 절차를 확정한다. 공개 웹의 공통 개발 검증 안내 문구는 사용자 요청으로 제거했다.
+
+카드 재출력 함수는 프로젝트별 Secret Manager의 `CARD_PRINT_KEY`(32바이트 난수의 Base64 문자열)를 사용한다. `firebase functions:secrets:set CARD_PRINT_KEY --data-file <보호된_임시_키_파일> --project manito-938cc`로 개발 프로젝트에 설정하고 `registerStudents`·`rotateStudentCredential`·`getPrintableCards`·`reissueMissingCards`에만 바인딩한다. 임시 키 파일을 Git에 넣지 않으며 설정 뒤 제거한다. 키를 잃거나 무계획하게 교체하면 기존 암호화 카드가 재출력되지 않으므로 운영 프로젝트의 키 접근·보관·교체 절차를 확정해야 한다.
 
 프로덕션 공개 전에는 개발 프로젝트의 전체 흐름을 검증한 뒤 별도 운영 프로젝트를 만들고 같은 방식으로 배포한다. 개발 데이터와 실제 학생 데이터를 한 프로젝트에 섞지 않는다.
 

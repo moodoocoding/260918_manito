@@ -94,6 +94,16 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await assert.rejects(other.call("getRightsRequestsForTeacher",{classId}),
     {code:"functions/permission-denied"});
   await assert.rejects(other.call("listRounds", {classId}), {code:"functions/permission-denied"});
+  const futureDates = Array.from({length:5},(_,i)=>new Date(Date.now()+(i+2)*86400_000))
+    .map((date)=>new Intl.DateTimeFormat("sv-SE", {timeZone:"Asia/Seoul",year:"numeric",
+      month:"2-digit",day:"2-digit"}).format(date));
+  const future = await teacher.call("createRound",{...roundInput(classId,ids,"미래 시즌"),
+    startsAt:new Date(Date.now()+86400_000).toISOString(),
+    endsAt:new Date(Date.now()+10*86400_000).toISOString(),activityDates:futureDates});
+  const futureReady = await teacher.call("prepareRound",{classId,roundId:future.roundId});
+  await assert.rejects(teacher.call("startRound",{classId,roundId:future.roundId,
+    rosterVersion:futureReady.rosterVersion,requestId:rid()}),{code:"functions/failed-precondition"});
+  await teacher.call("changeRoundStatus",{classId,roundId:future.roundId,action:"cancel",requestId:rid()});
   const first = await teacher.call("createRound", roundInput(classId, ids, "첫 번째 작전"));
   const roundId = first.roundId;
   assert.equal((await students[0].call("getStudentHome", null)).round, null);
@@ -229,7 +239,28 @@ test("forty students start as one atomic one-to-one round", async () => {
     displayNames:Array.from({length:40},(_,i)=>`가상학생${i+1}`),requestId:rid()});
   assert.equal(registration.students.length,40);
   const ids = registration.students.map((student)=>student.studentUid);
-  const {roundId} = await teacher.call("createRound",roundInput(classId,ids,"정원 검증"));
+  const legacyCards = adminDb.batch();
+  for (const studentUid of ids) {
+    legacyCards.update(adminDb.doc(`studentCredentials/${studentUid}`),
+      {encryptedCardCode:FieldValue.delete()});
+    legacyCards.update(adminDb.doc(`classes/${classId}/members/${studentUid}`),
+      {printableCardAvailable:false});
+  }
+  await legacyCards.commit();
+  const missingCards = await teacher.call("getPrintableCards",{classId,studentUids:ids});
+  assert.equal(missingCards.cards.length,0);
+  assert.equal(missingCards.missingStudentUids.length,40);
+  await teacher.call("reissueMissingCards",{classId,studentUids:ids,requestId:rid()});
+  const reprintedCards = await teacher.call("getPrintableCards",{classId,studentUids:ids});
+  assert.equal(reprintedCards.cards.length,40);
+  assert.notEqual(reprintedCards.cards[0].cardCode,registration.students[0].cardCode);
+  const activityDates = Array.from({length:20},(_,i)=>new Date(Date.now()+i*86400_000))
+    .filter((date)=>![0,6].includes(date.getUTCDay()))
+    .map((date)=>new Intl.DateTimeFormat("sv-SE", {timeZone:"Asia/Seoul",year:"numeric",
+      month:"2-digit",day:"2-digit"}).format(date));
+  const {roundId} = await teacher.call("createRound",{...roundInput(classId,ids,"정원 검증"),
+    endsAt:new Date(Date.now()+20*86400_000).toISOString(),activityDates});
+  assert.ok(activityDates.length >= 14, "20-day season should accept more than 10 school days");
   const ready = await teacher.call("prepareRound",{classId,roundId});
   await teacher.call("startRound",{classId,roundId,rosterVersion:ready.rosterVersion,requestId:rid()});
   const assignments = (await teacher.call("getAssignmentsForTeacher",{classId,roundId})).assignments;
