@@ -95,9 +95,9 @@ response: {
 
 둘 중 하나라도 없으면 학급·학생 관리 함수가 거절된다. D1에서 로컬 관리자 실행 도구를 추가했으며 실제 운영 전에는 운영자 권한·교사 확인 절차를 확정한다.
 
-## D1 로컬 추가 함수
+## D1 추가 함수
 
-모두 `asia-northeast3`의 Callable Function이다. 아래 추가 함수는 로컬 코드와 Emulator에서 구현·검증했으며 Firebase 개발 프로젝트에는 아직 배포하지 않았다.
+모두 `asia-northeast3`의 Callable Function이다. 아래 추가 함수는 로컬 코드와 Emulator에서 구현·검증했고 Firebase 개발 프로젝트 `manito-938cc`에 배포했다. 개발 클라우드에서 웹 App Check·Custom Token 전체 흐름은 아직 검증하지 않았다.
 
 | 함수 | 요청 | 응답 | 권한·오류 |
 |---|---|---|---|

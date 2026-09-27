@@ -1,6 +1,6 @@
 # 우리 반 비밀친구
 
-초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. Firebase 개발 프로젝트에는 계정·학급 백엔드 4개 함수가 배포되어 있고, D1 첫 입장 웹과 인증 보강은 로컬에서 구현·검증 중이다. 웹 배포 대상은 Vercel이다.
+초등학교 교사와 학생을 위한 반복형 마니또 웹서비스다. D1 첫 입장 웹은 로컬에서 구현·검증해 GitHub에 푸시했고, Firebase 개발 프로젝트에는 계정·학급 함수 9개와 Firestore Rules·인덱스를 배포했다. Vercel 웹 배포는 설정 중이다.
 
 ## 현재 구성
 
@@ -35,7 +35,7 @@ Firestore 에뮬레이터는 Java가 필요하다. `.firebaserc`의 `demo-manitt
 
 ## Vercel 배포 준비
 
-Vercel 프로젝트의 루트 디렉터리는 저장소 루트로 둔다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. Firebase 웹 앱을 개발 프로젝트에 등록한 뒤 Vercel의 빌드 환경 변수에 `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`를 설정하고 `VITE_USE_EMULATORS=false`로 둔다. Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 설정에 등록한다. 값이 빠지면 웹 빌드가 실패하도록 설정했다. 실제 미리보기 배포와 클라우드 인증 검증은 아직 진행하지 않았다.
+Vercel `manito` 프로젝트는 GitHub 저장소와 연결했고 루트 디렉터리를 저장소 루트로 설정했다. `vercel.json`이 `web/` 빌드와 SPA 경로를 처리한다. 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. Vercel의 빌드 환경 변수에 `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`를 설정하고 `VITE_USE_EMULATORS=false`로 둔다. 현재 변수 이름만 있으며 값은 비어 있다. Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 설정에 등록해야 한다. 값이 빠지면 웹 빌드가 실패하도록 설정했다. 첫 Vercel 배포는 프로젝트 루트가 `web/`로 설정돼 실패했고, 이후 루트 설정을 수정했다. 성공한 웹 배포와 클라우드 인증 검증은 아직 없다.
 
 ## 다음 구현 순서
 
@@ -46,4 +46,4 @@ Vercel 프로젝트의 루트 디렉터리는 저장소 루트로 둔다. `verce
 5. D5: 공개·감사·회고·다음 회차·보관·삭제와 학생 도입 준비
 6. D6: 가상 학급 두 회차 E2E, 공용기기·접근성·장애 검증 후 비공개 시범 준비
 
-첫 시연 목표는 **교사 승인 → 학급·학생 등록 → 카드 인쇄 → 학생 로그인 → 준비 안내 → 안전한 로그아웃**이다. 로컬 Emulator에서 학생 입장·로그아웃을 확인했다. Firebase 웹 앱 등록, Vercel 미리보기 배포, 개발 클라우드의 App Check·서명 권한 검증은 아직 남아 있다.
+첫 시연 목표는 **교사 승인 → 학급·학생 등록 → 카드 인쇄 → 학생 로그인 → 준비 안내 → 안전한 로그아웃**이다. 로컬 Emulator에서 학생 입장·로그아웃을 확인했다. Vercel 웹 배포, Google 로그인·App Check 설정, 개발 클라우드의 토큰 서명 권한 검증은 아직 남아 있다.

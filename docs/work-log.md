@@ -233,3 +233,12 @@
 - `web/index.html`을 `file://`로 직접 열어 빈 화면이 되는 상황을 확인했다. 이 파일은 Vite 개발 진입점이므로 개발 서버 없이 브라우저에서 직접 실행할 수 없다.
 - Vite 개발 서버와 `demo-manitto` 에뮬레이터를 시작하고 앱 브라우저의 `http://127.0.0.1:5173/student`에서 입장 화면 렌더링과 브라우저 오류 없음 상태를 확인했다. 이 주소는 실행 중인 로컬 서버에만 유효하며 Vercel 배포 주소가 아니다.
 - README에 직접 파일 열기와 개발 서버 접속의 차이를 기록했다. 기능 코드와 클라우드 배포 상태는 변경하지 않았다.
+
+## 2026-09-27 — GitHub 푸시와 개발 백엔드 배포
+
+- D1 첫 입장 웹·인증 보강을 커밋 `942785d`로 GitHub `moodoocoding/260918_manito`의 `main`에 푸시했다. `web/.env.local`, 빌드 산출물, `node_modules`는 포함하지 않았다.
+- 배포 전 `npm run build`와 `git diff --check`를 통과했다. 앞선 함수 단위 4개, Firestore Rules 9개, Emulator 통합 흐름 1개의 통과 결과를 기준으로 개발 프로젝트에 배포했다.
+- Firebase `manito-938cc`에 Firestore Rules·인덱스와 함수 9개를 배포했다. 기존 함수 4개는 갱신, `getTeacherStatus`, `listClasses`, `getClassAccessInfo`, `getStudentHome`, `setStudentAccess`는 새로 생성됐다. CLI가 전체 성공을 보고했다. 로컬 Emulator `demo-manitto`에는 배포하지 않았다.
+- 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. 웹 App Check와 Google 로그인 설정, 클라우드 Custom Token 서명·App Check 실행 권한의 실제 검증은 아직 남아 있다.
+- GitHub와 연결된 Vercel `manito` 프로젝트의 첫 배포는 프로젝트 루트가 `web/`인 채 저장소 루트용 빌드 명령을 실행해 `No workspaces found: --workspace=web`로 실패했다. Vercel 루트를 저장소 루트로 수정했다. 환경 변수 6개는 이름만 등록돼 값이 비어 있으며, 성공한 웹 배포는 아직 없다.
+- 이 항목의 GitHub 푸시와 Firebase 백엔드 배포는 완료됐지만 Vercel 웹 배포는 별도 상태다. 실제 학생 데이터는 사용하지 않았다.
