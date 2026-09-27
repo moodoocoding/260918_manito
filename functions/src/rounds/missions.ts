@@ -141,10 +141,12 @@ export const setMissionStatus = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "지금은 미션을 기록할 수 없어요.");
   }
   const missionRef = student.roundRef.collection("studentData").doc(student.uid).collection("missions").doc(missionId);
+  const viewRef = student.roundRef.collection("studentData").doc(student.uid);
   return student.classRef.firestore.runTransaction(async (tx) => {
     await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
-    const [round, participant, mission] = await Promise.all([
-      tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)), tx.get(missionRef),
+    const [round, participant, mission, view] = await Promise.all([
+      tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
+      tx.get(missionRef), tx.get(viewRef),
     ]);
     const planned = (round.get("missionPlan") as Array<{missionId: string; text: string}> | undefined)
       ?.find((item) => item.missionId === missionId);
@@ -155,7 +157,43 @@ export const setMissionStatus = onCall(async (request) => {
     if (mission.exists) tx.update(missionRef, {status: input.status, updatedAt: FieldValue.serverTimestamp()});
     else tx.create(missionRef, {text: planned!.text, status: input.status, replacementCount: 0,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
+    if (view.get("focusMissionId") === missionId) tx.update(viewRef, {focusMissionId: null});
     return { missionId, status: input.status };
+  });
+});
+
+export const setStudentMissionFocus = onCall(async (request) => {
+  const input = requireRecord(request.data);
+  const roundId = requireDocumentId(input.roundId, "시즌");
+  const missionId = input.missionId === null ? null : requireMissionId(input.missionId);
+  const requestId = requireRequestId(input.requestId);
+  const student = await requireStudentRound(request, roundId);
+  const viewRef = student.roundRef.collection("studentData").doc(student.uid);
+  const missionRef = missionId ? viewRef.collection("missions").doc(missionId) : null;
+  const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
+  const fingerprint = inputFingerprint({roundId, missionId});
+  return db.runTransaction(async (tx) => {
+    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, roundId);
+    const [round, participant, view, mission, command] = await Promise.all([
+      tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
+      tx.get(viewRef), missionRef ? tx.get(missionRef) : Promise.resolve(null), tx.get(commandRef),
+    ]);
+    if (command.exists) {
+      assertSameCommand(command.data(), "setStudentMissionFocus", student.uid, fingerprint);
+      return command.get("result") as {missionId: string | null};
+    }
+    const planned = (round.get("missionPlan") as Array<{missionId: string}> | undefined)
+      ?.some((item) => item.missionId === missionId);
+    if (round.get("status") !== "active" || round.get("endsAt").toDate() <= new Date()
+      || participant.get("participationStatus") !== "active"
+      || (missionId !== null && (!mission?.exists && !planned || mission?.exists && mission.get("status") !== "todo"))) {
+      throw new HttpsError("failed-precondition", "지금은 이 미션을 선택할 수 없어요.");
+    }
+    const result = {missionId};
+    tx.update(viewRef, {focusMissionId: missionId, updatedAt: FieldValue.serverTimestamp()});
+    tx.create(commandRef, {type:"setStudentMissionFocus", requestedBy:student.uid,
+      inputFingerprint:fingerprint, result, createdAt:FieldValue.serverTimestamp()});
+    return result;
   });
 });
 
@@ -165,14 +203,15 @@ export const replaceMission = onCall(async (request) => {
   const requestId = requireRequestId(input.requestId);
   const student = await requireStudentRound(request);
   const missionRef = student.roundRef.collection("studentData").doc(student.uid).collection("missions").doc(missionId);
+  const viewRef = student.roundRef.collection("studentData").doc(student.uid);
   const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
   const gradeBand = student.classDoc.get("gradeBand") as string;
   const fingerprint = inputFingerprint({ missionId });
   return student.classRef.firestore.runTransaction(async (tx) => {
     await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
-    const [round, participant, mission, command, all] = await Promise.all([
+    const [round, participant, mission, command, all, view] = await Promise.all([
       tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
-      tx.get(missionRef), tx.get(commandRef), tx.get(missionRef.parent),
+      tx.get(missionRef), tx.get(commandRef), tx.get(missionRef.parent), tx.get(viewRef),
     ]);
     if (command.exists) {
       assertSameCommand(command.data(), "replaceMission", student.uid, fingerprint);
@@ -198,6 +237,7 @@ export const replaceMission = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
     tx.create(missionRef.parent.doc(candidate), { text, status: "todo", replacementCount: replacementCount + 1,
       assignedDate: koreaDate(), createdAt: FieldValue.serverTimestamp() });
+    if (view.get("focusMissionId") === missionId) tx.update(viewRef, {focusMissionId: null});
     tx.create(commandRef, { type: "replaceMission", requestedBy: student.uid,
       inputFingerprint: fingerprint, missionId, result, createdAt: FieldValue.serverTimestamp() });
     return result;

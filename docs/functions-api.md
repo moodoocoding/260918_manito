@@ -127,9 +127,13 @@ response: {
 | `getAssignmentsForTeacher` | `{classId,roundId}` | 안전 대응용 전체 관계. 매 열람 감사 |
 | `getMissionCatalog` | `{classId,gradeBand}` | 담당 학급의 학년군별 4개 카테고리×10개 기본 미션과 학급 전용 미션 |
 | `createCustomMission` | `{classId,text,requestId}` | 담당 교사가 학급 미션을 100자 이내로 추가. 학급당 최대 40개, 멱등 처리 |
-| `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 관계 이름은 `revealed`·`archived`에서만 반환하며 그 전에는 `targetDisplayName`·`incomingDisplayName` 모두 `null`. 한국 날짜 `koreaDate`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함 |
+| `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 관계 이름은 `revealed`·`archived`에서만 반환하며 그 전에는 `targetDisplayName`·`incomingDisplayName` 모두 `null`. 한국 날짜 `koreaDate`, 시즌 날짜 `startsOn`·`endsOn`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함. `missions[]`에 공개 범주 `category`를, `missionSummary`에 본인 현재 유효 미션의 `done`·`todo`·`skipped`·`total` 수를 반환한다. `replaced` 원본은 요약에서 제외한다. 유효한 개인 선택 `focusMissionId`는 본인에게만 반환한다. 구 시즌의 불명 범주는 `기타 미션`이다. |
 | `listStudentRounds` | `null` | 본인이 참가한 공개 완료·보관 회차의 ID·제목·상태만 조회 |
 | `setMissionStatus` | `{missionId,status:"done"\|"skipped"}` | 진행 중 회차에서 본인 미션 변경 |
+| `setStudentMissionFocus` | `{roundId,missionId:string\|null,requestId}` | 본인 현재 유효 `todo` 미션을 ‘이번에 해볼 미션’으로 선택하거나 해제. 완료·쉬기·교체 시 선택을 해제한다. 참가 자격·활성 시즌·카드 세션을 검사하고 요청 ID로 멱등 처리 |
+| `getStudentCommunity` | `{roundId?}` | 본인 참여 시즌의 `contentOnly` 상태, 검토된 배려 예시 최대 2개, 게시된 교사 안내·게시 시각만 반환. 학급 합계·학생별 기록·초안·비공개 사유는 반환하지 않음 |
+| `getTeacherCommunity` | `{classId,roundId}` | 담당 교사의 시즌별 안내 초안·게시본·게시 시각 조회 |
+| `updateRoundCommunity` | `{classId,roundId,action:"save"\|"publish"\|"unpublish",text?,requestId}` | 담당 교사가 140자 이하 링크·HTML 없는 평문 초안을 저장하고, 저장된 초안만 게시하거나 게시본을 내림. 취소·보관 시즌 변경 거절, 요청 ID 멱등 처리·감사 기록. 숫자 공개 설정은 제공하지 않음 |
 | `replaceMission` | `{missionId,requestId}` | 같은 학년군의 미사용 미션으로 교체, 연속 2회 한도 |
 | `sendMessage` | `{kind:"preset"\|"free",text,replyToMessageId?,requestId}` | 첫 쪽지는 서버 배정 상대, 답장은 실제 받은 쪽지의 발신자에게만 즉시 전달. 수업일 학생당 10건, 자유 입력 200자 |
 | `reviewMessage` | `{classId,roundId,messageId,decision:"approve"\|"reject",requestId}` | 변경 전 접수된 `pending` 자유 쪽지의 호환용 처리, 감사 기록 |

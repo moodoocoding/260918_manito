@@ -6,6 +6,7 @@ import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import { assertStudentTransaction, requireStudentRound } from "../shared/student.js";
 import { requireDocumentId, requireRecord, requireRequestId, requireText } from "../shared/validation.js";
 import { koreaDate, requireTeacherRound } from "./common.js";
+import { builtInMissions } from "./missions.js";
 
 const presetMessages = [
   "오늘도 응원해!", "함께해서 즐거웠어.", "네 생각이 참 좋았어.",
@@ -32,18 +33,35 @@ export const getStudentActivity = onCall(async (request) => {
     student.roundRef.collection("thankYouSecrets").doc(student.uid).get(),
   ]);
   const activityDates = student.roundDoc.get("activityDates") as string[];
-  const missionPlan = student.roundDoc.get("missionPlan") as Array<{missionId: string; text: string}> | undefined;
+  const missionPlan = student.roundDoc.get("missionPlan") as Array<{missionId: string; text: string; category?: string}> | undefined;
   const missionRecords = new Map(missions.docs.map((doc) => [doc.id, doc]));
+  const builtInCategories = new Map(builtInMissions(student.classDoc.get("gradeBand") as string)
+    .map((mission) => [mission.missionId, mission.category]));
+  const categoryOf = (missionId: string) => missionId.startsWith("custom_") ? "우리 반 미션"
+    : builtInCategories.get(missionId) ?? "기타 미션";
   const visibleMissions = missionPlan
-    ? [...missionPlan.map(({missionId, text}) => ({missionId, text,
-      status: missionRecords.get(missionId)?.get("status") ?? "todo"})),
+    ? [...missionPlan.map(({missionId, text, category}) => ({missionId, text,
+      category: category ?? categoryOf(missionId), status: missionRecords.get(missionId)?.get("status") ?? "todo"})),
       ...missions.docs.filter((doc) => !missionPlan.some((item) => item.missionId === doc.id))
-        .map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}))]
-    : missions.docs.map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}));
+        .map((doc) => ({missionId: doc.id, text: doc.get("text"), category: categoryOf(doc.id), status: doc.get("status")}))]
+    : missions.docs.map((doc) => ({missionId: doc.id, text: doc.get("text"),
+      category: categoryOf(doc.id), status: doc.get("status")}));
+  const currentMissions = visibleMissions.filter((mission) => mission.status !== "replaced");
+  const savedFocus = view.get("focusMissionId") as string | null | undefined;
+  const focusMissionId = currentMissions.some((mission) => mission.missionId === savedFocus && mission.status === "todo")
+    ? savedFocus : null;
+  const missionSummary = {
+    done: currentMissions.filter((mission) => mission.status === "done").length,
+    todo: currentMissions.filter((mission) => mission.status === "todo").length,
+    skipped: currentMissions.filter((mission) => mission.status === "skipped").length,
+    total: currentMissions.length,
+  };
   const identityRevealed = ["revealed", "archived"].includes(student.roundDoc.get("status"));
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
     title: student.roundDoc.get("title"),
+    startsOn: koreaDate(student.roundDoc.get("startsAt").toDate()),
+    endsOn: koreaDate(student.roundDoc.get("endsAt").toDate()),
     targetDisplayName: identityRevealed ? view.get("targetDisplayName") ?? null : null,
     incomingDisplayName: identityRevealed ? view.get("incomingDisplayName") ?? null : null,
     activityDates,
@@ -59,6 +77,8 @@ export const getStudentActivity = onCall(async (request) => {
     allowFreeTextMessages: student.roundDoc.get("allowFreeTextMessages") === true,
     presetMessages,
     missions: visibleMissions,
+    missionSummary,
+    focusMissionId,
     inbox: inbox.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
       reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true,

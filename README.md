@@ -15,6 +15,8 @@
 - 시즌마다 미션을 1~80개 선택할 수 있다. 학생은 선택된 미션을 기간 안에 원하는 순서로 수행한다. 시즌 시작 때 공통 미션 계획을 고정하고 학생별 활동 상태만 기록해 40명 학급의 10개 미션 시작도 단일 트랜잭션으로 처리한다. [이번 변경 검토](docs/design-reviews/2026-09-28-entry-card-flexible-missions-demo.md)에 브라우저 확인 결과와 남은 검수를 기록한다.
 - 진행 중 학생 화면과 학생 API에서는 배정된 친구의 이름을 보여주지 않는다. 쪽지는 서버가 자동 전달하고, 교사 공개 승인 후에만 본인 관계를 공개 결과로 확인한다. 예전 시즌 방식으로 저장된 이름도 학생의 Firestore 직접 읽기에서는 차단한다. [비공개 검토](docs/design-reviews/2026-09-28-student-friend-secrecy.md)에 변경과 검증 범위를 기록한다.
 
+- 학생 화면은 [디자인 수정 계획 v2.0](docs/design-revision-plan.md)과 [개발 계획 v2.3](docs/manitto-development-plan.md)에 따라 홈·미션·우편함·우리 반으로 분리했다. 본인 미션 요약·선택·필터·8개씩 탐색과 교사 안내 초안/게시를 구현했다. 학급 실천 숫자는 추정 위험 검토가 남아 **비공개**이며, 우리 반에는 검토된 배려 예시와 게시된 안내만 보인다. [검토 기록](docs/design-reviews/2026-09-28-student-se1-se2-implementation.md)에 검증 범위와 남은 항목을 기록했다.
+
 ## 구조
 
 - [개발 계획서](docs/manitto-development-plan.md), [데이터 계약](docs/firestore-schema.md), [함수 계약](docs/functions-api.md), [개인정보 처리방침 초안](docs/privacy-policy-draft.md), [작업일지](docs/work-log.md)

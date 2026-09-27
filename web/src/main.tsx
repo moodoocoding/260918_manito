@@ -4,13 +4,14 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
 import { TeacherRounds } from "./TeacherRounds";
-import { StudentRound } from "./StudentRound";
+import { StudentRound, type StudentMailDraft, type StudentMissionUi } from "./StudentRound";
+import { StudentCommunity } from "./StudentCommunity";
 import { StudentRights, TeacherRights } from "./RightsRequests";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import "./style.css";
 
 type TeacherPage = "classes" | "overview" | "students" | "rounds" | "safety" | "history" | "settings";
-type StudentPage = "today" | "mail" | "help" | "history";
+type StudentPage = "today" | "missions" | "mail" | "community" | "help" | "history";
 const teacherPages: Array<{id: TeacherPage; label: string}> = [
   {id:"overview",label:"운영 요약"},{id:"rounds",label:"시즌 설정"},
   {id:"students",label:"입장 카드"},{id:"safety",label:"안전 확인"},
@@ -50,8 +51,9 @@ function App() {
   const [teacherPage, setTeacherPage] = useState<TeacherPage>(() => teacherLocation(window.location.pathname).page);
   const [studentPage, setStudentPage] = useState<StudentPage>(() => {
     const page = window.location.pathname.split("/")[2];
-    return ["mail","help","history"].includes(page) ? page as StudentPage : "today";
+    return ["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today";
   });
+  const [studentMissionUi, setStudentMissionUi] = useState<StudentMissionUi>({filter:"all",category:"전체",limit:8});
   const [role, setRole] = useState<"none" | "teacher" | "student">("none");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -85,6 +87,9 @@ function App() {
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block"} | null>(null);
   const generation = useRef(0);
+  const studentRoundId = useRef<string | null>(null);
+  const studentMailDraft = useRef<StudentMailDraft>({selectedMessage:"",freeText:"",replyToMessageId:null,
+    replyText:"",mode:"preset",section:"inbox"});
   const roundDirty = useRef(false);
   const lastTeacherPath = useRef(window.location.pathname);
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
@@ -102,6 +107,9 @@ function App() {
     cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(false);
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
+    studentRoundId.current = null; setStudentMissionUi({filter:"all",category:"전체",limit:8});
+    studentMailDraft.current = {selectedMessage:"",freeText:"",replyToMessageId:null,
+      replyText:"",mode:"preset",section:"inbox"};
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
     roundDirty.current = false;
@@ -136,6 +144,12 @@ function App() {
       call<null, {rounds: HistoryRound[]}>("listStudentRounds", null),
     ]);
     if (current !== generation.current) return;
+    if (studentRoundId.current !== result.round?.roundId) {
+      studentRoundId.current = result.round?.roundId ?? null;
+      setStudentMissionUi({filter:"all",category:"전체",limit:8});
+      studentMailDraft.current = {selectedMessage:"",freeText:"",replyToMessageId:null,
+        replyText:"",mode:"preset",section:"inbox"};
+    }
     setHome(result);
     setHistoryRounds(historyResult.rounds);
     setStudentRefreshVersion((version) => version + 1);
@@ -161,7 +175,7 @@ function App() {
         else { setSelected(null); setTeacherPage("classes"); }
       } else {
         const page = path.split("/")[2];
-        setStudentPage(["mail","help","history"].includes(page) ? page as StudentPage : "today");
+        setStudentPage(["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today");
       }
     };
     window.addEventListener("popstate", onPop);
@@ -177,7 +191,7 @@ function App() {
           setRole("student"); setRoute("student");
           if (!window.location.pathname.startsWith("/student")) history.replaceState(null, "", "/student");
           const studentPath = window.location.pathname.split("/")[2];
-          setStudentPage(["mail", "help", "history"].includes(studentPath) ? studentPath as StudentPage : "today");
+          setStudentPage(["missions", "mail", "community", "help", "history"].includes(studentPath) ? studentPath as StudentPage : "today");
           await loadStudent();
         } else {
           setRole("teacher"); setRoute("teacher");
@@ -258,6 +272,9 @@ function App() {
   }
 
   function openStudentPage(page: StudentPage) {
+    if (studentPage === "mail" && page !== "mail"
+      && (studentMailDraft.current.freeText.trim() || studentMailDraft.current.replyText.trim())
+      && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) return;
     setStudentPage(page); setOpenHistoryRoundId(null);
     setError(""); setNotice("");
     history.pushState(null, "", page === "today" ? "/student" : `/student/${page}`);
@@ -446,7 +463,7 @@ function App() {
   const filteredMembers = members.filter((member) => member.displayName.includes(memberSearch)
     && (memberFilter === "all" || member.accessStatus === memberFilter));
 
-  return <div className="app-shell">
+  return <div className={`app-shell${role === "student" ? " student-app" : ""}`}>
     <header className="topbar no-print">
       <a className="brand" href={role === "teacher" ? "/teacher" : "/student"} onClick={(event) => { event.preventDefault();
         if (role === "teacher") openClasses();
@@ -465,20 +482,19 @@ function App() {
       {notice && <div className="message success" role="status">{notice}</div>}
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
         role === "student" ? <section className="student-grid student-shell">
-          <div className="hero student-hero"><h1>안녕, {home?.displayName}!</h1><p>{home?.className} · 친구를 편안하게 챙겨요. 어려우면 쉬어도 괜찮아요.</p></div>
-          <nav className="student-nav" aria-label="학생 활동 메뉴">{([{id:"today",label:"오늘"},{id:"mail",label:"우편함"},{id:"history",label:"지난 활동"}] as const).map((item) =>
+          <nav className="student-nav" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"우편함"},{id:"community",label:"우리 반"}] as const).map((item) =>
             <button key={item.id} aria-current={studentPage === item.id ? "page" : undefined} onClick={() => openStudentPage(item.id)}>{item.label}</button>)}</nav>
-          {studentPage === "today" && <><h2 className="student-page-title">오늘의 활동</h2>
-            {home?.round ? <><section className="panel"><span className="eyebrow">{home.round.status === "revealed" ? "친구 공개 완료" : home.round.status === "archived" ? "지난 활동" : home.round.status === "paused" ? "잠시 쉬는 중" : home.round.status === "reveal_pending" ? "공개 준비 중" : "진행 중"}</span><h2>{home.round.title}</h2>
-              <p>{["revealed", "archived"].includes(home.round.status) ? "친구 공개가 끝났어요. 아래에서 결과를 확인할 수 있어요." : "친구의 이름은 활동이 끝날 때까지 비밀이에요. 쪽지는 배정된 친구에게 전해져요."}</p></section>
-              <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="today" gradeBand={home.gradeBand} />
-            </> : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p></section>}
-            <button className="wide outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></>}
-          {studentPage === "mail" && <><h2 className="student-page-title">우편함</h2>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
-          {studentPage === "help" && <><h2 className="student-page-title">선생님 도움</h2>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} />}
+          {studentPage === "today" && <><h1 className="student-page-title">안녕, {home?.displayName}!</h1><p className="student-intro">{home?.className} · 오늘도 편하게 참여해요.</p>
+            {home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} onNavigate={openStudentPage} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />
+              : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p><button className="outline" onClick={() => openStudentPage("history")}>지난 활동 보기</button></section>}
+            <button className="outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></>}
+          {studentPage === "missions" && <><h1 className="student-page-title">미션</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
+          {studentPage === "mail" && <><h2 className="student-page-title">우편함</h2>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
+          {studentPage === "community" && <><h1 className="student-page-title">우리 반</h1>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
+          {studentPage === "help" && <><h2 className="student-page-title">선생님 도움</h2>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
             <StudentRights /></>}
           {studentPage === "history" && <><h2 className="student-page-title">지난 활동</h2><section className="panel"><p>예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p>{historyRounds.length === 0 ? <p>아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
-            {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} />}</>}
+            {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}</>}
         </section> : route === "student" && role === "none" ? <section className="entry-layout">
           <div className="hero"><span className="eyebrow">학생 입장</span><h1>비밀친구 작전,<br />시작해 볼까요?</h1><p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p><div className="envelope">💌</div></div>
           <form className="panel entry-form" onSubmit={(event) => { event.preventDefault(); void task(async () => {

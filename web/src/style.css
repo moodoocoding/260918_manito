@@ -156,3 +156,64 @@ button[aria-busy="true"]{cursor:wait}
 @media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}
 @page{size:A4;margin:14mm}
 @media print{:root,body,.app-shell{background:#fff!important}}
+/* Student experience v2.3: one reading column and one owner for each gap. */
+.student-app .topbar,.student-app .content{max-width:808px;width:100%;padding-inline:24px}
+.student-app .topbar{padding-block:18px;flex-wrap:wrap;gap:8px 12px}
+.student-app .topbar .brand{margin-right:auto}
+.student-app .content{padding-top:8px}
+.student-app .student-grid{max-width:760px;gap:24px}
+.student-app .student-activities{gap:24px}
+.student-app .student-grid .panel{border-radius:20px;padding:24px;box-shadow:0 5px 18px #74573610}
+.student-app .student-grid .panel h2{margin:0 0 8px;font-size:1.25rem}
+.student-app .student-grid .panel h3{margin:24px 0 8px}
+.student-app .student-grid .panel p{line-height:1.6;overflow-wrap:anywhere}
+.student-app .student-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.student-app .student-nav button{min-width:0;border-radius:12px;padding:10px 8px;min-height:48px}
+.student-app .student-page-title{font-size:clamp(1.5rem,4vw,1.75rem);line-height:1.35;margin:0}
+.student-intro{margin:-16px 0 0;color:#52647a;line-height:1.6}
+.student-app .student-season{background:linear-gradient(135deg,#fff 70%,#fff2df)}
+.student-app .student-season .eyebrow{margin-bottom:16px}
+.student-progress{display:flex;flex-wrap:wrap;gap:8px 20px;color:#354158;font-size:1rem}
+.student-progress span{white-space:nowrap}
+.student-progress strong{color:#a5413d;font-size:1.2rem}
+.student-app .field-help{color:#52647a;font-size:.92rem;line-height:1.55}
+.student-app .student-mission-text{font-size:1.2rem;font-weight:750;margin:16px 0 0}
+.student-link-row{margin-top:24px}
+.student-community-preview{background:#f4faf5!important}
+.student-history-link{justify-self:start}
+.student-mission-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.student-app .student-mission-filters label{margin:8px 0 0}
+.student-mission-list{list-style:none;padding:0;margin:16px 0 24px;display:grid;gap:12px}
+.student-mission-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;min-width:0;padding:16px;border:1px solid #e8d9ca;border-radius:12px;background:#fffdf9}
+.student-mission-list li>div{min-width:0}
+.student-mission-list strong,.student-mission-list small{display:block;overflow-wrap:anywhere;line-height:1.5}
+.student-mission-list small{color:#52647a;margin-bottom:4px}
+.student-mission-list button{flex:none}
+.student-mission-detail h3{font-size:1.22rem;line-height:1.5;overflow-wrap:anywhere}
+.student-mission-detail h3:focus{outline:0}
+.student-mission-actions{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 16px}
+.student-replace-confirm{border:1px solid #e8d9ca;background:#fff8ed;padding:16px;border-radius:12px;margin-top:16px}
+.student-mail-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}
+.student-mail-tabs button{flex:1 1 130px;padding-inline:12px}
+.student-app .review-card,.student-app .sent-message{overflow-wrap:anywhere}
+@media(max-width:599px){
+  .student-app .topbar,.student-app .content{padding-inline:16px}
+  .student-app .student-grid,.student-app .student-activities{gap:24px}
+  .student-app .student-grid .panel{padding:20px}
+  .student-app .student-mission-filters{grid-template-columns:1fr;gap:0}
+  .student-mission-list li{align-items:stretch;flex-direction:column}
+  .student-mission-list li button{align-self:flex-start}
+  .student-mission-actions button{flex:1 1 100%}
+  .student-app .student-nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .student-app .topbar .brand{flex:1 1 100%;white-space:normal}
+}
+@media(max-width:360px){.student-app .topbar,.student-app .content{padding-inline:12px}.student-app .student-grid .panel{padding:16px}}
+.student-example-list{padding-left:1.3rem;margin:16px 0;display:grid;gap:12px;line-height:1.6}
+.teacher-community{border:1px solid #e9dbcc;border-radius:16px;background:#fffdf9;padding:20px;display:grid;gap:12px}
+.teacher-community h3,.teacher-community p{margin:0}
+.teacher-community>label{display:block;font-weight:700;margin:0}
+.teacher-community textarea{display:block;width:100%;min-height:100px;margin-top:8px;padding:12px;border:1px solid #a8aeb8;border-radius:10px;color:#283449;background:white;resize:vertical}
+.teacher-community-current,.teacher-community-preview{border-radius:12px;background:#f4f8f5;padding:16px;display:grid;gap:8px;overflow-wrap:anywhere}
+.teacher-community-preview{background:#fff4e6}
+.teacher-community-preview button{justify-self:start}
+@media(max-width:599px){.teacher-community{padding:16px}.teacher-community .action-row button{flex:1 1 100%}}

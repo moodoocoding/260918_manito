@@ -35,6 +35,7 @@ classes/{classId}
     studentCommands/{studentUid_requestId} # 서버 전용
     thankYouSecrets/{studentUid}        # 서버 전용
   roundSettings/{roundId}               # 참가자·제외 관계·미션 선택, 서버 전용
+  roundCommunity/{roundId}              # 교사 안내 초안·게시본, 서버 전용
   commands/{requestId}                  # 회차·학급 명령 중복 방지
   pairHistory/{encodedPairKey}           # 서버 전용
   auditLogs/{logId}
@@ -49,7 +50,7 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 
 ## 문서별 책임
 
-2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. 새 시즌의 `rounds/{roundId}.missionPlan`은 시작 때 확정한 1~80개 미션 ID와 원문 배열이다. 참가 학생이 같은 미션을 읽으며 배정 관계·개별 활동 상태는 포함하지 않는다. `studentData/{uid}/missions`는 완료·쉬기·교체할 때만 생기는 개인 상태 문서다. 과거 시즌의 시작 시 전부 만든 미션 문서는 계속 읽는다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
+2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. 새 시즌의 `rounds/{roundId}.missionPlan`은 시작 때 확정한 1~80개 미션 ID·원문·공개 범주 배열이다. 구 시즌에는 범주가 없을 수 있으며 서버가 기본 미션 ID로 복원하거나 `기타 미션`으로 응답한다. 참가 학생이 같은 미션을 읽으며 배정 관계·개별 활동 상태는 포함하지 않는다. `studentData/{uid}/missions`는 완료·쉬기·교체할 때만 생기는 개인 상태 문서다. `studentData/{uid}.focusMissionId`는 본인 편의 선택으로 서버만 갱신하며 완료·쉬기·교체 때 해제한다. 부모 문서의 학생 직접 읽기는 여전히 금지한다. `roundCommunity/{roundId}`는 교사 안내의 초안·게시본·게시 시각·버전·작성자를 서버 전용으로 보관한다. 학생은 Callable에서 게시 평문만 받으며 숫자 집계 문서는 아직 없다. 학급 전체 삭제는 이 하위 문서도 재귀 삭제한다. 과거 시즌의 시작 시 전부 만든 미션 문서는 계속 읽는다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
 
 | 경로 | 책임 | 학생 직접 읽기 | 교사 직접 읽기 | 직접 쓰기 |
 |---|---|---:|---:|---:|
@@ -66,6 +67,7 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 | `sentMessages` | 발신자에게 보여줄 본인 쪽지·전달/교사 숨김 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `helpRequests` | 도움 요청과 교사 처리 상태 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
 | `roundSettings` | 참가자·제외 관계·미션 선택·명단 버전 | 아니요 | 함수로 감사 후 조회 | 서버만 |
+| `roundCommunity/{roundId}` | 교사 안내 초안·게시본·작성자·버전. 학생에게는 게시 평문만 Callable 반환 | 아니요 | 담당 교사 함수로만 조회 | 서버만 |
 | `helpSecrets`, `messageDays`, `studentCommands`, `thankYouSecrets` | 안전 원문·하루 한도·중복 명령·감사 전달 | 아니요 | 함수로 감사 후 조회 | 서버만 |
 | `assignmentSecrets` | 전체 방향 관계 | 아니요 | 함수로 감사 후 열람 | 서버만 |
 | `messageSecrets` | 원문·발신자·수신자·`replyToMessageId`·전달/교사 숨김 상태 | 아니요 | 함수로 감사 후 열람 | 서버만 |

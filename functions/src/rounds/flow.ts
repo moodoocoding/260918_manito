@@ -6,7 +6,7 @@ import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import { requireDocumentId, requireRecord, requireRequestId } from "../shared/validation.js";
 import { matchParticipants, pairKey, type PairHistory } from "./matching.js";
 import { koreaDate, parseRoundInput, requireTeacherRound, type RoundSettings } from "./common.js";
-import { missionText } from "./missions.js";
+import { builtInMissions, missionText } from "./missions.js";
 
 function roundRefs(classId: string, roundId: string) {
   const classRef = db.doc(`classes/${classId}`);
@@ -227,7 +227,9 @@ export const startRound = onCall(async (request) => {
     const missionIds = settings.missionIds.length > 0 ? settings.missionIds
       : [1, 2, 3].map((index) => `${gradeBand}-${String(index).padStart(2, "0")}`);
     const missionTexts = await selectedMissionTexts(tx, classRef, gradeBand, missionIds);
-    const missionPlan = missionIds.map((missionId) => ({missionId, text: missionTexts.get(missionId)!}));
+    const categories = new Map(builtInMissions(gradeBand).map((mission) => [mission.missionId, mission.category]));
+    const missionPlan = missionIds.map((missionId) => ({missionId, text: missionTexts.get(missionId)!,
+      category: missionId.startsWith("custom_") ? "우리 반 미션" : categories.get(missionId) ?? "기타 미션"}));
     for (const [giverUid, receiverUid] of assignments) {
       tx.create(roundRef.collection("assignmentSecrets").doc(giverUid), {
         giverUid, receiverUid, createdAt: FieldValue.serverTimestamp(),

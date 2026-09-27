@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { call } from "./firebase";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
+import { TeacherCommunity } from "./TeacherCommunity";
 
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Round = { roundId: string; title: string; status: string; startsAt: string; endsAt: string;
@@ -419,6 +420,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       </div>
       {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료일<input type="date" min={koreaDay(new Date(current.endsAt))} value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 3~20일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:endOfKoreaDay(end), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
       {current.status === "reveal_pending" && summary && (summary.helpCount + summary.pendingMessageCount > 0) && <p className="message error">도움 요청 {summary.helpCount}건과 검토할 쪽지 {summary.pendingMessageCount}건을 처리한 뒤 공개해 주세요. <button className="small outline" onClick={() => onNavigate("safety")}>안전 확인으로</button></p>}
+      <TeacherCommunity key={current.roundId} classId={classId} roundId={current.roundId} roundStatus={current.status} />
       {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => { if (assignments) { assignmentRequest.current++; setAssignments(null); return; } const version = ++assignmentRequest.current; void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); if (version === assignmentRequest.current && document.visibilityState === "visible") setAssignments(result.assignments); }); }}>{assignments ? "배정표 가리기" : "안전 대응용 배정표 열람"}</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}
     </div>}
 

@@ -140,6 +140,12 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      match /roundCommunity/{roundId} {
+        // Draft and author information stay server-only. Callable responses
+        // return only the posted plain-text notice to participating students.
+        allow read, write: if false;
+      }
+
       match /auditLogs/{logId} {
         allow read: if isClassTeacher(classId);
         allow write: if false;
