@@ -9,7 +9,7 @@ type Activity = { roundId: string; title: string; status: string; startsOn?: str
   messagesSentToday?: number; dailyMessageLimit?: number; nextActivityDate?: string | null;
   reflectionText?: string | null; thankYouSent?: boolean; allowFreeTextMessages: boolean;
   presetMessages: string[]; missions: Mission[];
-  missionSummary?: { done: number; todo: number; skipped: number; total: number };
+  missionSummary?: { done: number; todo: number; skipped: number; total: number } | null;
   focusMissionId?: string | null;
   inbox: Array<{messageId: string; text: string; hidden: boolean; reported: boolean; type: string; reacted: boolean; replyToMessageId: string | null}>;
   sent: Array<{messageId: string; text: string; status: string; date: string; reacted: boolean; replyToMessageId: string | null}>;
@@ -89,11 +89,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const today = data?.koreaDate ?? "";
   const canSend = data?.canSendMessage ?? false;
   const missions = data?.missions.filter((mission) => mission.status !== "replaced") ?? [];
-  const summary = data?.missionSummary ?? {
-    done: missions.filter((mission) => mission.status === "done").length,
-    todo: missions.filter((mission) => mission.status === "todo").length,
-    skipped: missions.filter((mission) => mission.status === "skipped").length, total: missions.length,
-  };
+  const summary = data?.missionSummary;
   const filtered = missions.filter((mission) => (missionFilter === "all" || mission.status === missionFilter)
     && (category === "전체" || (mission.category ?? "기타 미션") === category));
   const selectedMission = missions.find((mission) => mission.missionId === openMissionId);
@@ -102,10 +98,10 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const revealed = ["revealed", "archived"].includes(data?.status ?? status);
   const availableCategories = categoryOrder.filter((item) => missions.some((mission) => (mission.category ?? "기타 미션") === item));
   const nextDay = data?.nextActivityDate ?? data?.activityDates.find((day) => day > today);
-  const summaryElement = <div className="student-progress" aria-label="내 미션 기록">
+  const summaryElement = summary ? <div className="student-progress" aria-label="내 미션 기록">
     <span>해봤어요 <strong>{summary.done}</strong></span><span>골라볼 미션 <strong>{summary.todo}</strong></span>
     <span>쉬었어요 <strong>{summary.skipped}</strong></span>
-  </div>;
+  </div> : <p>이전 미션 기록은 아래 목록에서 확인해 주세요.</p>;
   return <div className="student-activities">
     {error && <p className="message error" role="alert">{error}</p>}
     {notice && <p className="message success" role="status">{notice}</p>}
@@ -148,7 +144,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
             <p className="field-help">{filtered.length}개 중 {Math.min(filtered.length, missionLimit)}개를 보여 줘요.</p>
             {filtered.length === 0 ? <p>이 조건에 맞는 미션이 없어요. 다른 상태나 종류를 골라 주세요.</p>
               : <ul className="student-mission-list">{filtered.slice(0,missionLimit).map((mission) => <li key={mission.missionId}><div><small>{mission.category ?? "기타 미션"} · {missionStatus[mission.status] ?? "기록 확인"}</small><strong>{mission.text}</strong></div><button className="outline small" ref={(node) => {if(node) missionButtonRefs.current.set(mission.missionId,node);}} onClick={() => setOpenMissionId(mission.missionId)}>이 미션 보기</button></li>)}</ul>}
-            {missionLimit < filtered.length && <button className="outline" onClick={() => onMissionUiChange({...missionUi,limit:missionLimit+8})}>8개 더 보기</button>}
+            {missionLimit < filtered.length && <button className="outline" onClick={() => onMissionUiChange({...missionUi,limit:missionLimit+8})}>{Math.min(8, filtered.length-missionLimit)}개 더 보기</button>}
           </>}
         </section>
       </>}

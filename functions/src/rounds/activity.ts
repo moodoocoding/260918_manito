@@ -47,15 +47,17 @@ export const getStudentActivity = onCall(async (request) => {
     : missions.docs.map((doc) => ({missionId: doc.id, text: doc.get("text"),
       category: categoryOf(doc.id), status: doc.get("status")}));
   const currentMissions = visibleMissions.filter((mission) => mission.status !== "replaced");
+  const summaryValid = currentMissions.every((mission) => ["todo", "done", "skipped"].includes(mission.status))
+    && new Set(currentMissions.map((mission) => mission.missionId)).size === currentMissions.length;
   const savedFocus = view.get("focusMissionId") as string | null | undefined;
   const focusMissionId = currentMissions.some((mission) => mission.missionId === savedFocus && mission.status === "todo")
     ? savedFocus : null;
-  const missionSummary = {
+  const missionSummary = summaryValid ? {
     done: currentMissions.filter((mission) => mission.status === "done").length,
     todo: currentMissions.filter((mission) => mission.status === "todo").length,
     skipped: currentMissions.filter((mission) => mission.status === "skipped").length,
     total: currentMissions.length,
-  };
+  } : null;
   const identityRevealed = ["revealed", "archived"].includes(student.roundDoc.get("status"));
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
