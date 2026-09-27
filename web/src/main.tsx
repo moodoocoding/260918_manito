@@ -89,6 +89,7 @@ function App() {
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
   const pendingRegistration = useRef<{ key: string; requestId: string } | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
+  const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
 
   const clearPrivate = useCallback(() => {
     generation.current += 1;
@@ -171,6 +172,8 @@ function App() {
         if (token.claims.role === "student") {
           setRole("student"); setRoute("student");
           if (!window.location.pathname.startsWith("/student")) history.replaceState(null, "", "/student");
+          const studentPath = window.location.pathname.split("/")[2];
+          setStudentPage(["mail", "help", "history"].includes(studentPath) ? studentPath as StudentPage : "today");
           await loadStudent();
         } else {
           setRole("teacher"); setRoute("teacher");
@@ -226,6 +229,10 @@ function App() {
     document.addEventListener("visibilitychange", hideCard);
     return () => document.removeEventListener("visibilitychange", hideCard);
   }, [role]);
+
+  useEffect(() => {
+    if (mobileTeacherMenu.current) mobileTeacherMenu.current.open = false;
+  }, [teacherPage]);
 
   function navigate(next: "student" | "teacher") {
     history.pushState(null, "", next === "teacher" ? "/teacher" : "/student");
@@ -316,7 +323,7 @@ function App() {
       });
       pendingRegistration.current = null;
       setCards(result.students); setNamesInput("");
-      await loadTeacher(); await selectClass(selected.classId);
+      await loadTeacher(); await selectClass(selected.classId, "students");
       setCards(result.students);
       setNotice(result.requiresCredentialRotation ? "등록은 완료됐지만 카드 원문을 다시 볼 수 없어요. 학생별로 재발급해 주세요." : "학생을 등록했어요. 카드는 지금 개별 인쇄해 주세요.");
     });
@@ -432,10 +439,11 @@ function App() {
             <nav className="teacher-sidebar" aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav>
             <div className="teacher-main">
               <div className="teacher-context"><div><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
-              <details className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
+              <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
               {teacherPage === "students" && <section className="panel"><div className="page-header"><div><h2>학생·입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
                 <div className="class-code"><span>학급 코드</span><strong>{selected.classCode}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
-                <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>
+                {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
+                  : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
                 <h3>학생 카드 관리 · {members.length}명</h3><div className="page-actions"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 제한</option></select></label></div>
                 {cards.length > 0 && <div className="action-row"><button className="small outline" onClick={() => setSelectedCardUids(cards.map((card) => card.studentUid))}>발급된 카드 전체 선택</button><button className="small outline" onClick={() => setSelectedCardUids([])}>선택 해제</button><button disabled={selectedCardUids.length === 0} onClick={() => print(cards.filter((card) => selectedCardUids.includes(card.studentUid)))}>선택한 카드 {selectedCardUids.length}장 인쇄</button></div>}
                 {members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요.</p> : <ul className="member-list">{members.filter((m) => m.displayName.includes(memberSearch) && (memberFilter === "all" || m.accessStatus === memberFilter)).map((member) => {

@@ -41,6 +41,8 @@ button[aria-busy="true"]{cursor:wait}
 .page-header h2{margin:0}
 .page-header p{margin:8px 0 0;color:#546177}
 .page-actions{display:flex;gap:8px;flex-wrap:wrap}
+.teacher-main .page-actions label{display:grid;gap:6px;flex:1 1 140px;min-width:0;font-weight:700;color:#354158}
+.teacher-main .page-actions input,.teacher-main .page-actions select{width:100%;min-width:0;min-height:44px;padding:9px 10px;border:1px solid #a8aeb8;border-radius:10px;background:#fff;color:#283449}
 .teacher-page-form{max-width:840px}
 .teacher-page-form .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
 .round-nav{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none;margin:0 0 18px}
@@ -91,8 +93,15 @@ button[aria-busy="true"]{cursor:wait}
 .student-shell{display:grid;gap:16px}
 .member-list li>div.member-primary{display:block;flex:1;min-width:0}
 .member-primary .choice-row{width:max-content;max-width:100%}
+.member-list small{color:#5e6979}
+.student-registration{margin:16px 0;border:1px solid #e5d4c8;border-radius:12px;background:#fffdf9}
+.student-registration summary{padding:14px 16px;font-weight:700;cursor:pointer}
+.student-registration summary:focus-visible,.mobile-teacher-menu summary:focus-visible{outline:3px solid #557dc5;outline-offset:3px}
+.student-registration form{padding:0 16px 18px}
 .mobile-teacher-menu{display:none}
 @media(max-width:900px){.teacher-shell{grid-template-columns:1fr}.teacher-sidebar{display:none}.mobile-teacher-menu{display:block}.mobile-teacher-menu summary{padding:14px;border:1px solid #dbcabc;border-radius:12px;background:white;font-weight:700;cursor:pointer}.mobile-teacher-menu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;background:white}.teacher-overview-grid{grid-template-columns:1fr}.participant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.topbar{gap:8px}.content{padding-inline:16px}.panel{padding:20px;border-radius:20px}.teacher-layout>.panel{padding:18px}.teacher-page-form .form-grid,.participant-grid,.mission-grid{grid-template-columns:1fr}.section-heading h1{font-size:1.8rem}.student-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.student-nav button{padding-inline:5px}.student-hero{padding:18px}.student-grid .panel{padding:18px}.teacher-context{align-items:flex-start}.action-row button{flex-grow:1}}
 @media(max-width:360px){.brand{white-space:normal}.topbar{padding-inline:14px}.content{padding-inline:12px}.student-nav button{font-size:.9rem}}
 @media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}
+@page{size:A4;margin:14mm}
+@media print{:root,body,.app-shell{background:#fff!important}}
