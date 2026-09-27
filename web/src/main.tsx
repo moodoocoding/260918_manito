@@ -387,9 +387,6 @@ function App() {
     </header>
 
     <main className="content no-print">
-      <div className="message development-notice" role="note">
-        개발 검증 중인 사이트입니다. 개인정보 처리방침과 학교 운영 절차가 확정되기 전에는 실제 학생의 이름·활동 내용을 입력하지 마세요.
-      </div>
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
