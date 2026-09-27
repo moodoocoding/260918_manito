@@ -21,14 +21,17 @@ export function StudentRound({ roundId, status, incomingDisplayName, refreshVers
   const [freeText, setFreeText] = useState("");
   const [helpNote, setHelpNote] = useState("");
   const [reflection, setReflection] = useState("");
-  const load = useCallback(async () => {
-    const result = await call<{roundId: string}, Activity>("getStudentActivity", {roundId});
-    setData(result);
-  }, [roundId]);
-  useEffect(() => { setData(null); void load().catch(() => setError("활동을 불러오지 못했어요.")); }, [load, status, refreshVersion]);
+  const load = useCallback(() => call<{roundId: string}, Activity>("getStudentActivity", {roundId}), [roundId]);
+  useEffect(() => {
+    let active = true;
+    setData(null);
+    void load().then((result) => { if (active) setData(result); })
+      .catch(() => { if (active) setError("활동을 불러오지 못했어요."); });
+    return () => { active = false; };
+  }, [load, status, refreshVersion]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
-    try { await action(); await load(); }
+    try { await action(); setData(await load()); }
     catch (caught) { setError(caught instanceof Error ? caught.message : "처리하지 못했어요."); }
     finally { setBusy(false); }
   }

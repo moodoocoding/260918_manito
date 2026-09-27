@@ -94,8 +94,10 @@ function App() {
 
   const loadStudent = useCallback(async () => {
     const current = generation.current;
-    const result = await call<null, StudentHome>("getStudentHome", null);
-    const historyResult = await call<null, {rounds: HistoryRound[]}>("listStudentRounds", null);
+    const [result, historyResult] = await Promise.all([
+      call<null, StudentHome>("getStudentHome", null),
+      call<null, {rounds: HistoryRound[]}>("listStudentRounds", null),
+    ]);
     if (current !== generation.current) return;
     setTargetVisible(false);
     setHome(result);
