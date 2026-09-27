@@ -47,6 +47,7 @@ function App() {
   const [printCard, setPrintCard] = useState<Card | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
   const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([]);
+  const [studentRefreshVersion, setStudentRefreshVersion] = useState(0);
   const [openHistoryRoundId, setOpenHistoryRoundId] = useState<string | null>(null);
   const [targetVisible, setTargetVisible] = useState(false);
   const [classCodeInput, setClassCodeInput] = useState("");
@@ -99,6 +100,7 @@ function App() {
     setTargetVisible(false);
     setHome(result);
     setHistoryRounds(historyResult.rounds);
+    setStudentRefreshVersion((version) => version + 1);
   }, []);
 
   useEffect(() => {
@@ -286,12 +288,12 @@ function App() {
         role === "student" ? <section className="student-grid">
           <div className="hero student-hero"><span className="eyebrow">우리 반 비밀친구</span><h1>안녕, {home?.displayName}!</h1><p>{home?.className}에서 작은 배려를 함께해요.</p></div>
           <section className="panel pledge"><h2>함께 지킬 약속</h2><p>친구를 편안하게 챙겨요. 어려우면 쉬어도 괜찮아요. 쪽지와 도움 요청은 선생님이 안전을 위해 확인할 수 있어요.</p></section>
-          {home?.round ? <section className="panel"><span className="eyebrow">진행 중인 작전</span><h2>{home.round.title}</h2>
-            {home.round.targetDisplayName ? <><p>내가 챙겨줄 친구</p><div className="secret-name">{targetVisible ? home.round.targetDisplayName : "•••"}</div>
-              <button onClick={() => setTargetVisible(!targetVisible)}>{targetVisible ? "다시 가리기" : "친구 보기"}</button></> : <p>선생님이 준비하고 있어요.</p>}
+          {home?.round ? <section className="panel"><span className="eyebrow">{home.round.status === "revealed" ? "공개된 작전" : home.round.status === "archived" ? "지난 작전" : "진행 중인 작전"}</span><h2>{home.round.title}</h2>
+            {home.round.targetDisplayName ? <><p>내가 챙겨줄 친구</p><div className="secret-name">{targetVisible || home.round.status === "revealed" ? home.round.targetDisplayName : "•••"}</div>
+              {home.round.status !== "revealed" && <button onClick={() => setTargetVisible(!targetVisible)}>{targetVisible ? "다시 가리기" : "친구 보기"}</button>}</> : home.round.status === "archived" ? null : <p>선생님이 준비하고 있어요.</p>}
           </section> : <section className="panel empty"><div className="big-icon">💌</div><h2>선생님이 작전을 준비하고 있어요</h2><p>새 회차가 시작되면 여기에서 내 활동을 볼 수 있어요.</p></section>}
-          {home?.round && <StudentRound roundId={home.round.roundId} status={home.round.status} incomingDisplayName={home.round.incomingDisplayName} />}
-          {historyRounds.some((item) => item.roundId !== home?.round?.roundId) && <section className="panel"><h2>지난 회차</h2><p>예전 배정과 쪽지 기록은 각 회차 안에서만 볼 수 있어요.</p>{historyRounds.filter((item) => item.roundId !== home?.round?.roundId).map((item) => <button key={item.roundId} className="small outline" onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}>{item.title} {openHistoryRoundId === item.roundId ? "닫기" : "보기"}</button>)}{openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" incomingDisplayName={null} />}</section>}
+          {home?.round && <StudentRound roundId={home.round.roundId} status={home.round.status} incomingDisplayName={home.round.incomingDisplayName} refreshVersion={studentRefreshVersion} />}
+          {historyRounds.some((item) => item.roundId !== home?.round?.roundId) && <section className="panel"><h2>지난 회차</h2><p>예전 배정과 쪽지 기록은 각 회차 안에서만 볼 수 있어요.</p>{historyRounds.filter((item) => item.roundId !== home?.round?.roundId).map((item) => <button key={item.roundId} className="small outline" onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}>{item.title} {openHistoryRoundId === item.roundId ? "닫기" : "보기"}</button>)}{openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" incomingDisplayName={null} refreshVersion={studentRefreshVersion} />}</section>}
           <button className="wide outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button>
           <StudentRights />
           <button className="wide secondary" onClick={() => void exit()}>활동 끝내고 다음 친구에게 넘기기</button>

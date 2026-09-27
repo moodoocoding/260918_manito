@@ -10,8 +10,8 @@ type Activity = { roundId: string; title: string; status: string;
   sent: Array<{messageId: string; text: string; status: string; date: string; reacted: boolean}>;
   help: Array<{helpId: string; status: string; category: string}> };
 
-export function StudentRound({ roundId, status, incomingDisplayName }: {
-  roundId: string; status: string; incomingDisplayName: string | null;
+export function StudentRound({ roundId, status, incomingDisplayName, refreshVersion }: {
+  roundId: string; status: string; incomingDisplayName: string | null; refreshVersion: number;
 }) {
   const [data, setData] = useState<Activity | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export function StudentRound({ roundId, status, incomingDisplayName }: {
     const result = await call<{roundId: string}, Activity>("getStudentActivity", {roundId});
     setData(result);
   }, [roundId]);
-  useEffect(() => { void load().catch(() => setError("활동을 불러오지 못했어요.")); }, [load, roundId]);
+  useEffect(() => { setData(null); void load().catch(() => setError("활동을 불러오지 못했어요.")); }, [load, status, refreshVersion]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
     try { await action(); await load(); }
