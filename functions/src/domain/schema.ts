@@ -77,12 +77,10 @@ export interface AssignmentSecretDocument {
 }
 
 export interface StudentRoundViewDocument {
-  targetDisplayName: string | null;
-  targetRevealed: boolean;
-  supporterDisplayName: string | null;
-  supporterRevealed: boolean;
-  participationStatus: "active" | "stopped";
-  updatedAt: FirestoreTimestamp;
+  createdAt: FirestoreTimestamp;
+  targetDisplayName?: string | null;
+  incomingDisplayName?: string | null;
+  revealedAt?: FirestoreTimestamp;
 }
 
 export interface MissionInstanceDocument {

@@ -40,11 +40,12 @@ export const getStudentActivity = onCall(async (request) => {
       ...missions.docs.filter((doc) => !missionPlan.some((item) => item.missionId === doc.id))
         .map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}))]
     : missions.docs.map((doc) => ({missionId: doc.id, text: doc.get("text"), status: doc.get("status")}));
+  const identityRevealed = ["revealed", "archived"].includes(student.roundDoc.get("status"));
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
     title: student.roundDoc.get("title"),
-    targetDisplayName: view.get("targetDisplayName") ?? null,
-    incomingDisplayName: view.get("incomingDisplayName") ?? null,
+    targetDisplayName: identityRevealed ? view.get("targetDisplayName") ?? null : null,
+    incomingDisplayName: identityRevealed ? view.get("incomingDisplayName") ?? null : null,
     activityDates,
     canSubmit: activeForSubmission(student.roundDoc),
     koreaDate: today,

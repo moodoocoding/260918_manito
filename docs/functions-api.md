@@ -104,7 +104,7 @@ response: {
 | `getTeacherStatus` | `null` | `{ status: "pending" \| "verified" \| "suspended", displayName }` | 로그인한 비학생만 조회. Claims와 교사 문서가 모두 확인돼야 `verified` |
 | `listClasses` | `null` | `{ classes: [{ classId, name, schoolYear, gradeBand, memberCount }] }` | 확인된 교사만 담당 활성 학급 조회 |
 | `getClassAccessInfo` | `{ classId }` | `{ classId, classCode, name, schoolYear, gradeBand, memberCount }` | 담당 교사만 학급 코드를 재조회. 다른 학급은 `permission-denied` |
-| `getStudentHome` | `null` | `{ displayName, className, gradeBand, round: null \| { title, status, targetDisplayName, incomingDisplayName } }` | 학생 본인 토큰·세션 버전·소속 확인. 회차 없으면 `round: null`; 다른 명부 없음 |
+| `getStudentHome` | `null` | `{ displayName, className, gradeBand, round: null \| { roundId, title, status } }` | 학생 본인 토큰·세션 버전·소속 확인. 회차 없으면 `round: null`; 관계 이름과 다른 명부는 반환하지 않음 |
 | `setStudentAccess` | `{ classId, studentUid, status: "active" \| "blocked", requestId }` | `{ studentUid, status }` | 담당 교사만 변경, 세션 버전 증가, 감사 기록. 같은 요청 재시도는 동일 결과 |
 
 `scripts/manage-teacher.mjs`는 Callable이 아닌 신뢰된 관리자 실행 환경의 도구다. ADC의 Firebase Auth·Firestore 관리 권한이 있는 운영자만 사용한다. `--project=manito-938cc --uid=... --status=verified|suspended --operator=...`를 명시한다. 승인 시 교사 문서를 `pending`으로 먼저 두고 Claims를 설정한 뒤 `verified`로 바꾼다. 중지는 문서를 먼저 `suspended`로 바꾼다. 중간 실패는 접근 거절 상태로 남으며 같은 명령을 재실행해 복구할 수 있다. 실행 감사 기록은 `operatorAuditLogs`에 남긴다. 실제 학생 데이터 도입 전 관리자 식별·권한 운영 절차를 확정한다.
@@ -127,7 +127,7 @@ response: {
 | `getAssignmentsForTeacher` | `{classId,roundId}` | 안전 대응용 전체 관계. 매 열람 감사 |
 | `getMissionCatalog` | `{classId,gradeBand}` | 담당 학급의 학년군별 4개 카테고리×10개 기본 미션과 학급 전용 미션 |
 | `createCustomMission` | `{classId,text,requestId}` | 담당 교사가 학급 미션을 100자 이내로 추가. 학급당 최대 40개, 멱등 처리 |
-| `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 한국 날짜 `koreaDate`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함 |
+| `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 관계 이름은 `revealed`·`archived`에서만 반환하며 그 전에는 `targetDisplayName`·`incomingDisplayName` 모두 `null`. 한국 날짜 `koreaDate`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함 |
 | `listStudentRounds` | `null` | 본인이 참가한 공개 완료·보관 회차의 ID·제목·상태만 조회 |
 | `setMissionStatus` | `{missionId,status:"done"\|"skipped"}` | 진행 중 회차에서 본인 미션 변경 |
 | `replaceMission` | `{missionId,requestId}` | 같은 학년군의 미사용 미션으로 교체, 연속 2회 한도 |

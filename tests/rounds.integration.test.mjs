@@ -143,11 +143,18 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const firstHome = await students[0].call("getStudentHome",null);
   assert.equal(firstHome.round.status,"active");
   assert.equal(firstHome.gradeBand,"middle");
+  assert.equal("targetDisplayName" in firstHome.round,false);
+  assert.equal("incomingDisplayName" in firstHome.round,false);
   const ownDataPath = `classes/${classId}/rounds/${roundId}/studentData/${ids[0]}`;
+  assert.equal((await adminDb.doc(ownDataPath).get()).get("targetDisplayName"),undefined);
+  await adminDb.doc(ownDataPath).update({targetDisplayName:"이전 시즌 방식의 이름"});
+  await assert.rejects(getDoc(doc(students[0].db,ownDataPath)));
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/assignmentSecrets/${ids[0]}`)));
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/studentData/${ids[1]}`)));
   await assert.rejects(getDoc(doc(teacher.db,ownDataPath)));
   const activity = await students[0].call("getStudentActivity",null);
+  assert.equal(activity.targetDisplayName,null);
+  assert.equal(activity.incomingDisplayName,null);
   assert.equal(activity.missions.length,3);
   assert.ok(activity.missions.some((mission)=>mission.text===custom.text));
   assert.equal(activity.thankYouSent,false);
@@ -217,6 +224,7 @@ test("four students complete two isolated rounds with review, help, reveal and h
     activityDates:dates(),requestId:rid()});
   await teacher.call("changeRoundStatus",{classId,roundId,action:"resume",requestId:rid()});
   await teacher.call("changeRoundStatus",{classId,roundId,action:"end",requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",null)).targetDisplayName,null);
   await assert.rejects(students[2].call("sendMessage", {kind:"preset",text:"고마워!",requestId:rid()}),
     {code:"functions/failed-precondition"});
   await assert.rejects(teacher.call("revealRound",{classId,roundId,requestId:rid()}),
@@ -227,6 +235,9 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await teacher.call("revealRound",{classId,roundId,requestId:rid()});
   assert.equal((await adminDb.doc(`classes/${classId}`).get()).get("activeRoundId"),null);
   assert.equal((await students[0].call("getStudentHome",null)).round.status,"revealed");
+  assert.equal((await students[0].call("getStudentActivity",null)).targetDisplayName,
+    cards[ids.indexOf(assignments.find((a)=>a.giverUid===ids[0]).receiverUid)].displayName);
+  await assert.rejects(getDoc(doc(students[0].db,ownDataPath)));
   const thanksId = rid();
   await students[0].call("sendThankYou",{text:"고마워!",requestId:thanksId});
   await assert.rejects(students[0].call("sendThankYou",{text:"나를 챙겨 줘서 고마워!",requestId:thanksId}),

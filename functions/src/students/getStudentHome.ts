@@ -25,10 +25,9 @@ export const getStudentHome = onCall( async (request) => {
     return { displayName: memberSnapshot.get("displayName") as string,
       className: classSnapshot.get("name") as string, gradeBand, round: null };
   }
-  const [round, participation, view] = await Promise.all([
+  const [round, participation] = await Promise.all([
     db.doc(`classes/${classId}/rounds/${roundId}`).get(),
     db.doc(`classes/${classId}/rounds/${roundId}/participants/${uid}`).get(),
-    db.doc(`classes/${classId}/rounds/${roundId}/studentData/${uid}`).get(),
   ]);
   if (!round.exists || !participation.exists || participation.get("participationStatus") !== "active"
     || (classSnapshot.get("activeRoundId") !== roundId
@@ -36,18 +35,13 @@ export const getStudentHome = onCall( async (request) => {
     return { displayName: memberSnapshot.get("displayName") as string,
       className: classSnapshot.get("name") as string, gradeBand, round: null };
   }
-  const roundStatus = round.get("status") as string;
   return {
     displayName: memberSnapshot.get("displayName") as string,
     className: classSnapshot.get("name") as string,
     gradeBand,
     round: {
       title: round.get("title") as string,
-      status: roundStatus,
-      targetDisplayName: ["active", "paused", "reveal_pending", "revealed"].includes(roundStatus) && view.exists
-        ? (view.get("targetDisplayName") as string | null) : null,
-      incomingDisplayName: roundStatus === "revealed" && view.exists
-        ? (view.get("incomingDisplayName") as string | null) : null,
+      status: round.get("status") as string,
       roundId,
     },
   };

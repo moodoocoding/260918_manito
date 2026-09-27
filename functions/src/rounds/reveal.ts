@@ -74,6 +74,9 @@ export const revealRound = onCall(async (request) => {
       const giverUid = assignment.id;
       const receiverUid = assignment.get("receiverUid") as string;
       if (active.has(giverUid) && active.has(receiverUid)) {
+        tx.update(roundRef.collection("studentData").doc(giverUid), {
+          targetDisplayName: names.get(receiverUid) ?? null, revealedAt: FieldValue.serverTimestamp(),
+        });
         tx.update(roundRef.collection("studentData").doc(receiverUid), {
           incomingDisplayName: names.get(giverUid) ?? null, revealedAt: FieldValue.serverTimestamp(),
         });

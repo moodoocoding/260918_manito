@@ -86,7 +86,9 @@ service cloud.firestore {
         }
 
         match /studentData/{studentUid} {
-          allow read: if isRoundParticipant(classId, roundId, studentUid);
+          // A pre-reveal round may contain legacy relationship fields. Children
+          // remain readable by their owner, but this parent document is server-only.
+          allow read: if false;
           allow write: if false;
 
           match /missions/{missionId} {

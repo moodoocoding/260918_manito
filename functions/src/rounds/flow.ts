@@ -223,7 +223,6 @@ export const startRound = onCall(async (request) => {
     const assignments = matchParticipants(settings.participantIds, settings.excludedPairs.map(({a,b}) => [a,b]),
       history, classDoc.get("lastRoundId") ?? null);
     if (!assignments) throw new HttpsError("failed-precondition", "제외 조건을 만족하는 배정이 없어요.");
-    const names = new Map(members.map((doc) => [doc.id, doc.get("displayName") as string]));
     const gradeBand = classDoc.get("gradeBand") as string;
     const missionIds = settings.missionIds.length > 0 ? settings.missionIds
       : [1, 2, 3].map((index) => `${gradeBand}-${String(index).padStart(2, "0")}`);
@@ -237,7 +236,6 @@ export const startRound = onCall(async (request) => {
         participationStatus: "active", joinedAt: FieldValue.serverTimestamp(),
       });
       tx.create(roundRef.collection("studentData").doc(giverUid), {
-        targetDisplayName: names.get(receiverUid), incomingDisplayName: null,
         createdAt: FieldValue.serverTimestamp(),
       });
       const historyRef = classRef.collection("pairHistory").doc(Buffer.from(pairKey(giverUid, receiverUid)).toString("base64url"));

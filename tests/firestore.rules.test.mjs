@@ -120,14 +120,27 @@ test("suspended and unverified teachers cannot read student data", async () => {
   await assertFails(getDoc(doc(teacherDb("teacher-a"), "classes/class-a/members/student-a")));
 });
 
-test("a student can read only their own round view", async () => {
+test("a student cannot directly read a round view containing a legacy assigned name", async () => {
   const db = studentDb("student-a");
-  await assertSucceeds(
+  await assertFails(
     getDoc(doc(db, "classes/class-a/rounds/round-a/studentData/student-a")),
   );
   await assertFails(
     getDoc(doc(db, "classes/class-a/rounds/round-a/studentData/student-b")),
   );
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "classes/class-a/rounds/round-a"), {status:"revealed"}, {merge:true});
+  });
+  await assertFails(getDoc(doc(db, "classes/class-a/rounds/round-a/studentData/student-a")));
+});
+
+test("a student can still read their own mission child after the private parent is blocked", async () => {
+  const path = "classes/class-a/rounds/round-a/studentData/student-a/missions/mission-a";
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), path), {text:"가상 미션", status:"todo"});
+  });
+  await assertSucceeds(getDoc(doc(studentDb("student-a"), path)));
+  await assertFails(getDoc(doc(studentDb("student-b"), path)));
 });
 
 test("an outdated student session cannot read student data", async () => {

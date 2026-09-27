@@ -12,8 +12,8 @@ type Activity = { roundId: string; title: string; status: string;
   sent: Array<{messageId: string; text: string; status: string; date: string; reacted: boolean; replyToMessageId: string | null}>;
   help: Array<{helpId: string; status: string; category: string}> };
 
-export function StudentRound({ roundId, status, incomingDisplayName, refreshVersion, view, gradeBand }: {
-  roundId: string; status: string; incomingDisplayName: string | null; refreshVersion: number;
+export function StudentRound({ roundId, status, refreshVersion, view, gradeBand }: {
+  roundId: string; status: string; refreshVersion: number;
   view: "today" | "mail" | "help" | "history"; gradeBand?: string;
 }) {
   const [data, setData] = useState<Activity | null>(null);
@@ -60,7 +60,7 @@ export function StudentRound({ roundId, status, incomingDisplayName, refreshVers
   const missions = data?.missions.filter((m) => m.status !== "replaced") ?? [];
   const visibleMissions = view === "history" || showAllMissions ? missions : (missions.find((m) => m.status === "todo") ? [missions.find((m) => m.status === "todo")!] : missions.slice(0,1));
   const revealed = ["revealed", "archived"].includes(data?.status ?? status);
-  const incoming = data?.incomingDisplayName ?? incomingDisplayName;
+  const incoming = data?.incomingDisplayName;
   const statusMessage: Record<string,string> = {
     active:"이번 활동이 진행 중이에요.", paused:"지금은 활동을 잠깐 쉬고 있어요.",
     reveal_pending:"활동이 끝났어요. 선생님이 친구 공개를 준비하고 있어요.",
@@ -72,10 +72,10 @@ export function StudentRound({ roundId, status, incomingDisplayName, refreshVers
     {!data && !error && <section className="panel"><p>활동을 불러오는 중이에요…</p></section>}
     {error && !data && <button className="outline" onClick={() => { setError(""); void load().then(setData).catch(() => setError("다시 불러오지 못했어요.")); }}>다시 시도</button>}
     {data && <>
-      {(view === "today" || view === "history") && revealed && <section className="panel"><h2>{view === "history" ? data.title : "나를 챙긴 친구"}</h2>
-        {view === "history" && <><h3>내가 챙긴 친구</h3><div className="student-secret">{pastTargetVisible ? data.targetDisplayName ?? "안전 사안으로 공개되지 않았어요" : "•••"}</div><p><button onClick={() => setPastTargetVisible((value) => !value)}>{pastTargetVisible ? "다시 가리기" : "친구 보기"}</button></p><h3>나를 챙긴 친구</h3></>}
+      {(view === "today" || view === "history") && revealed && <section className="panel"><h2>{view === "history" ? data.title : "친구 공개 결과"}</h2>
+        <h3>내가 챙긴 친구</h3><div className="student-secret">{pastTargetVisible ? data.targetDisplayName ?? "안전 사안으로 공개되지 않았어요" : "•••"}</div><p><button onClick={() => setPastTargetVisible((value) => !value)}>{pastTargetVisible ? "내가 챙긴 친구 가리기" : "내가 챙긴 친구 보기"}</button></p><h3>나를 챙긴 친구</h3>
         <div className="student-secret">{incomingVisible ? incoming ?? "안전 사안으로 공개되지 않았어요" : "•••"}</div>
-        <p><button onClick={() => setIncomingVisible((value) => !value)}>{incomingVisible ? "다시 가리기" : "친구 보기"}</button></p>
+        <p><button onClick={() => setIncomingVisible((value) => !value)}>{incomingVisible ? "나를 챙긴 친구 가리기" : "나를 챙긴 친구 보기"}</button></p>
         {view === "history" ? data.reflectionText && <p>돌아보기: {data.reflectionText}</p> : data.status === "revealed" && <>
           {incoming && <><h3>고마운 마음 전하기</h3>{data.thankYouSent || thankYouSentLocal ? <p>감사 인사를 전했어요.</p> : <div className="action-row">{["고마워!", "나를 챙겨 줘서 고마워!", "함께해서 즐거웠어!"].map((text) => <button key={text} className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("sendThankYou", {roundId, text, requestId: crypto.randomUUID()}); setThankYouSentLocal(true); setNotice("감사 인사를 보냈어요."); })}>{text}</button>)}</div>}</>}
           <h3>이번 활동 돌아보기</h3>
