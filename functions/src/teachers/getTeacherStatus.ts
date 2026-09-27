@@ -1,10 +1,7 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { callableOptions } from "../shared/callableOptions.js";
-import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { db } from "../shared/firebase.js";
 
-export const getTeacherStatus = onCall(callableOptions, async (request) => {
-  requireFreshAppCheck(request);
+export const getTeacherStatus = onCall( async (request) => {
   const uid = request.auth?.uid;
   if (!uid || request.auth?.token.role === "student") {
     throw new HttpsError("unauthenticated", "교사 로그인이 필요해요.");

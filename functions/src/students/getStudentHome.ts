@@ -1,10 +1,7 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { callableOptions } from "../shared/callableOptions.js";
-import { requireFreshAppCheck } from "../shared/appCheck.js";
 import { db } from "../shared/firebase.js";
 
-export const getStudentHome = onCall(callableOptions, async (request) => {
-  requireFreshAppCheck(request);
+export const getStudentHome = onCall( async (request) => {
   const uid = request.auth?.uid;
   const token = request.auth?.token;
   if (!uid || token?.role !== "student" || token.memberId !== uid || typeof token.classId !== "string") {

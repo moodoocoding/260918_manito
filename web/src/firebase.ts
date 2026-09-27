@@ -1,5 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
   browserPopupRedirectResolver, connectAuthEmulator, inMemoryPersistence,
   initializeAuth, GoogleAuthProvider, signInWithPopup,
@@ -9,29 +8,23 @@ import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
-const projectId = useEmulators ? "demo-manitto" : import.meta.env.VITE_FIREBASE_PROJECT_ID;
-if (!projectId || !import.meta.env.VITE_FIREBASE_API_KEY || !import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || !import.meta.env.VITE_FIREBASE_APP_ID) {
+const projectId = useEmulators ? "demo-manitto" : import.meta.env.VITE_FIREBASE_PROJECT_ID || "manito-938cc";
+const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
+  (projectId === "manito-938cc" ? "manito-938cc.firebaseapp.com" : "");
+const appId = import.meta.env.VITE_FIREBASE_APP_ID ||
+  (projectId === "manito-938cc" ? "1:531830348458:web:11d1e2d0bddca057b80ed3" : "");
+if (!import.meta.env.VITE_FIREBASE_API_KEY || !authDomain || !appId) {
   throw new Error("Firebase 웹 환경 변수가 설정되지 않았어요. web/.env.example을 확인해 주세요.");
 }
 if (useEmulators && import.meta.env.VITE_FIREBASE_PROJECT_ID !== "demo-manitto") {
   throw new Error("Emulator 모드에는 demo-manitto 프로젝트만 사용할 수 있어요.");
 }
-if (!useEmulators && !import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY) {
-  throw new Error("App Check 사이트 키가 필요해요.");
-}
-
 const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain,
   projectId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId,
 });
-if (!useEmulators) {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY),
-    isTokenAutoRefreshEnabled: true,
-  });
-}
 
 export const auth = initializeAuth(app, {
   persistence: inMemoryPersistence,
@@ -47,7 +40,7 @@ if (useEmulators) {
 }
 
 export function call<I, O>(name: string, data: I): Promise<O> {
-  return httpsCallable<I, O>(functions, name, { limitedUseAppCheckTokens: true })(data).then((response) => response.data);
+  return httpsCallable<I, O>(functions, name)(data).then((response) => response.data);
 }
 
 export async function teacherLogin(): Promise<void> {

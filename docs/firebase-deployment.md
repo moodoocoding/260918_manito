@@ -34,7 +34,7 @@ npx firebase firestore:databases:create "(default)" \
 
 Console에서 만들 경우 **Firestore Database → 데이터베이스 만들기 → Standard edition → Production mode → Seoul (`asia-northeast3`)** 순서로 선택한다. 컬렉션은 앱이 처음 데이터를 쓸 때 자동으로 생성되므로 미리 만들 필요가 없다.
 
-## 2. 인증과 App Check 준비
+## 2. 인증 준비
 
 ### 웹 앱 등록
 
@@ -49,10 +49,6 @@ Console에서 만들 경우 **Firestore Database → 데이터베이스 만들�
 3. 같은 UID로 `teachers/{uid}` 문서를 만들고 `verificationStatus: "verified"`를 저장한다.
 
 2~3번을 자동화하는 교사 승인 관리자 기능은 아직 구현 범위 밖이다. 그 기능을 만들기 전에는 승인용 관리 스크립트가 필요하다. 학생은 이름과 입장 카드로 로그인하며, `loginStudent` 함수가 Firebase Custom Token을 발급하므로 별도의 로그인 제공업체를 켤 필요가 없다.
-
-### App Check 설정
-
-현재 모든 Callable Function은 실제 배포 환경에서 App Check를 강제한다. 웹 앱에 App Check를 등록하고 reCAPTCHA Enterprise 또는 reCAPTCHA v3 공급자를 설정한 뒤, 프런트엔드에서 Firebase Functions를 호출하기 전에 App Check를 초기화해야 한다. 설정 전에는 정상 사용자 요청도 함수에서 거부된다.
 
 ## 3. 백엔드 배포
 
@@ -89,11 +85,11 @@ Firebase Console에서도 아래 항목을 확인한다.
 1. **Functions**에 함수 4개가 있고 리전이 `asia-northeast3`인지 확인한다.
 2. **Firestore Database → Rules**의 게시 시간이 방금 배포한 시각인지 확인한다.
 3. **Firestore Database → Indexes**에서 인덱스 빌드가 완료될 때까지 기다린다.
-4. 웹 앱에서 App Check가 붙은 호출을 보내고 Functions 로그에 오류가 없는지 확인한다.
+4. 가상 교사·학생 계정으로 인증과 권한 검사를 확인하고 Functions 로그에 오류가 없는지 확인한다.
 
 ## 5. 프런트엔드 연결 전 필요한 작업
 
-백엔드 배포만으로 사용자가 접속할 웹사이트가 생기지는 않는다. 교사용·학생용 첫 입장 웹은 `web/`에 로컬 구현했으며, 배포 대상은 Vercel이다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel 프로젝트에는 `web/.env.example`의 `VITE_*` 값을 개발 Firebase 웹 앱 설정으로 입력하고 `VITE_USE_EMULATORS=false`를 유지한다. 공개할 Vercel 도메인을 Firebase Auth 허용 도메인과 App Check 웹 등록 범위에 추가한 뒤 가상 계정으로 확인한다. 현재 Vercel과 Firebase 개발 클라우드의 연결은 아직 검증하지 않았다.
+백엔드 배포만으로 사용자가 접속할 웹사이트가 생기지는 않는다. 교사용·학생용 첫 입장 웹은 `web/`에 로컬 구현했으며, 배포 대상은 Vercel이다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. 공개할 Vercel 도메인을 Firebase Auth 허용 도메인에 추가한 뒤 가상 계정으로 확인한다. 현재 Vercel과 Firebase 개발 클라우드의 연결은 아직 검증하지 않았다.
 
 프로덕션 공개 전에는 개발 프로젝트의 전체 흐름을 검증한 뒤 별도 운영 프로젝트를 만들고 같은 방식으로 배포한다. 개발 데이터와 실제 학생 데이터를 한 프로젝트에 섞지 않는다.
 

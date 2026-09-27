@@ -1,6 +1,6 @@
 # 교사·학생 계정 Functions API v0.2
 
-모든 함수는 `asia-northeast3`의 Firebase Callable Function이다. 운영 환경에서는 App Check가 필수이며, Firestore 쓰기는 이 함수들만 수행한다.
+모든 함수는 `asia-northeast3`의 Firebase Callable Function이다. App Check는 사용하지 않는다. 각 함수는 Firebase Auth·업무 권한을 검증하며, Firestore 쓰기는 이 함수들만 수행한다.
 
 ## 공통 규칙
 
@@ -10,7 +10,7 @@
 - 카드 응답을 잃으면 기존 카드를 조회할 수 없으므로 교사가 재발급한다.
 - 학생 카드 재발급은 `sessionVersion`을 올려 기존 로그인 세션도 즉시 읽기 권한을 잃게 한다.
 - 재시도 명령은 작업 종류·요청자·정규화한 입력의 fingerprint가 같을 때만 같은 `requestId`를 인정한다. 다른 입력 또는 다른 명령으로 재사용하면 `already-exists`다.
-- 운영 환경은 App Check limited-use 토큰을 사용하며 이미 소비된 토큰은 `permission-denied`다. 업무 재시도에는 새 App Check 토큰과 같은 `requestId`를 사용한다.
+- 업무 재시도에는 같은 `requestId`를 사용한다. App Check 토큰은 요구하지 않는다.
 
 ## `createClass`
 
@@ -97,7 +97,7 @@ response: {
 
 ## D1 추가 함수
 
-모두 `asia-northeast3`의 Callable Function이다. 아래 추가 함수는 로컬 코드와 Emulator에서 구현·검증했고 Firebase 개발 프로젝트 `manito-938cc`에 배포했다. 개발 클라우드에서 웹 App Check·Custom Token 전체 흐름은 아직 검증하지 않았다.
+모두 `asia-northeast3`의 Callable Function이다. 아래 추가 함수는 로컬 코드와 Emulator에서 구현·검증했고 Firebase 개발 프로젝트 `manito-938cc`에 배포했다. 개발 클라우드에서 웹 Custom Token 전체 흐름은 아직 검증하지 않았다.
 
 | 함수 | 요청 | 응답 | 권한·오류 |
 |---|---|---|---|

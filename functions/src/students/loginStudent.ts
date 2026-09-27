@@ -7,8 +7,6 @@ import {
   verifySecret,
 } from "../auth/codes.js";
 import { auth, db } from "../shared/firebase.js";
-import { requireFreshAppCheck } from "../shared/appCheck.js";
-import { callableOptions } from "../shared/callableOptions.js";
 import { requireRecord } from "../shared/validation.js";
 
 const maximumFailures = 5;
@@ -19,9 +17,8 @@ function invalidLogin(): HttpsError {
 }
 
 export const loginStudent = onCall(
-  { ...callableOptions, timeoutSeconds: 30 },
+  { timeoutSeconds: 30 },
   async (request): Promise<{ customToken: string; classId: string }> => {
-    requireFreshAppCheck(request);
     const input = requireRecord(request.data);
     if (typeof input.classCode !== "string" || typeof input.cardCode !== "string") {
       throw invalidLogin();

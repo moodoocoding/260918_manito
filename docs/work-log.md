@@ -255,3 +255,11 @@
 - Vercel `manito`의 `VITE_FIREBASE_API_KEY`는 기존에 Secret으로 저장돼 Config로 직접 변경할 수 없었다. 기존 변수가 삭제된 상태를 확인하고 Firebase 웹 앱의 동일한 키를 Config로 다시 등록했다. 적용 환경은 기존과 같은 Production·Preview다. 키 값은 작업일지와 Git에 기록하지 않았다.
 - Vercel 환경 변수 목록에서 유형 `Config`, 적용 환경 `Production and Preview`, 등록 성공 알림을 확인했다. 이 변경은 새 배포부터 적용되며, 웹 배포 성공을 뜻하지 않는다.
 - 남은 작업: 다른 Firebase 웹 환경 변수와 App Check 사이트 키의 실제 값·적용 범위, Firebase Auth·App Check 설정을 확인하고 새 Vercel 배포에서 빌드와 로그인 흐름을 검증한다. 실제 학생 데이터는 사용하지 않았다.
+
+## 2026-09-27 — App Check 제거와 개발 함수 갱신
+
+- 사용자의 결정에 따라 웹의 `ReCaptchaEnterpriseProvider` 초기화와 limited-use 토큰 요청, 함수 9개의 App Check 강제·소비 토큰 검사를 제거했다. reCAPTCHA 사이트 키는 더 이상 사용하지 않는다. 교사 인증·소유권 검사, 학생 카드 해시·실패 잠금, 세션 버전, Firestore Rules와 명령 멱등성은 유지했다.
+- Vercel에 이미 설정된 개발 Firebase 웹 API 키를 사용하고, 비어 있는 공개 설정 변수 대신 개발 웹 앱의 공개 프로젝트 식별값을 기본값으로 사용하도록 했다. 다른 Firebase 프로젝트를 지정할 때는 인증 도메인과 앱 ID도 명시하도록 빌드 검사를 유지했다.
+- TypeScript 함수·웹 빌드, 함수 단위 테스트 4개, Firestore Rules 테스트 9개, Emulator 통합 흐름 1개를 통과했다. 빈 공개 환경 변수와 테스트 API 키를 둔 배포형 웹 빌드도 통과했다. `git diff --check`를 통과했다.
+- Firebase 개발 프로젝트 `manito-938cc`의 함수 9개를 갱신 배포했다. 배포된 `loginStudent`에 잘못된 가상 카드로 App Check 없이 호출했을 때 Firebase가 카드 오류 `UNAUTHENTICATED`를 반환해 App Check 선행 거절 없이 함수 코드까지 실행됨을 확인했다. 실제 학생 데이터는 사용하지 않았다.
+- 남은 작업: GitHub 변경 푸시와 Vercel 빌드·화면 확인, Google 로그인 제공업체·허용 도메인 설정, 개발 클라우드의 Custom Token 서명·로그인 검증. D2~D6 기능과 실제 학생 도입 정책은 별도 작업이다.

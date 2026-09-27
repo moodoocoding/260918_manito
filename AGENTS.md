@@ -1,6 +1,6 @@
 # AGENTS.md
 
-이 지침은 저장소 전체에 적용한다. 세부 제품 정책은 `docs/manitto-development-plan.md` v2.0(2026-09-27), 현재 진행 상태는 `docs/work-log.md`, 데이터 계약은 `docs/firestore-schema.md`, 함수 계약은 `docs/functions-api.md`를 기준으로 한다. 계획서에 제시한 신규 API·필드는 구현안이며 현재 제공되는 기능으로 간주하지 않는다.
+이 지침은 저장소 전체에 적용한다. 세부 제품 정책은 `docs/manitto-development-plan.md` v2.1(2026-09-27), 현재 진행 상태는 `docs/work-log.md`, 데이터 계약은 `docs/firestore-schema.md`, 함수 계약은 `docs/functions-api.md`를 기준으로 한다. 계획서에 제시한 신규 API·필드는 구현안이며 현재 제공되는 기능으로 간주하지 않는다.
 
 ## 제품 목표
 
@@ -101,24 +101,23 @@
 ## 기술 기준
 
 - 프런트엔드: React + TypeScript + Vite 반응형 웹을 `web/` workspace에 구현 중이며 Vercel로 배포한다. Firebase는 백엔드로 유지한다.
-- 백엔드: Firebase Authentication, Cloud Firestore, Cloud Functions, Security Rules, App Check.
+- 백엔드: Firebase Authentication, Cloud Firestore, Cloud Functions, Security Rules.
 - Functions: 2세대, Node.js 22, TypeScript, 서울 `asia-northeast3`.
 - Firestore: 서울 `asia-northeast3`의 Native mode Standard 데이터베이스.
 - 개발 프로젝트: 표시 이름 `260918 manito`, ID `manito-938cc`, 별칭 `dev`.
 - 로컬 Emulator 프로젝트: `demo-manitto`. 실제 배포 대상으로 사용하지 않는다.
-- 운영 환경의 Callable Function은 App Check를 강제한다.
-- 현재 `consumeAppCheckToken` 설정에 맞춰 웹의 limited-use 토큰과 실행 계정의 App Check 검증 권한을 확인한다. Custom Token 서명 권한도 개발 클라우드에서 별도로 검증한다.
+- App Check는 현재 사용하지 않는다. Callable Function에서 인증·교사 소유권·학생 소속·입력값을 검사하고 학생 카드 실패 잠금을 유지한다. Custom Token 서명 권한은 개발 클라우드에서 별도로 검증한다.
 - Admin SDK는 Security Rules를 우회하므로 모든 함수에서 교사 소유권, 학생 소속, 회차 상태, 입력값을 다시 검증한다.
 - 학생용 공개 문서와 교사·서버 전용 비밀 문서를 분리한다. Firestore 문서의 일부 필드만 규칙으로 숨길 수 있다고 가정하지 않는다.
 - 중요한 상태 변경은 멱등성을 갖게 하고 부분 저장과 중복 전달을 막는다.
 
 ## 현재 구현 범위
 
-2026-09-27 기준 개발 프로젝트에는 D1 계정·학급 백엔드 함수 9개와 Firestore Rules·인덱스가 배포돼 있다. 첫 입장 웹은 로컬에서 구현·검증했고 GitHub `main`에 푸시했다. Vercel 웹 배포는 설정 중이며 아직 성공하지 않았다. 현재 상태가 바뀌면 이 절과 작업일지를 함께 갱신한다.
+2026-09-27 기준 개발 프로젝트에는 D1 계정·학급 백엔드 함수 9개와 Firestore Rules·인덱스가 배포돼 있다. 함수 9개는 App Check 의존성을 제거해 다시 배포했다. 첫 입장 웹은 로컬에서 구현·검증했고 Vercel 웹 배포는 설정 중이다. 현재 상태가 바뀌면 이 절과 작업일지를 함께 갱신한다.
 
 - 구현·배포 완료: Firestore 스키마·규칙·인덱스, 기존 함수 4개와 `getTeacherStatus`, `listClasses`, `getClassAccessInfo`, `getStudentHome`, `setStudentAccess`. 개발 Firebase 웹 앱도 등록했다.
 - 웹 코드: 교사·학생 첫 입장, 학급·카드 관리, 학생 홈과 로그아웃, B-01~03·05 보강, Vercel 정적 배포 설정. 로컬 Emulator에서 검증했으며 개발 클라우드와 웹 연결은 미검증이다.
-- 미구현: 회차·매칭, 미션, 쪽지·도움 요청, 공개·회고, 실제 학생 도입·삭제, Vercel 배포와 클라우드 App Check·Custom Token 검증.
+- 미구현: 회차·매칭, 미션, 쪽지·도움 요청, 공개·회고, 실제 학생 도입·삭제, Vercel 배포와 클라우드 Custom Token 검증.
 
 백엔드 배포가 웹서비스 완성을 의미한다고 기록하거나 보고하지 않는다.
 
@@ -170,7 +169,7 @@ P0의 완료 기준은 같은 학급에서 교사가 실제로 두 회차를 운
 
 - Firebase 명령은 대상 프로젝트를 명시한다. `demo-manitto`에는 실제 배포하지 않는다.
 - 개발 배포는 `manito-938cc` 또는 `dev` 별칭만 사용한다.
-- Vercel 웹 빌드에는 Emulator 설정을 사용하지 않는다. 개발 미리보기는 개발 Firebase 웹 앱 설정과 App Check·Auth 허용 도메인을 확인한 뒤 연결한다.
+- Vercel 웹 빌드에는 Emulator 설정을 사용하지 않는다. 개발 미리보기는 개발 Firebase 웹 앱 설정과 Auth 허용 도메인을 확인한 뒤 연결한다.
 - 로컬 Firestore Rules 배포는 Console 규칙을 덮어쓰므로 저장소 파일을 기준으로 관리한다.
 - 비밀 키, 서비스 계정 파일, `.env` 파일, 학생 데이터와 로그 원문을 Git에 커밋하지 않는다.
 - 실제 운영 프로젝트는 개발 프로젝트와 분리하고, 생성·결제·리전·데이터 이전을 명시적으로 검토한 뒤 연결한다.

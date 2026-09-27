@@ -7,8 +7,6 @@ import {
   hashSecret,
 } from "../auth/codes.js";
 import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
-import { requireFreshAppCheck } from "../shared/appCheck.js";
-import { callableOptions } from "../shared/callableOptions.js";
 import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
@@ -25,9 +23,8 @@ interface StudentCardResult {
 }
 
 export const registerStudents = onCall(
-  { ...callableOptions, timeoutSeconds: 60 },
+  { timeoutSeconds: 60 },
   async (request): Promise<{ students: StudentCardResult[]; requiresCredentialRotation: boolean }> => {
-    requireFreshAppCheck(request);
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
     const classId = requireDocumentId(input.classId, "학급");

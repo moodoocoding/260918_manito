@@ -2,8 +2,6 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { generateClassCode } from "../auth/codes.js";
 import { requireVerifiedTeacher } from "../shared/authorization.js";
-import { requireFreshAppCheck } from "../shared/appCheck.js";
-import { callableOptions } from "../shared/callableOptions.js";
 import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
@@ -20,9 +18,7 @@ interface CreateClassResult {
 }
 
 export const createClass = onCall(
-  callableOptions,
   async (request): Promise<CreateClassResult> => {
-    requireFreshAppCheck(request);
     const teacherUid = await requireVerifiedTeacher(request);
     const input = requireRecord(request.data);
     const name = requireText(input.name, "학급 이름", 40);
