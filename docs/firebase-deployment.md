@@ -48,7 +48,7 @@ Console에서 만들 경우 **Firestore Database → 데이터베이스 만들�
 2. 교사 확인 절차를 통과한 계정에 서버에서 `role: "teacher"`, `teacherVerified: true` Custom Claims를 부여한다.
 3. 같은 UID로 `teachers/{uid}` 문서를 만들고 `verificationStatus: "verified"`를 저장한다.
 
-2~3번을 자동화하는 교사 승인 관리자 기능은 아직 구현 범위 밖이다. 지금은 운영자가 확인한 계정만 수동 승인한다. 학생은 학급 코드와 개인 입장 카드로 로그인하며, `loginStudent` 함수가 Firebase Custom Token을 발급하므로 별도의 로그인 제공업체를 켤 필요가 없다. 개발 클라우드에서 이 함수의 `iam.serviceAccounts.signBlob` 권한 오류가 확인됐다. 함수 실행 계정의 서비스 계정 서명 권한을 해당 서비스 계정 리소스에 한정해 점검한 뒤 가상 카드로 다시 검증한다.
+2~3번을 자동화하는 교사 승인 관리자 기능은 아직 구현 범위 밖이다. 지금은 운영자가 확인한 계정만 수동 승인한다. 학생은 학급 코드와 개인 입장 카드로 로그인하며, `loginStudent` 함수가 Firebase Custom Token을 발급하므로 별도의 로그인 제공업체를 켤 필요가 없다. 개발 프로젝트의 Cloud Run 기본 Compute 실행 계정에는 동일 서비스 계정 리소스 범위에서 서비스 계정 토큰 생성자 역할을 부여했다. `iam.serviceAccounts.signBlob` 오류가 해결됐고 가상 학생 카드 로그인까지 확인했다. 별도 운영 프로젝트를 만들면 해당 프로젝트의 실제 실행 계정에 대해 다시 점검한다.
 
 ## 3. 백엔드 배포
 
@@ -89,7 +89,7 @@ Firebase Console에서도 아래 항목을 확인한다.
 
 ## 5. 프런트엔드 연결 전 필요한 작업
 
-교사용·학생용 웹은 `web/`에 구현해 [Vercel 개발 사이트](https://manito-one-blond.vercel.app)에 배포했다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. Google 교사 로그인, 가상 학급·카드 발급, 서버 회차 시작까지 배포 웹에서 확인했다. 학생의 개발 클라우드 Custom Token 로그인은 위 서명 권한 문제로 재검증이 필요하다.
+교사용·학생용 웹은 `web/`에 구현해 [Vercel 개발 사이트](https://manito-one-blond.vercel.app)에 배포했다. `vercel.json`이 빌드 출력과 `/teacher`·`/student` 새로고침 경로를 설정한다. Vercel에는 개발 Firebase 웹 API 키를 `VITE_FIREBASE_API_KEY` Config로 설정한다. 개발 프로젝트의 `authDomain`·`projectId`·`appId` 공개 설정은 코드에 기본값이 있으며, 다른 Firebase 프로젝트를 연결할 때는 해당 프로젝트의 세 값을 모두 환경 변수로 지정한다. `VITE_USE_EMULATORS`는 배포 환경에서 켜지 않는다. Google 교사 로그인, 가상 학급·카드 발급, 서버 회차 시작과 가상 학생 로그인·공개·다음 회차를 배포 웹에서 확인했다.
 
 실제 학생 데이터 도입 전에는 [개인정보 처리방침 초안](privacy-policy-draft.md)의 미확정 항목과 별도 운영 프로젝트, 학교·보호자 안내, 권리 요청 처리 절차를 확정한다. 현재 공개 웹은 개발 검증 안내를 표시한다.
 

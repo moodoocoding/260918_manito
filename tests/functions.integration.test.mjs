@@ -15,6 +15,9 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/
 
 const projectId = "demo-manitto";
 const region = "asia-northeast3";
+const authPort = Number(process.env.MANITTO_TEST_AUTH_PORT ?? 9099);
+const functionsPort = Number(process.env.MANITTO_TEST_FUNCTIONS_PORT ?? 5001);
+const firestorePort = Number(process.env.MANITTO_TEST_FIRESTORE_PORT ?? 8080);
 const teacherUid = `teacher-integration-${crypto.randomUUID().slice(0, 8)}`;
 const otherTeacherUid = `teacher-other-${crypto.randomUUID().slice(0, 8)}`;
 let teacherApp;
@@ -61,17 +64,17 @@ before(async () => {
   teacherAuth = getAuth(teacherApp);
   studentAuth = getAuth(studentApp);
   otherTeacherAuth = getAuth(otherTeacherApp);
-  connectAuthEmulator(teacherAuth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectAuthEmulator(studentAuth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectAuthEmulator(otherTeacherAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectAuthEmulator(teacherAuth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
+  connectAuthEmulator(studentAuth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
+  connectAuthEmulator(otherTeacherAuth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
   teacherFunctions = getFunctions(teacherApp, region);
   studentFunctions = getFunctions(studentApp, region);
   otherTeacherFunctions = getFunctions(otherTeacherApp, region);
-  connectFunctionsEmulator(teacherFunctions, "127.0.0.1", 5001);
-  connectFunctionsEmulator(studentFunctions, "127.0.0.1", 5001);
-  connectFunctionsEmulator(otherTeacherFunctions, "127.0.0.1", 5001);
-  connectFirestoreEmulator(getFirestore(teacherApp), "127.0.0.1", 8080);
-  connectFirestoreEmulator(getFirestore(studentApp), "127.0.0.1", 8080);
+  connectFunctionsEmulator(teacherFunctions, "127.0.0.1", functionsPort);
+  connectFunctionsEmulator(studentFunctions, "127.0.0.1", functionsPort);
+  connectFunctionsEmulator(otherTeacherFunctions, "127.0.0.1", functionsPort);
+  connectFirestoreEmulator(getFirestore(teacherApp), "127.0.0.1", firestorePort);
+  connectFirestoreEmulator(getFirestore(studentApp), "127.0.0.1", firestorePort);
 
   const teacherToken = await adminAuth.createCustomToken(teacherUid, {
     role: "teacher",

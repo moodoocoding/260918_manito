@@ -9,6 +9,9 @@ import { connectFirestoreEmulator, doc, getDoc, getFirestore } from "firebase/fi
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 
 const projectId = "demo-manitto";
+const authPort = Number(process.env.MANITTO_TEST_AUTH_PORT ?? 9099);
+const functionsPort = Number(process.env.MANITTO_TEST_FUNCTIONS_PORT ?? 5001);
+const firestorePort = Number(process.env.MANITTO_TEST_FIRESTORE_PORT ?? 8080);
 const admin = initializeAdminApp({projectId}, "round-admin");
 const adminAuth = getAdminAuth(admin);
 const adminDb = getAdminFirestore(admin);
@@ -17,11 +20,11 @@ function client(name) {
   const app = initializeApp({projectId, apiKey:"demo-key"}, name);
   apps.push(app);
   const auth = getAuth(app);
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", {disableWarnings:true});
+  connectAuthEmulator(auth, `http://127.0.0.1:${authPort}`, {disableWarnings:true});
   const functions = getFunctions(app, "asia-northeast3");
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  connectFunctionsEmulator(functions, "127.0.0.1", functionsPort);
   const db = getFirestore(app);
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectFirestoreEmulator(db, "127.0.0.1", firestorePort);
   return {app, auth, functions, db, call: (name, data) => httpsCallable(functions, name)(data).then((r) => r.data)};
 }
 const teacher = client("round-teacher");

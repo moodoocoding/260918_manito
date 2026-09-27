@@ -9,12 +9,15 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { readFile } from "node:fs/promises";
 
 const projectId = "demo-manitto-rules";
+const firestorePort = Number(process.env.MANITTO_TEST_FIRESTORE_PORT ?? 8080);
 let testEnv;
 
 before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId,
     firestore: {
+      host: "127.0.0.1",
+      port: firestorePort,
       rules: await readFile("firestore.rules", "utf8"),
     },
   });

@@ -6,7 +6,7 @@
 
 - D1 학급·학생 카드·로그인·로그아웃은 Firebase 개발 프로젝트 `manito-938cc`와 [Vercel 개발 웹](https://manito-one-blond.vercel.app)에 배포됐다.
 - D2~D5 회차·서버 매칭·30개 미션·쪽지 검토·도움 요청·공개·회고·설정 복사·학급 삭제와 추가 안전·정보 요청 접수 기능을 Firebase 개발 프로젝트에 배포했다. `demo-manitto` 에뮬레이터로 가상 학급 두 회차와 40명 매칭을 검증하고, 인증 후 학생 브라우저 흐름을 확인했다. 최신 웹 커밋도 Vercel Production에서 Ready다. 세부 결과는 [작업일지](docs/work-log.md)를 본다.
-- Firebase Google 로그인 제공업체와 Vercel 허용 도메인을 설정하고 가상 교사를 승인했다. 배포 웹에서 학급·학생 카드 발급과 회차 시작까지 확인했다. 학생 카드 로그인은 개발 클라우드 실행 계정의 Custom Token 서명 권한 오류가 확인돼 복구 중이다. 학생 정보 요청은 접수 단계이며 개별 정정·삭제 처리 절차와 실제 학생 운영용 별도 프로젝트도 아직 없다.
+- Firebase Google 로그인 제공업체와 Vercel 허용 도메인을 설정하고 가상 교사를 승인했다. 개발 클라우드의 Custom Token 서명 권한을 복구했고 배포 웹에서 가상 학생 로그인, 미션·도움·공개·감사·회고, 설정을 복사한 두 번째 회차 시작까지 확인했다. 학생 정보 요청은 접수 단계이며 개별 정정·삭제 처리 절차와 실제 학생 운영용 별도 프로젝트도 아직 없다.
 - App Check와 reCAPTCHA는 사용자 결정에 따라 사용하지 않는다. 인증, 카드 실패 잠금, 세션 버전, 함수 권한 검사, Firestore Rules와 요청 멱등성을 유지한다.
 - 사이트에 개발 검증 안내를 표시한다. 실제 학생 데이터 사용 전 개인정보 처리방침과 학교·보호자 안내 절차를 확정해야 한다. [개인정보 처리방침 초안](docs/privacy-policy-draft.md)은 운영 주체·연락처·보유 기간 등이 미확정인 검토 문서다.
 
@@ -31,6 +31,8 @@ npm run dev:web
 ```
 
 Firestore 에뮬레이터는 Java 21이 필요하다. `.firebaserc`의 `demo-manitto`는 로컬 전용이고 `dev`는 개발 프로젝트 `manito-938cc`다. `web/.env.example`을 참고해 `web/.env.local`을 설정한다. 에뮬레이터를 별도 터미널에서 시작한 뒤 `http://127.0.0.1:5173/student` 또는 `/teacher`로 접속한다. `web/index.html`을 `file://`로 직접 열면 Vite 앱이 실행되지 않는다.
+
+기본 Emulator 포트가 이미 사용 중이면 `npm run test:rules:isolated`와 `npm run test:integration:isolated`로 별도 포트의 임시 Emulator를 실행할 수 있다.
 
 ## 배포
 

@@ -13,7 +13,9 @@
     "emulators": "firebase emulators:start --project demo-manitto",
     "test:functions": "npm --workspace functions test",
     "test:integration": "npm run build && firebase emulators:exec --project demo-manitto --only auth,firestore,functions \"node --test --test-concurrency=1 tests/*.integration.test.mjs\"",
-    "test:rules": "firebase emulators:exec --project demo-manitto --only firestore \"node --test tests/firestore.rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --project demo-manitto --only firestore \"node --test tests/firestore.rules.test.mjs\"",
+    "test:integration:isolated": "npm run build && MANITTO_TEST_AUTH_PORT=9199 MANITTO_TEST_FUNCTIONS_PORT=5101 MANITTO_TEST_FIRESTORE_PORT=8180 firebase emulators:exec --config firebase.test.json --project demo-manitto --only auth,firestore,functions \"node --test --test-concurrency=1 tests/*.integration.test.mjs\"",
+    "test:rules:isolated": "MANITTO_TEST_FIRESTORE_PORT=8180 firebase emulators:exec --config firebase.test.json --project demo-manitto-rules --only firestore \"node --test tests/firestore.rules.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
