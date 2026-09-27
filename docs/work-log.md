@@ -241,4 +241,5 @@
 - Firebase `manito-938cc`에 Firestore Rules·인덱스와 함수 9개를 배포했다. 기존 함수 4개는 갱신, `getTeacherStatus`, `listClasses`, `getClassAccessInfo`, `getStudentHome`, `setStudentAccess`는 새로 생성됐다. CLI가 전체 성공을 보고했다. 로컬 Emulator `demo-manitto`에는 배포하지 않았다.
 - 개발 Firebase 웹 앱 `manito-web-dev`를 등록했다. 웹 App Check와 Google 로그인 설정, 클라우드 Custom Token 서명·App Check 실행 권한의 실제 검증은 아직 남아 있다.
 - GitHub와 연결된 Vercel `manito` 프로젝트의 첫 배포는 프로젝트 루트가 `web/`인 채 저장소 루트용 빌드 명령을 실행해 `No workspaces found: --workspace=web`로 실패했다. Vercel 루트를 저장소 루트로 수정했다. 환경 변수 6개는 이름만 등록돼 값이 비어 있으며, 성공한 웹 배포는 아직 없다.
+- 문서 커밋 `e3cda61`도 GitHub `main`에 푸시했다. 이 커밋으로 실행된 두 번째 Vercel 빌드는 올바른 작업 공간에서 시작했지만 빈 `VITE_FIREBASE_API_KEY` 때문에 실패했다. 저장소 루트 문제는 해결됐고 웹 환경 설정이 다음 차단 조건임을 확인했다.
 - 이 항목의 GitHub 푸시와 Firebase 백엔드 배포는 완료됐지만 Vercel 웹 배포는 별도 상태다. 실제 학생 데이터는 사용하지 않았다.
