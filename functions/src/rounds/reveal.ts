@@ -81,6 +81,7 @@ export const revealRound = onCall(async (request) => {
     }
     tx.update(roundRef, { status: "revealed", revealedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp() });
+    tx.update(classRef, { activeRoundId: null, updatedAt: FieldValue.serverTimestamp() });
     tx.create(commandRef, { type: "revealRound", requestedBy: teacherUid,
       inputFingerprint: fingerprint, result: { roundId, status: "revealed" },
       createdAt: FieldValue.serverTimestamp() });
@@ -96,13 +97,14 @@ export const sendThankYou = onCall(async (request) => {
   const text = requireText(input.text, "감사 인사", 50);
   const choices = ["고마워!", "나를 챙겨 줘서 고마워!", "함께해서 즐거웠어!"];
   if (!choices.includes(text)) throw new HttpsError("invalid-argument", "준비된 감사 인사를 선택해 주세요.");
-  const student = await requireStudentRound(request);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
   if (student.roundDoc.get("status") !== "revealed") throw new HttpsError("failed-precondition", "공개 후에 인사를 보낼 수 있어요.");
   const thankRef = student.roundRef.collection("thankYouSecrets").doc(student.uid);
   const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
   const fingerprint = inputFingerprint({ text });
   return db.runTransaction(async (tx) => {
-    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
+    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId, false);
     const [round, thank, command, assignments, participants] = await Promise.all([
       tx.get(student.roundRef), tx.get(thankRef), tx.get(commandRef),
       tx.get(student.roundRef.collection("assignmentSecrets")),
@@ -131,11 +133,12 @@ export const sendThankYou = onCall(async (request) => {
 export const saveReflection = onCall(async (request) => {
   const input = requireRecord(request.data);
   const text = requireText(input.text, "돌아보기", 300);
-  const student = await requireStudentRound(request);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
   if (student.roundDoc.get("status") !== "revealed") throw new HttpsError("failed-precondition", "공개 후에 돌아볼 수 있어요.");
   const ref = student.roundRef.collection("studentData").doc(student.uid).collection("reflection").doc("mine");
   return db.runTransaction(async (tx) => {
-    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
+    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId, false);
     const [round, participant] = await Promise.all([
       tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
     ]);

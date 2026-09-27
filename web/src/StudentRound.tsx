@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { call } from "./firebase";
 
-type Activity = { roundId: string; status: string; activityDates: string[]; canSubmit: boolean;
+type Activity = { roundId: string; title: string; status: string;
+  targetDisplayName: string | null; incomingDisplayName: string | null;
+  activityDates: string[]; canSubmit: boolean;
   allowFreeTextMessages: boolean;
   presetMessages: string[]; missions: Array<{missionId: string; text: string; status: string}>;
-  inbox: Array<{messageId: string; text: string; hidden: boolean; reported: boolean; type: string}>;
-  sent: Array<{messageId: string; text: string; status: string; date: string}>;
+  inbox: Array<{messageId: string; text: string; hidden: boolean; reported: boolean; type: string; reacted: boolean}>;
+  sent: Array<{messageId: string; text: string; status: string; date: string; reacted: boolean}>;
   help: Array<{helpId: string; status: string; category: string}> };
 
 export function StudentRound({ roundId, status, incomingDisplayName }: {
@@ -20,9 +22,9 @@ export function StudentRound({ roundId, status, incomingDisplayName }: {
   const [helpNote, setHelpNote] = useState("");
   const [reflection, setReflection] = useState("");
   const load = useCallback(async () => {
-    const result = await call<null, Activity>("getStudentActivity", null);
+    const result = await call<{roundId: string}, Activity>("getStudentActivity", {roundId});
     setData(result);
-  }, []);
+  }, [roundId]);
   useEffect(() => { void load().catch(() => setError("활동을 불러오지 못했어요.")); }, [load, roundId]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
@@ -35,9 +37,9 @@ export function StudentRound({ roundId, status, incomingDisplayName }: {
   return <div className="student-activities">
     {error && <p className="message error" role="alert">{error}</p>}
     {notice && <p className="message success" role="status">{notice}</p>}
-    {status === "revealed" && <section className="panel"><h2>나를 챙긴 친구</h2><p className="secret-name">{incomingDisplayName ?? "안전 사안으로 공개되지 않았어요"}</p>
-      {incomingDisplayName && <><p>고마운 마음을 전해요.</p>{["고마워!", "나를 챙겨 줘서 고마워!", "함께해서 즐거웠어!"].map((text) => <button key={text} className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("sendThankYou", {text, requestId: crypto.randomUUID()}); setNotice("감사 인사를 보냈어요."); })}>{text}</button>)}</>}
-      <label>이번 활동을 돌아보기<textarea rows={3} maxLength={300} value={reflection} onChange={(e) => setReflection(e.target.value)} placeholder="내가 해 본 배려나 고마웠던 일을 적어 봐요." /></label><button disabled={busy || !reflection.trim()} onClick={() => void run(async () => { await call<object, object>("saveReflection", {text: reflection}); setNotice("돌아보기를 저장했어요."); })}>돌아보기 저장</button>
+    {["revealed", "archived"].includes(data?.status ?? status) && <section className="panel"><h2>공개된 친구</h2><p>내가 챙긴 친구: {data?.targetDisplayName ?? "공개되지 않았어요"}</p><p>나를 챙긴 친구</p><p className="secret-name">{data?.incomingDisplayName ?? incomingDisplayName ?? "안전 사안으로 공개되지 않았어요"}</p>
+      {(data?.status ?? status) === "revealed" && (data?.incomingDisplayName ?? incomingDisplayName) && <><p>고마운 마음을 전해요.</p>{["고마워!", "나를 챙겨 줘서 고마워!", "함께해서 즐거웠어!"].map((text) => <button key={text} className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("sendThankYou", {roundId, text, requestId: crypto.randomUUID()}); setNotice("감사 인사를 보냈어요."); })}>{text}</button>)}</>}
+      {(data?.status ?? status) === "revealed" && <><label>이번 활동을 돌아보기<textarea rows={3} maxLength={300} value={reflection} onChange={(e) => setReflection(e.target.value)} placeholder="내가 해 본 배려나 고마웠던 일을 적어 봐요." /></label><button disabled={busy || !reflection.trim()} onClick={() => void run(async () => { await call<object, object>("saveReflection", {roundId, text: reflection}); setNotice("돌아보기를 저장했어요."); })}>돌아보기 저장</button></>}
     </section>}
     {data && <>
       <section className="panel"><h2>오늘의 배려 미션</h2><p>어렵다면 바꾸거나 쉬어도 괜찮아요.</p><ul className="mission-list">{data.missions.filter((m) => m.status !== "replaced").map((m) => <li key={m.missionId}><strong>{m.text}</strong><span>{m.status === "done" ? "해냈어요" : m.status === "skipped" ? "쉬었어요" : "도전 중"}</span>{data.canSubmit && m.status === "todo" && <div className="action-row"><button className="small" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId: m.missionId, status: "done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button><button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("replaceMission", {missionId: m.missionId, requestId: crypto.randomUUID()}); setNotice("다른 미션으로 바꿨어요."); })}>다른 미션</button><button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId: m.missionId, status: "skipped"}); setNotice("오늘은 쉬어도 괜찮아요."); })}>쉬기</button></div>}</li>)}</ul></section>
@@ -45,9 +47,10 @@ export function StudentRound({ roundId, status, incomingDisplayName }: {
         {data.canSubmit && data.activityDates.includes(date) && !sentToday && <><label>준비된 문구<select value={selectedMessage} onChange={(e) => setSelectedMessage(e.target.value)}><option value="">문구 선택</option>{data.presetMessages.map((text) => <option key={text}>{text}</option>)}</select></label><button disabled={busy || !selectedMessage} onClick={() => void run(async () => { await call<object, object>("sendMessage", {kind: "preset", text: selectedMessage, requestId: crypto.randomUUID()}); setSelectedMessage(""); setNotice("쪽지를 보냈어요."); })}>선택형 쪽지 보내기</button>
           {data.allowFreeTextMessages && <><label>직접 쓰기 (선생님 검토 후 전달)<textarea rows={3} maxLength={200} value={freeText} onChange={(e) => setFreeText(e.target.value)} /></label><button className="outline" disabled={busy || !freeText.trim()} onClick={() => void run(async () => { await call<object, object>("sendMessage", {kind: "free", text: freeText, requestId: crypto.randomUUID()}); setFreeText(""); setNotice("선생님께 검토를 부탁했어요."); })}>직접 쓴 쪽지 보내기</button></>}</>}
         {sentToday && <p>오늘의 쪽지를 보냈어요.</p>}
-        <h3>받은 쪽지</h3>{data.inbox.filter((m) => !m.hidden).length === 0 ? <p>아직 받은 쪽지가 없어요.</p> : data.inbox.filter((m) => !m.hidden).map((m) => <div className="review-card" key={m.messageId}><p>{m.text}</p><button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("hideMessage", {messageId: m.messageId}); setNotice("쪽지를 숨겼어요."); })}>숨기기</button><button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("createHelpRequest", {category: "message", messageId: m.messageId, requestId: crypto.randomUUID()}); setNotice("선생님께 도움을 요청했어요."); })}>선생님께 알리기</button></div>)}
+        <h3>보낸 쪽지 상태</h3>{data.sent.length === 0 ? <p>아직 보낸 쪽지가 없어요.</p> : data.sent.map((m) => <p key={m.messageId}>{m.date} · {m.status === "pending" ? "선생님 검토 중" : m.status === "rejected" ? "전달되지 않음" : "전달됨"}{m.reacted ? " · 친구가 고마워했어요" : ""}</p>)}
+        <h3>받은 쪽지</h3>{data.inbox.filter((m) => !m.hidden).length === 0 ? <p>아직 받은 쪽지가 없어요.</p> : data.inbox.filter((m) => !m.hidden).map((m) => <div className="review-card" key={m.messageId}><p>{m.text}</p>{m.reacted && <p>고마워요를 전했어요.</p>}{m.type === "encouragement" && !m.reacted && data.status !== "archived" && <button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("reactToMessage", {roundId, messageId: m.messageId, requestId: crypto.randomUUID()}); setNotice("고마워요를 전했어요."); })}>고마워요</button>}<button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("hideMessage", {roundId, messageId: m.messageId}); setNotice("쪽지를 숨겼어요."); })}>숨기기</button><button className="small outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("createHelpRequest", {roundId, category: "message", messageId: m.messageId, requestId: crypto.randomUUID()}); setNotice("선생님께 도움을 요청했어요."); })}>선생님께 알리기</button></div>)}
       </section>
-      {["active", "paused", "reveal_pending"].includes(status) && <section className="panel"><h2>도움이 필요해요</h2><p>불편하거나 걱정되는 일이 있으면 선생님께 알려 주세요. 공개되거나 감점되지 않아요.</p><label>선생님께 전할 말 (선택)<textarea rows={3} maxLength={300} value={helpNote} onChange={(e) => setHelpNote(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("createHelpRequest", {category: "uncomfortable", note: helpNote, requestId: crypto.randomUUID()}); setHelpNote(""); setNotice("선생님께 도움을 요청했어요."); })}>도움 요청하기</button></section>}
+      {["active", "paused", "reveal_pending", "revealed", "archived"].includes(data.status) && <section className="panel"><h2>도움이 필요해요</h2><p>불편하거나 걱정되는 일이 있으면 선생님께 알려 주세요. 공개되거나 감점되지 않아요.</p><label>선생님께 전할 말 (선택)<textarea rows={3} maxLength={300} value={helpNote} onChange={(e) => setHelpNote(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("createHelpRequest", {roundId, category: "uncomfortable", note: helpNote, requestId: crypto.randomUUID()}); setHelpNote(""); setNotice("선생님께 도움을 요청했어요."); })}>도움 요청하기</button></section>}
     </>}
   </div>;
 }

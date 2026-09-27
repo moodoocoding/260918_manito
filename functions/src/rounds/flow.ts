@@ -5,7 +5,7 @@ import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import { requireDocumentId, requireRecord, requireRequestId } from "../shared/validation.js";
 import { matchParticipants, pairKey, type PairHistory } from "./matching.js";
-import { parseRoundInput, requireTeacherRound, type RoundSettings } from "./common.js";
+import { koreaDate, parseRoundInput, requireTeacherRound, type RoundSettings } from "./common.js";
 import { missionText } from "./missions.js";
 
 function roundRefs(classId: string, roundId: string) {
@@ -277,7 +277,7 @@ export const changeRoundStatus = onCall(async (request) => {
     if (["resume", "pause", "end"].includes(action) && classDoc.get("activeRoundId") !== roundId) {
       throw new HttpsError("failed-precondition", "진행 중인 회차가 아니에요.");
     }
-    if (action === "resume" && roundDoc.get("endsAt").toDate() <= new Date()) {
+    if (["pause", "resume"].includes(action) && roundDoc.get("endsAt").toDate() <= new Date()) {
       throw new HttpsError("failed-precondition", "종료 시각이 지난 뒤에는 재개할 수 없어요.");
     }
     tx.update(roundRef, { status: next, updatedAt: FieldValue.serverTimestamp() });
@@ -292,6 +292,55 @@ export const changeRoundStatus = onCall(async (request) => {
       inputFingerprint: fingerprint, result, createdAt: FieldValue.serverTimestamp() });
     tx.create(classRef.collection("auditLogs").doc(), { action: `round.${action}`, actorUid: teacherUid,
       roundId, requestId, createdAt: FieldValue.serverTimestamp() });
+    return result;
+  });
+});
+
+export const extendRound = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "회차");
+  const requestId = requireRequestId(input.requestId);
+  const endsAt = new Date(String(input.endsAt));
+  if (!Number.isFinite(endsAt.getTime()) || !Array.isArray(input.activityDates)
+    || ![5, 10].includes(input.activityDates.length)
+    || input.activityDates.some((date) => typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      || !Number.isFinite(new Date(`${date}T00:00:00Z`).getTime())
+      || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)
+    || new Set(input.activityDates).size !== input.activityDates.length) {
+    throw new HttpsError("invalid-argument", "연장 기간과 수업일을 확인해 주세요.");
+  }
+  const activityDates = [...input.activityDates].sort() as string[];
+  const fingerprint = inputFingerprint({ classId, roundId, endsAt: endsAt.toISOString(), activityDates });
+  const { classRef, roundRef, settingsRef } = roundRefs(classId, roundId);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  return db.runTransaction(async (tx) => {
+    const [classDoc, round, settings, command] = await Promise.all([
+      tx.get(classRef), tx.get(roundRef), tx.get(settingsRef), tx.get(commandRef),
+    ]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "extendRound", teacherUid, fingerprint);
+      return command.get("result") as {roundId: string; status: string};
+    }
+    const now = new Date();
+    if (round.get("status") !== "paused" || classDoc.get("activeRoundId") !== roundId
+      || round.get("endsAt").toDate() <= now || endsAt <= round.get("endsAt").toDate()
+      || endsAt.getTime() - round.get("startsAt").toDate().getTime() > 30 * 86400_000
+      || !settings.exists || !(round.get("activityDates") as string[]).every((date) => activityDates.includes(date))
+      || activityDates[0] < koreaDate(round.get("startsAt").toDate())
+      || activityDates.at(-1)! > koreaDate(endsAt)) {
+      throw new HttpsError("failed-precondition", "종료 전 일시정지 회차에서 기존 수업일을 유지하며 연장해 주세요.");
+    }
+    tx.update(roundRef, { endsAt: Timestamp.fromDate(endsAt), activityDates,
+      updatedAt: FieldValue.serverTimestamp() });
+    tx.update(settingsRef, { activityDates });
+    const result = { roundId, status: "paused" };
+    tx.create(commandRef, {type:"extendRound", requestedBy:teacherUid, inputFingerprint:fingerprint,
+      result, createdAt:FieldValue.serverTimestamp()});
+    tx.create(classRef.collection("auditLogs").doc(), { action:"round.extended", actorUid:teacherUid,
+      roundId, requestId, createdAt:FieldValue.serverTimestamp() });
     return result;
   });
 });

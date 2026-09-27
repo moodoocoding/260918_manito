@@ -4,10 +4,12 @@ import { call } from "./firebase";
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Round = { roundId: string; title: string; status: string; startsAt: string; endsAt: string;
   activityDates: string[]; participantCount: number; rosterVersion: number; allowFreeTextMessages: boolean };
-type Overview = { helps: Array<{helpId: string; studentName: string; category: string; note: string}>;
+type Overview = { helps: Array<{helpId: string; studentName: string; category: string; note: string; messageId: string | null}>;
   pendingMessages: Array<{messageId: string; senderName: string; receiverName: string; text: string}>;
-  participation: Array<{studentUid: string; displayName: string; status: string}>; activityDates: string[] };
+  participation: Array<{studentUid: string; displayName: string; status: string; accessStatus: string;
+    lastLoginAt: string | null; hasActivity: boolean}>; activityDates: string[] };
 type Assignment = { giverUid: string; giverName: string; receiverName: string };
+type SafetyMessage = { text: string; senderName: string; receiverName: string; status: string };
 type Settings = { participantIds: string[]; excludedPairs: Array<{a: string; b: string}>;
   missionIds: string[]; activityDates: string[] };
 
@@ -50,6 +52,7 @@ export function TeacherRounds({ classId, gradeBand, members }: {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [resolution, setResolution] = useState<Record<string, string>>({});
+  const [safetyMessages, setSafetyMessages] = useState<Record<string, SafetyMessage>>({});
 
   const load = useCallback(async () => {
     const result = await call<{classId: string}, {rounds: Round[]}>("listRounds", {classId});
@@ -105,7 +108,7 @@ export function TeacherRounds({ classId, gradeBand, members }: {
     });
   }
   async function selectRound(roundId: string) {
-    setChosen(roundId); setAssignments(null); setOverview(null);
+    setChosen(roundId); setAssignments(null); setOverview(null); setSafetyMessages({});
     if (!roundId) { setTitle(""); setExcludedPairs([]); setMissionIds([]);
       setDates(plannedDates().join(", ")); return; }
     try {
@@ -128,6 +131,14 @@ export function TeacherRounds({ classId, gradeBand, members }: {
     if (!current) return;
     await run(async () => { await call<object, object>("resolveHelpRequest", {classId, roundId: current.roundId,
       helpId, resolution: resolution[helpId], requestId: crypto.randomUUID()}); setNotice("도움 요청을 처리했어요."); });
+  }
+  async function inspectMessage(messageId: string) {
+    if (!current) return;
+    await run(async () => {
+      const result = await call<object, SafetyMessage>("getMessageForReview", {classId,
+        roundId: current.roundId, messageId});
+      setSafetyMessages((old) => ({...old, [messageId]: result}));
+    });
   }
   async function stop(studentUid: string) {
     if (!current) return;
@@ -176,12 +187,13 @@ export function TeacherRounds({ classId, gradeBand, members }: {
         {["revealed", "cancelled"].includes(current.status) && <button disabled={busy} onClick={() => void action("archive")}>보관하고 다음 회차 준비</button>}
         {["draft", "ready", "active", "paused"].includes(current.status) && <button className="outline" disabled={busy} onClick={() => void action("cancel")}>회차 취소</button>}
       </div>
+      {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료 시각<input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 5일 또는 10일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:new Date(end).toISOString(), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
       {["revealed", "archived", "cancelled"].includes(current.status) && <div className="review-card"><label>다음 회차 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정만 복사해 새 회차 만들기</button></div>}
       <button className="small outline" disabled={busy} onClick={() => void loadOverview(current.roundId)}>현황 새로고침</button>
       {overview && <>
-        <h3>1. 도움 요청</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {h.category}</strong><p>{h.note}</p><input aria-label={`${h.studentName} 처리 내용`} placeholder="처리 내용" value={resolution[h.helpId] ?? ""} onChange={(e) => setResolution((old) => ({...old, [h.helpId]: e.target.value}))} /><button disabled={busy || !resolution[h.helpId]} onClick={() => void resolve(h.helpId)}>처리 완료</button></div>)}
+        <h3>1. 도움 요청</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {h.category}</strong><p>{h.note}</p>{h.messageId && <><button className="small outline" disabled={busy} onClick={() => void inspectMessage(h.messageId!)}>신고 쪽지 원문 확인</button>{safetyMessages[h.messageId] && <p>발신 {safetyMessages[h.messageId].senderName} → 수신 {safetyMessages[h.messageId].receiverName}: {safetyMessages[h.messageId].text}</p>}</>}<input aria-label={`${h.studentName} 처리 내용`} placeholder="처리 내용" value={resolution[h.helpId] ?? ""} onChange={(e) => setResolution((old) => ({...old, [h.helpId]: e.target.value}))} /><button disabled={busy || !resolution[h.helpId]} onClick={() => void resolve(h.helpId)}>처리 완료</button></div>)}
         <h3>2. 검토할 쪽지</h3>{overview.pendingMessages.length === 0 ? <p>대기 중인 쪽지가 없어요.</p> : overview.pendingMessages.map((m) => <div className="review-card" key={m.messageId}><strong>{m.senderName} → {m.receiverName}</strong><p>{m.text}</p><button disabled={busy} onClick={() => void review(m.messageId, "approve")}>승인</button><button className="outline" disabled={busy} onClick={() => void review(m.messageId, "reject")}>반려</button></div>)}
-        <h3>3. 참가 상태</h3><ul className="member-list">{overview.participation.map((p) => <li key={p.studentUid}><span>{p.displayName} · {p.status}</span>{p.status === "active" && ["active", "paused", "reveal_pending"].includes(current.status) && <button className="small outline" disabled={busy} onClick={() => void stop(p.studentUid)}>참여 중단</button>}</li>)}</ul>
+        <h3>3. 접속·활동 확인</h3><p className="help">학생별 지원을 위한 비공개 정보예요. 점수나 순위로 사용하지 마세요.</p><ul className="member-list">{overview.participation.map((p) => <li key={p.studentUid}><span>{p.displayName} · {p.status}<small>{p.accessStatus === "active" ? "입장 가능" : "입장 제한"} · {p.lastLoginAt ? `최근 입장 ${new Date(p.lastLoginAt).toLocaleDateString("ko-KR")}` : "입장 기록 없음"} · {p.hasActivity ? "활동 기록 있음" : "활동 기록 없음"}</small></span>{p.status === "active" && ["active", "paused", "reveal_pending"].includes(current.status) && <button className="small outline" disabled={busy} onClick={() => void stop(p.studentUid)}>참여 중단</button>}</li>)}</ul>
         <h3>4. 일정</h3><p>{overview.activityDates.join(", ")}</p>
       </>}
       {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); setAssignments(result.assignments); })}>안전 대응용 배정표 열람</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}

@@ -156,6 +156,13 @@ test("login credentials and class-code lookups are server-only", async () => {
   await assertFails(getDoc(doc(db, "classCodes/ABCDEFGH")));
 });
 
+test("student rights requests are available only through audited functions", async () => {
+  const path = "classes/class-a/rightsRequests/request-a";
+  await assertFails(getDoc(doc(studentDb("student-a"), path)));
+  await assertFails(getDoc(doc(teacherDb("teacher-a"), path)));
+  await assertFails(setDoc(doc(studentDb("student-a"), path), { kind: "deletion" }));
+});
+
 test("browser clients cannot write application documents", async () => {
   const db = studentDb("student-a");
   await assertFails(

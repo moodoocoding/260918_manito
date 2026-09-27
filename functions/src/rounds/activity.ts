@@ -17,23 +17,29 @@ function activeForSubmission(round: FirebaseFirestore.DocumentSnapshot): boolean
 }
 
 export const getStudentActivity = onCall(async (request) => {
-  const student = await requireStudentRound(request);
+  const input = request.data === null || request.data === undefined ? {} : requireRecord(request.data);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
   const dataRef = student.roundRef.collection("studentData").doc(student.uid);
-  const [missions, inbox, sent, help] = await Promise.all([
+  const [view, missions, inbox, sent, help] = await Promise.all([
+    dataRef.get(),
     dataRef.collection("missions").get(), dataRef.collection("inboxItems").get(),
     dataRef.collection("sentMessages").get(), dataRef.collection("helpRequests").get(),
   ]);
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
+    title: student.roundDoc.get("title"),
+    targetDisplayName: view.get("targetDisplayName") ?? null,
+    incomingDisplayName: view.get("incomingDisplayName") ?? null,
     activityDates: student.roundDoc.get("activityDates") as string[],
     canSubmit: activeForSubmission(student.roundDoc),
     allowFreeTextMessages: student.roundDoc.get("allowFreeTextMessages") === true,
     presetMessages,
     missions: missions.docs.map((doc) => ({ missionId: doc.id, text: doc.get("text"), status: doc.get("status") })),
     inbox: inbox.docs.map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
-      reported: doc.get("reported") === true, type: doc.get("type") })),
+      reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true })),
     sent: sent.docs.map((doc) => ({ messageId: doc.id, text: doc.get("text"), status: doc.get("status"),
-      date: doc.get("date") })),
+      date: doc.get("date"), reacted: doc.get("reacted") === true })),
     help: help.docs.map((doc) => ({ helpId: doc.id, status: doc.get("status"),
       category: doc.get("category"), createdAt: doc.get("createdAt")?.toDate()?.toISOString() })),
   };
@@ -156,12 +162,51 @@ export const reviewMessage = onCall(async (request) => {
 export const hideMessage = onCall(async (request) => {
   const input = requireRecord(request.data);
   const messageId = requireDocumentId(input.messageId, "쪽지");
-  const student = await requireStudentRound(request);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
   const ref = student.roundRef.collection("studentData").doc(student.uid).collection("inboxItems").doc(messageId);
   const item = await ref.get();
   if (!item.exists) throw new HttpsError("not-found", "쪽지를 찾지 못했어요.");
   await ref.update({ hidden: true, updatedAt: FieldValue.serverTimestamp() });
   return { messageId, hidden: true };
+});
+
+export const reactToMessage = onCall(async (request) => {
+  const input = requireRecord(request.data);
+  const messageId = requireDocumentId(input.messageId, "쪽지");
+  const requestId = requireRequestId(input.requestId);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
+  const messageRef = student.roundRef.collection("messageSecrets").doc(messageId);
+  const inboxRef = student.roundRef.collection("studentData").doc(student.uid).collection("inboxItems").doc(messageId);
+  const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
+  const fingerprint = inputFingerprint({ messageId });
+  return db.runTransaction(async (tx) => {
+    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion,
+      student.roundId, !["revealed", "archived"].includes(student.roundDoc.get("status")));
+    const [round, participant, message, inbox, command] = await Promise.all([
+      tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
+      tx.get(messageRef), tx.get(inboxRef), tx.get(commandRef),
+    ]);
+    if (command.exists) {
+      assertSameCommand(command.data(), "reactToMessage", student.uid, fingerprint);
+      return { messageId, reacted: true };
+    }
+    if (!["active", "paused", "reveal_pending", "revealed"].includes(round.get("status"))
+      || participant.get("participationStatus") !== "active" || !message.exists
+      || message.get("receiverUid") !== student.uid || message.get("status") !== "delivered"
+      || !inbox.exists || inbox.get("reacted") === true || inbox.get("hidden") === true) {
+      throw new HttpsError("failed-precondition", "이 쪽지에는 반응할 수 없어요.");
+    }
+    const senderUid = message.get("senderUid") as string;
+    tx.update(inboxRef, { reacted: true, reactedAt: FieldValue.serverTimestamp() });
+    tx.update(student.roundRef.collection("studentData").doc(senderUid).collection("sentMessages").doc(messageId), {
+      reacted: true,
+    });
+    tx.create(commandRef, { type:"reactToMessage", requestedBy:student.uid,
+      inputFingerprint:fingerprint, result:{messageId,reacted:true}, createdAt:FieldValue.serverTimestamp() });
+    return { messageId, reacted: true };
+  });
 });
 
 export const createHelpRequest = onCall(async (request) => {
@@ -173,12 +218,14 @@ export const createHelpRequest = onCall(async (request) => {
   }
   const note = input.note === undefined || input.note === "" ? "" : requireText(input.note, "도움 설명", 300);
   const messageId = input.messageId === undefined ? null : requireDocumentId(input.messageId, "쪽지");
-  const student = await requireStudentRound(request);
+  const student = await requireStudentRound(request, typeof input.roundId === "string"
+    ? requireDocumentId(input.roundId, "회차") : undefined);
   const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
   const helpRef = student.roundRef.collection("helpSecrets").doc();
   const fingerprint = inputFingerprint({ category, note, messageId });
   return db.runTransaction(async (tx) => {
-    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion, student.roundId);
+    await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion,
+      student.roundId, !["revealed", "archived"].includes(student.roundDoc.get("status")));
     const [round, participant, command, inbox] = await Promise.all([
       tx.get(student.roundRef), tx.get(student.roundRef.collection("participants").doc(student.uid)),
       tx.get(commandRef), messageId ? tx.get(student.roundRef.collection("studentData").doc(student.uid).collection("inboxItems").doc(messageId)) : Promise.resolve(null),
@@ -187,7 +234,7 @@ export const createHelpRequest = onCall(async (request) => {
       assertSameCommand(command.data(), "createHelpRequest", student.uid, fingerprint);
       return command.get("result") as { helpId: string };
     }
-    if (!["active", "paused", "reveal_pending"].includes(round.get("status"))
+    if (!["active", "paused", "reveal_pending", "revealed", "archived"].includes(round.get("status"))
       || participant.get("participationStatus") !== "active" || (messageId && !inbox?.exists)) {
       throw new HttpsError("failed-precondition", "도움 요청을 보낼 수 없어요.");
     }
@@ -250,6 +297,16 @@ export const getTeacherRoundOverview = onCall(async (request) => {
     roundRef.collection("participants").get(), classRef.collection("members").get(),
   ]);
   const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
+  const memberInfo = new Map(members.docs.map((doc) => [doc.id, doc]));
+  const activity = await Promise.all(participants.docs.map(async (participant) => {
+    const dataRef = roundRef.collection("studentData").doc(participant.id);
+    const [missions, sent] = await Promise.all([
+      dataRef.collection("missions").get(), dataRef.collection("sentMessages").get(),
+    ]);
+    return { studentUid: participant.id,
+      hasActivity: missions.docs.some((doc) => ["done", "skipped"].includes(doc.get("status"))) || sent.size > 0 };
+  }));
+  const activityByUid = new Map(activity.map(({studentUid, hasActivity}) => [studentUid, hasActivity]));
   await classRef.collection("auditLogs").add({ action: "round.teacher_overview", actorUid: teacherUid,
     roundId, createdAt: FieldValue.serverTimestamp() });
   return {
@@ -263,6 +320,29 @@ export const getTeacherRoundOverview = onCall(async (request) => {
       receiverName: names.get(doc.get("receiverUid")), text: doc.get("text"),
     })),
     participation: participants.docs.map((doc) => ({ studentUid: doc.id,
-      displayName: names.get(doc.id), status: doc.get("participationStatus") })),
+      displayName: names.get(doc.id), status: doc.get("participationStatus"),
+      accessStatus: memberInfo.get(doc.id)?.get("accessStatus"),
+      lastLoginAt: memberInfo.get(doc.id)?.get("lastLoginAt")?.toDate()?.toISOString() ?? null,
+      hasActivity: activityByUid.get(doc.id) === true })),
   };
+});
+
+export const getMessageForReview = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "회차");
+  const messageId = requireDocumentId(input.messageId, "쪽지");
+  const { classRef, roundRef } = await requireTeacherRound(teacherUid, classId, roundId);
+  const [message, members] = await Promise.all([
+    roundRef.collection("messageSecrets").doc(messageId).get(), classRef.collection("members").get(),
+  ]);
+  if (!message.exists) throw new HttpsError("not-found", "쪽지를 찾지 못했어요.");
+  const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
+  await classRef.collection("auditLogs").add({ action: "message.teacher_read", actorUid: teacherUid,
+    roundId, messageId, createdAt: FieldValue.serverTimestamp() });
+  return { messageId, text: message.get("text"), kind: message.get("kind"),
+    status: message.get("status"), senderUid: message.get("senderUid"),
+    senderName: names.get(message.get("senderUid")), receiverUid: message.get("receiverUid"),
+    receiverName: names.get(message.get("receiverUid")) };
 });

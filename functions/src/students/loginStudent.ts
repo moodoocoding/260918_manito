@@ -108,6 +108,7 @@ export const loginStudent = onCall(
         lockedUntil: null,
         updatedAt: FieldValue.serverTimestamp(),
       });
+      transaction.update(memberRef, { lastLoginAt: FieldValue.serverTimestamp() });
       return Number(memberSnapshot.get("sessionVersion"));
     });
     const customToken = await auth.createCustomToken(studentUid, {

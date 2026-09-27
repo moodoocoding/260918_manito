@@ -5,6 +5,7 @@ import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
 import { TeacherRounds } from "./TeacherRounds";
 import { StudentRound } from "./StudentRound";
+import { StudentRights, TeacherRights } from "./RightsRequests";
 import "./style.css";
 
 type TeacherStatus = { status: "pending" | "verified" | "suspended"; displayName: string };
@@ -16,6 +17,7 @@ type StudentHome = { displayName: string; className: string; round: null | {
   roundId: string; title: string; status: string; targetDisplayName: string | null;
   incomingDisplayName: string | null;
 } };
+type HistoryRound = {roundId: string; title: string; status: string};
 
 function errorText(error: unknown): string {
   if (error && typeof error === "object" && "code" in error) {
@@ -42,6 +44,8 @@ function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [printCard, setPrintCard] = useState<Card | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
+  const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([]);
+  const [openHistoryRoundId, setOpenHistoryRoundId] = useState<string | null>(null);
   const [targetVisible, setTargetVisible] = useState(false);
   const [classCodeInput, setClassCodeInput] = useState("");
   const [cardCodeInput, setCardCodeInput] = useState("");
@@ -59,6 +63,7 @@ function App() {
     generation.current += 1;
     setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
     setCards([]); setPrintCard(null); setHome(null); setTargetVisible(false);
+    setHistoryRounds([]); setOpenHistoryRoundId(null);
     setCardCodeInput(""); setClassCodeInput("");
   }, []);
 
@@ -87,9 +92,11 @@ function App() {
   const loadStudent = useCallback(async () => {
     const current = generation.current;
     const result = await call<null, StudentHome>("getStudentHome", null);
+    const historyResult = await call<null, {rounds: HistoryRound[]}>("listStudentRounds", null);
     if (current !== generation.current) return;
     setTargetVisible(false);
     setHome(result);
+    setHistoryRounds(historyResult.rounds);
   }, []);
 
   useEffect(() => {
@@ -271,7 +278,9 @@ function App() {
               <button onClick={() => setTargetVisible(!targetVisible)}>{targetVisible ? "다시 가리기" : "친구 보기"}</button></> : <p>선생님이 준비하고 있어요.</p>}
           </section> : <section className="panel empty"><div className="big-icon">💌</div><h2>선생님이 작전을 준비하고 있어요</h2><p>새 회차가 시작되면 여기에서 내 활동을 볼 수 있어요.</p></section>}
           {home?.round && <StudentRound roundId={home.round.roundId} status={home.round.status} incomingDisplayName={home.round.incomingDisplayName} />}
+          {historyRounds.some((item) => item.roundId !== home?.round?.roundId) && <section className="panel"><h2>지난 회차</h2><p>예전 배정과 쪽지 기록은 각 회차 안에서만 볼 수 있어요.</p>{historyRounds.filter((item) => item.roundId !== home?.round?.roundId).map((item) => <button key={item.roundId} className="small outline" onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}>{item.title} {openHistoryRoundId === item.roundId ? "닫기" : "보기"}</button>)}{openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" incomingDisplayName={null} />}</section>}
           <button className="wide outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button>
+          <StudentRights />
           <button className="wide secondary" onClick={() => void exit()}>활동 끝내고 다음 친구에게 넘기기</button>
         </section> : route === "student" && role === "none" ? <section className="entry-layout">
           <div className="hero"><span className="eyebrow">학생 입장</span><h1>비밀친구 작전,<br />시작해 볼까요?</h1><p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p><div className="envelope">💌</div></div>
@@ -312,6 +321,7 @@ function App() {
             </> : <p className="muted">왼쪽에서 학급을 선택하거나 새로 만들어 주세요.</p>}
           </section></div>
           {selected && <TeacherRounds classId={selected.classId} gradeBand={selected.gradeBand} members={members} />}
+          {selected && <TeacherRights classId={selected.classId} />}
           {selected && <section className="panel"><h2>학급 데이터 삭제</h2><p>모든 회차를 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="outline" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section>}
         </section> : null}
     </main>

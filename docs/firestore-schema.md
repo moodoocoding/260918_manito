@@ -17,6 +17,8 @@
 teachers/{teacherUid}
 classes/{classId}
   members/{studentUid}
+  rightsRequests/{rightsRequestId}       # 학생 정보 열람·정정·삭제 요청, 서버 전용
+  rightsCommands/{studentUid_requestId} # 요청 접수 중복 방지, 서버 전용
   rounds/{roundId}
     participants/{studentUid}
     studentData/{studentUid}
@@ -50,7 +52,8 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 |---|---|---:|---:|---:|
 | `teachers/{uid}` | 교사 프로필·확인 상태 | 아니요 | 본인만 | 아니요 |
 | `classes/{classId}` | 학급·학년도·담당 교사·진행 회차 잠금 | 아니요 | 담당 교사 | 아니요 |
-| `members/{studentUid}` | 표시 이름·접근 상태·세션 버전 | 본인 | 담당 교사 | 아니요 |
+| `members/{studentUid}` | 표시 이름·접근 상태·세션 버전·마지막 로그인 시각 | 본인 | 담당 교사 | 아니요 |
+| `rightsRequests`, `rightsCommands` | 정보 열람·정정·삭제 요청의 종류·내용·상태와 멱등 명령 | 아니요 | 감사 기록을 남기는 함수로 조회 | 서버만 |
 | `rounds/{roundId}` | 회차 일정·상태·메시지 정책 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
 | `studentData/{studentUid}` | 본인에게 공개할 상대·공개 결과 | 활성 참가자 본인 | 함수로 감사 후 조회 | 아니요 |
@@ -106,4 +109,4 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 
 ## 현재 구현과 남은 운영 조건
 
-회차·미션·쪽지·도움·공개·설정 복사와 학급 삭제 경로를 로컬에 구현했다. 교사는 학생 개인 데이터를 직접 읽지 않고 감사 기록을 남기는 함수로 안전 현황과 배정을 조회한다. 배정은 `assignmentSecrets`, 제외 관계는 `roundSettings`에만 저장한다. `roundSettings.excludedPairs`는 Firestore의 중첩 배열 제한 때문에 `{a,b}` 객체 배열이다. 실제 학생 활성화에는 개인정보 처리 근거, 학교·보호자 안내, 보존 기간과 권리 요청 운영 절차의 확정이 남아 있다.
+회차·미션·쪽지·도움·공개·설정 복사, 학급 삭제, 학생 정보 요청 접수 경로를 구현했다. 교사는 학생 개인 데이터를 직접 읽지 않고 감사 기록을 남기는 함수로 안전 현황·배정·요청을 조회한다. 배정은 `assignmentSecrets`, 제외 관계는 `roundSettings`에만 저장한다. `roundSettings.excludedPairs`는 Firestore의 중첩 배열 제한 때문에 `{a,b}` 객체 배열이다. 실제 학생 활성화에는 개인정보 처리 근거, 학교·보호자 안내, 보존 기간과 요청 처리·백업 삭제 절차의 확정이 남아 있다.

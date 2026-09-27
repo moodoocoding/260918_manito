@@ -74,6 +74,22 @@ test("four students complete two isolated rounds with review, help, reveal and h
     const login = await students[i].call("loginStudent", {classCode, cardCode:cards[i].cardCode});
     await signInWithCustomToken(students[i].auth, login.customToken);
   }
+  const rightsId = rid();
+  const rights = await students[0].call("createRightsRequest", {
+    kind:"access",note:"제 기록을 확인하고 싶어요.",requestId:rightsId,
+  });
+  assert.deepEqual(await students[0].call("createRightsRequest", {
+    kind:"access",note:"제 기록을 확인하고 싶어요.",requestId:rightsId,
+  }),rights);
+  await assert.rejects(students[0].call("createRightsRequest", {
+    kind:"deletion",requestId:rightsId,
+  }),{code:"functions/already-exists"});
+  assert.equal((await students[0].call("listMyRightsRequests",null)).requests.length,1);
+  assert.equal((await students[1].call("listMyRightsRequests",null)).requests.length,0);
+  assert.equal((await teacher.call("getRightsRequestsForTeacher",{classId})).requests[0].note,
+    "제 기록을 확인하고 싶어요.");
+  await assert.rejects(other.call("getRightsRequestsForTeacher",{classId}),
+    {code:"functions/permission-denied"});
   await assert.rejects(other.call("listRounds", {classId}), {code:"functions/permission-denied"});
   const first = await teacher.call("createRound", roundInput(classId, ids, "첫 번째 작전"));
   const roundId = first.roundId;
@@ -114,29 +130,46 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const target0 = assignments.find((a)=>a.giverUid===ids[0]).receiverUid;
   const receiver0 = students[ids.indexOf(target0)];
   assert.equal((await receiver0.call("getStudentActivity",null)).inbox.length,1);
+  await receiver0.call("reactToMessage",{messageId:firstMsg.messageId,requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",null)).sent[0].reacted,true);
+  await assert.rejects(receiver0.call("reactToMessage",{messageId:firstMsg.messageId,requestId:rid()}),
+    {code:"functions/failed-precondition"});
   const free = await students[1].call("sendMessage", {kind:"free",text:"좋은 생각을 알려줘서 고마워.",requestId:rid()});
   assert.equal(free.status,"pending");
   const overview = await teacher.call("getTeacherRoundOverview", {classId,roundId});
   assert.equal(overview.pendingMessages.length,1);
+  assert.ok(overview.participation.every((item) => item.lastLoginAt));
   await teacher.call("reviewMessage",{classId,roundId,messageId:free.messageId,decision:"approve",requestId:rid()});
+  await receiver0.call("createHelpRequest", {category:"message",messageId:firstMsg.messageId,requestId:rid()});
+  const reported = await teacher.call("getMessageForReview",{classId,roundId,messageId:firstMsg.messageId});
+  assert.equal(reported.senderUid,ids[0]);
+  assert.equal(reported.text,"오늘도 응원해!");
+  await assert.rejects(other.call("getMessageForReview",{classId,roundId,messageId:firstMsg.messageId}),
+    {code:"functions/permission-denied"});
   await receiver0.call("createHelpRequest", {category:"uncomfortable",note:"선생님과 이야기하고 싶어요.",requestId:rid()});
+  await teacher.call("changeRoundStatus",{classId,roundId,action:"pause",requestId:rid()});
+  await assert.rejects(students[2].call("sendMessage", {kind:"preset",text:"고마워!",requestId:rid()}),
+    {code:"functions/failed-precondition"});
+  await teacher.call("extendRound",{classId,roundId,endsAt:new Date(Date.now()+13*86400_000).toISOString(),
+    activityDates:dates(),requestId:rid()});
+  await teacher.call("changeRoundStatus",{classId,roundId,action:"resume",requestId:rid()});
   await teacher.call("changeRoundStatus",{classId,roundId,action:"end",requestId:rid()});
   await assert.rejects(students[2].call("sendMessage", {kind:"preset",text:"고마워!",requestId:rid()}),
     {code:"functions/failed-precondition"});
   await assert.rejects(teacher.call("revealRound",{classId,roundId,requestId:rid()}),
     {code:"functions/failed-precondition"});
-  const help = (await teacher.call("getTeacherRoundOverview",{classId,roundId})).helps[0];
-  await teacher.call("resolveHelpRequest",{classId,roundId,helpId:help.helpId,
+  const helps = (await teacher.call("getTeacherRoundOverview",{classId,roundId})).helps;
+  for (const help of helps) await teacher.call("resolveHelpRequest",{classId,roundId,helpId:help.helpId,
     resolution:"학생과 직접 이야기함",requestId:rid()});
   await teacher.call("revealRound",{classId,roundId,requestId:rid()});
+  assert.equal((await adminDb.doc(`classes/${classId}`).get()).get("activeRoundId"),null);
   assert.equal((await students[0].call("getStudentHome",null)).round.status,"revealed");
   const thanksId = rid();
   await students[0].call("sendThankYou",{text:"고마워!",requestId:thanksId});
   await assert.rejects(students[0].call("sendThankYou",{text:"나를 챙겨 줘서 고마워!",requestId:thanksId}),
     {code:"functions/already-exists"});
   await students[0].call("saveReflection",{text:"친구의 이야기를 들어 주었다."});
-  await teacher.call("changeRoundStatus",{classId,roundId,action:"archive",requestId:rid()});
-  assert.equal((await adminDb.doc(`classes/${classId}`).get()).get("activeRoundId"),null);
+  assert.equal((await students[0].call("listStudentRounds",null)).rounds[0].roundId,roundId);
   const second = await teacher.call("copyRoundSettings", {classId,sourceRoundId:roundId,
     title:"두 번째 작전",startsAt:new Date(Date.now()-3600_000).toISOString(),
     endsAt:new Date(Date.now()+12*86400_000).toISOString(),requestId:rid()});
@@ -147,6 +180,13 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const ready2 = await teacher.call("prepareRound",{classId,roundId:second.roundId});
   await teacher.call("startRound",{classId,roundId:second.roundId,
     rosterVersion:ready2.rosterVersion,requestId:rid()});
+  await teacher.call("changeRoundStatus",{classId,roundId,action:"archive",requestId:rid()});
+  assert.equal((await adminDb.doc(`classes/${classId}`).get()).get("activeRoundId"),second.roundId);
+  assert.equal((await students[0].call("getStudentActivity",{roundId})).roundId,roundId);
+  assert.equal((await students[0].call("listStudentRounds",null)).rounds[0].roundId,roundId);
+  const oldHelp = await students[0].call("createHelpRequest",{roundId,category:"other",note:"지난 회차 문의",requestId:rid()});
+  await teacher.call("resolveHelpRequest",{classId,roundId,helpId:oldHelp.helpId,
+    resolution:"지난 회차 문의 처리",requestId:rid()});
   const assignments2 = (await teacher.call("getAssignmentsForTeacher",{classId,roundId:second.roundId})).assignments;
   assert.equal(assignments2.length,4);
   assert.ok(assignments2.every((a)=>a.giverUid!==a.receiverUid));
@@ -163,4 +203,23 @@ test("four students complete two isolated rounds with review, help, reveal and h
   assert.equal((await adminDb.doc(`classes/${classId}`).get()).exists,false);
   assert.equal((await adminDb.doc(`studentCredentials/${ids[0]}`).get()).exists,false);
   await assert.rejects(students[0].call("getStudentHome",null), {code:"functions/permission-denied"});
+});
+
+test("forty students start as one atomic one-to-one round", async () => {
+  const {classId} = await teacher.call("createClass", {name:"정원 검증반",
+    schoolYear:new Date().getUTCFullYear(), gradeBand:"middle", requestId:rid()});
+  const registration = await teacher.call("registerStudents", {classId,
+    displayNames:Array.from({length:40},(_,i)=>`가상학생${i+1}`),requestId:rid()});
+  assert.equal(registration.students.length,40);
+  const ids = registration.students.map((student)=>student.studentUid);
+  const {roundId} = await teacher.call("createRound",roundInput(classId,ids,"정원 검증"));
+  const ready = await teacher.call("prepareRound",{classId,roundId});
+  await teacher.call("startRound",{classId,roundId,rosterVersion:ready.rosterVersion,requestId:rid()});
+  const assignments = (await teacher.call("getAssignmentsForTeacher",{classId,roundId})).assignments;
+  assert.equal(assignments.length,40);
+  assert.equal(new Set(assignments.map((a)=>a.receiverUid)).size,40);
+  assert.ok(assignments.every((a)=>a.giverUid!==a.receiverUid));
+  await teacher.call("changeRoundStatus",{classId,roundId,action:"cancel",requestId:rid()});
+  await teacher.call("deleteClassData",{classId,requestId:rid()});
+  assert.equal((await adminDb.doc(`classes/${classId}`).get()).exists,false);
 });
