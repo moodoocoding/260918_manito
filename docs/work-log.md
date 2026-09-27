@@ -451,4 +451,7 @@
 - 학생 화면의 이름 봉투와 `친구 보기` 버튼을 진행 화면에서 제거했다. 교사 공개 승인 뒤 오늘·지난 활동에서만 본인 관계를 볼 수 있다. `roundId` 변경 시 학생 활동 컴포넌트를 다시 생성해 이전 시즌 상태가 잠깐 보일 가능성을 줄였다.
 - `getStudentHome`은 관계 이름을 반환하지 않는다. `getStudentActivity`는 공개 완료·보관 전에 두 관계 이름을 `null`로 돌려준다. 새 시즌 시작 때 학생 문서에 이름을 기록하지 않고, 공개 승인 시 활성 관계의 이름을 기록한다. 기존 시즌에 남은 이름은 Firestore 부모 `studentData` 문서 직접 읽기를 차단해 보호한다. 본인 미션 자식 문서 읽기는 유지한다.
 - TypeScript/Vite 전체 빌드, 함수 단위 10건, Firestore Rules 13건, 가상 학급 두 시즌 포함 격리 통합 3건과 `git diff --check` 통과. 통합 테스트는 새 시즌 문서에 이름 필드 부재, 기존 이름 필드가 있는 진행 시즌의 학생 API `null`, 공개 뒤 본인 관계 표시를 확인했다.
-- 개발 Firebase `manito-938cc`의 Firestore Rules, `getStudentHome`, `getStudentActivity`, `startRound`, `revealRound` 배포 성공. 웹 배포와 브라우저 수동 확인은 이어서 기록한다.
+- 개발 Firebase `manito-938cc`의 Firestore Rules, `getStudentHome`, `getStudentActivity`, `startRound`, `revealRound` 배포 성공. 코드·문서 커밋 `c0798d0`을 GitHub `main`에 푸시했고 해당 커밋의 Vercel 상태가 `success`다.
+- 배포 웹에서 가상 학생 카드로 오늘·우편함·도움을 열어 진행 중 이름 카드와 보기 버튼이 없는 것을 확인했다. 키보드 Enter로 화면을 바꾸고, 320·360·390·768·1280px에서 가로 넘침과 `친구 보기` 버튼이 없음을 확인했다. 브라우저 콘솔 오류는 0건이었다.
+- 개발 클라우드의 동일 가상 학생 응답을 직접 조회해 `getStudentHome` 관계 필드 부재, `getStudentActivity`의 두 이름 `null`, Firestore `studentData` 부모 문서 직접 읽기의 `permission-denied`를 확인했다. 개인정보를 담지 않은 가상 카드만 사용했다.
+- 미확인: 실제 아동·교사 사용성 관찰, 200% 확대·VoiceOver, 공개 시즌에서 새 진행 시즌으로 즉시 전환되는 순간의 수동 브라우저 재현. 자유 쪽지 문장만으로 상대를 추측할 가능성은 UI 비공개와 별도로 운영상 확인해야 한다.
