@@ -265,3 +265,29 @@ button[aria-busy="true"]{cursor:wait}
 .teacher-community-preview{background:#fff4e6}
 .teacher-community-preview button{justify-self:start}
 @media(max-width:599px){.teacher-community{padding:16px}.teacher-community .action-row button{flex:1 1 100%}}
+.teacher-status-section{min-width:0;display:grid;gap:16px}
+.teacher-status-section .section-heading{align-items:center}
+.teacher-status-section .section-heading h3,.teacher-status-section .section-heading p{margin:0}
+.teacher-status-section .section-heading p{margin-top:6px}
+.teacher-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.teacher-status-card{display:grid;gap:6px;min-width:0;text-align:left;background:#fffaf5;color:#283449;border:1px solid #e9d9cb;padding:18px;border-radius:16px;font-weight:500;overflow-wrap:anywhere}
+.teacher-status-card:hover{border-color:#b95650}
+.teacher-status-card[aria-expanded="true"]{background:#fff1e9;border:2px solid #b94a45;padding:17px}
+.teacher-status-card strong{font-size:1.15rem}
+.teacher-status-card b{font-weight:800}
+.teacher-status-card small{color:#8b3d39;font-weight:750}
+.teacher-student-detail{min-width:0;display:grid;gap:14px;padding:20px;border:1px solid #e2d2c3;background:#fffdf9;border-radius:18px;overflow-wrap:anywhere}
+.teacher-student-detail h3,.teacher-student-detail h4,.teacher-student-detail h5,.teacher-student-detail p{margin:0}
+.teacher-student-detail h4{margin-top:8px}
+.teacher-detail-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.teacher-detail-tabs button{flex:1 1 140px}
+.teacher-status-missions{display:grid;gap:12px}
+.teacher-status-missions section{padding:14px;border-radius:12px;background:#fff7ee}
+.teacher-status-missions ul{margin:10px 0 0;padding-left:1.4rem;display:grid;gap:6px;line-height:1.5}
+.teacher-status-messages{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.teacher-status-messages li{padding:14px;border:1px solid #eadfd2;border-radius:12px;min-width:0}
+.teacher-status-messages li>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 12px}
+.teacher-status-messages small{color:#5e6979}
+.teacher-status-messages p{margin-top:8px;line-height:1.55;white-space:pre-wrap}
+@media(max-width:1100px){.teacher-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.teacher-status-grid{grid-template-columns:1fr}.teacher-student-detail{padding:16px}.teacher-status-section .section-heading{display:flex;align-items:flex-start;flex-wrap:wrap}}

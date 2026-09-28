@@ -26,5 +26,6 @@ export { getStudentCommunity, getTeacherCommunity, updateRoundCommunity } from "
 export { getStudentActivity, sendMessage, reviewMessage, hideMessage, reactToMessage,
   createHelpRequest, resolveHelpRequest, getTeacherRoundOverview, getMessageForReview,
   listTeacherMessages, moderateMessage } from "./rounds/activity.js";
+export {getTeacherStudentStatus, getTeacherStudentDetail} from "./rounds/teacherStudentStatus.js";
 export { stopRoundParticipation, revealRound, sendThankYou,
   saveReflection, copyRoundSettings } from "./rounds/reveal.js";

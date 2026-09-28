@@ -206,6 +206,17 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await students[0].call("replaceMission", {missionId:activity.missions[1].missionId,requestId:replaceId});
   const updatedActivity = await students[0].call("getStudentActivity",null);
   assert.deepEqual(updatedActivity.missionSummary,{done:1,todo:2,skipped:0,total:3});
+  const studentStatus = await teacher.call("getTeacherStudentStatus",{classId,roundId});
+  assert.equal(studentStatus.students.length,4);
+  const firstStudentStatus = studentStatus.students.find((item)=>item.studentUid===ids[0]);
+  assert.equal(firstStudentStatus.completedMissions,1);
+  assert.equal(firstStudentStatus.totalMissions,3);
+  assert.equal(firstStudentStatus.sentMessages,0);
+  assert.equal(JSON.stringify(studentStatus).includes("친구의 이야기를"),false);
+  await assert.rejects(other.call("getTeacherStudentStatus",{classId,roundId}),
+    {code:"functions/permission-denied"});
+  await assert.rejects(students[0].call("getTeacherStudentStatus",{classId,roundId}),
+    {code:"functions/permission-denied"});
   await assert.rejects(students[0].call("replaceMission", {missionId:activity.missions[2].missionId,
     requestId:replaceId}), {code:"functions/already-exists"});
   const firstMsg = await students[0].call("sendMessage", {kind:"preset",text:"오늘도 응원해!",requestId:rid()});
@@ -262,6 +273,21 @@ test("four students complete two isolated rounds with review, help, reveal and h
     {code:"functions/failed-precondition"});
   const free = await students[1].call("sendMessage", {kind:"free",text:"좋은 생각을 알려줘서 고마워.",requestId:rid()});
   assert.equal(free.status,"delivered");
+  const studentStatusAfter = await teacher.call("getTeacherStudentStatus",{classId,roundId});
+  assert.equal(studentStatusAfter.students.find((item)=>item.studentUid===ids[0]).sentMessages,10);
+  const studentDetail = await teacher.call("getTeacherStudentDetail",{classId,roundId,studentUid:ids[0]});
+  assert.equal(studentDetail.missions.filter((item)=>item.status==="done").length,1);
+  assert.equal(studentDetail.missions.filter((item)=>item.status==="todo").length,2);
+  assert.equal(studentDetail.messages.filter((item)=>item.direction==="sent").length,10);
+  assert.ok(studentDetail.messages.some((item)=>item.messageId===reply.messageId && item.text==="응원 고마워!"));
+  assert.ok(studentDetail.messages.some((item)=>item.messageId===carerFirst.messageId && item.direction==="received"));
+  assert.ok((await adminDb.collection(`classes/${classId}/auditLogs`).where("action","==","round.teacher_student_detail").get()).size>0);
+  await assert.rejects(other.call("getTeacherStudentDetail",{classId,roundId,studentUid:ids[0]}),
+    {code:"functions/permission-denied"});
+  await assert.rejects(students[0].call("getTeacherStudentDetail",{classId,roundId,studentUid:ids[0]}),
+    {code:"functions/permission-denied"});
+  await assert.rejects(teacher.call("getTeacherStudentDetail",{classId,roundId,studentUid:"not-a-participant"}),
+    {code:"functions/permission-denied"});
   const overview = await teacher.call("getTeacherRoundOverview", {classId,roundId});
   assert.equal(overview.pendingMessages.length,0);
   assert.ok(overview.participation.every((item) => item.lastLoginAt));
@@ -304,6 +330,9 @@ test("four students complete two isolated rounds with review, help, reveal and h
   await assert.rejects(getDoc(doc(students[0].db,ownDataPath)));
   const thanksId = rid();
   await students[0].call("sendThankYou",{text:"고마워!",requestId:thanksId});
+  const thankedStudent = assignments.find((assignment)=>assignment.receiverUid===ids[0]).giverUid;
+  const detailWithThanks = await teacher.call("getTeacherStudentDetail",{classId,roundId,studentUid:thankedStudent});
+  assert.ok(detailWithThanks.messages.some((message)=>message.messageId===`thanks_${ids[0]}`));
   await assert.rejects(students[0].call("sendThankYou",{text:"나를 챙겨 줘서 고마워!",requestId:thanksId}),
     {code:"functions/already-exists"});
   await students[0].call("saveReflection",{text:"친구의 이야기를 들어 주었다."});
@@ -397,6 +426,10 @@ test("forty students start as one atomic one-to-one round", async () => {
     .filter((mission)=>mission.status!=="replaced").length,10);
   assert.deepEqual((await students[0].call("getStudentActivity",null)).missionSummary,
     {done:1,todo:9,skipped:0,total:10});
+  const fullClassStatus = await teacher.call("getTeacherStudentStatus",{classId,roundId});
+  assert.equal(fullClassStatus.students.length,40);
+  assert.deepEqual(fullClassStatus.students.find((item)=>item.studentUid===ids[0])?.completedMissions,1);
+  assert.ok(fullClassStatus.students.every((item)=>item.totalMissions===10));
   assert.equal((await teacher.call("getTeacherRoundOverview",{classId,roundId})).participation
     .find((item)=>item.studentUid===ids[0]).hasActivity,true);
   const assignments = (await teacher.call("getAssignmentsForTeacher",{classId,roundId})).assignments;

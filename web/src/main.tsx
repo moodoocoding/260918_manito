@@ -13,16 +13,16 @@ import { StudentRights, TeacherRights } from "./RightsRequests";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import "./style.css";
 
-type TeacherPage = "classes" | "overview" | "students" | "rounds" | "assignments" | "safety" | "history" | "settings";
+type TeacherPage = "classes" | "overview" | "students" | "rounds" | "assignments" | "status" | "history" | "settings";
 type StudentPage = "today" | "missions" | "mail" | "community" | "help" | "history";
 const teacherPages: Array<{id: TeacherPage; label: string}> = [
   {id:"overview",label:"운영 요약"},{id:"rounds",label:"시즌 설정"},{id:"assignments",label:"배정 확인"},
-  {id:"students",label:"입장 카드"},{id:"safety",label:"안전 확인"},
-  {id:"history",label:"지난 활동"},{id:"settings",label:"학급 설정"},
+  {id:"students",label:"입장 카드"},{id:"status",label:"상태 확인"},
+  {id:"history",label:"지난 활동"},{id:"settings",label:"정보 요청·삭제"},
 ];
 function teacherLocation(path: string): {classId: string | null; page: TeacherPage} {
   const parts = path.split("/").filter(Boolean);
-  const page = parts[3];
+  const page = parts[3] === "safety" ? "status" : parts[3];
   return { classId: parts[1] === "classes" && parts[2] ? parts[2] : null,
     page: teacherPages.some((item) => item.id === page) ? page as TeacherPage : parts[2] ? "overview" : "classes" };
 }
@@ -564,9 +564,9 @@ function App() {
                       </li>;
                     })}</ol>}
               </section>}
-              {(["overview","rounds","safety","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "safety" | "history"} onNavigate={(page) => openTeacherPage(page)} onDirtyChange={(value) => { roundDirty.current = value; }} />}
+              {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} onNavigate={(page) => openTeacherPage(page)} onDirtyChange={(value) => { roundDirty.current = value; }} />}
               {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
-              {teacherPage === "settings" && <><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
+              {teacherPage === "settings" && <><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요.</p></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
           {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else void changeAccess(target.member); }} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}

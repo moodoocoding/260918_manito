@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { call } from "./firebase";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import { TeacherCommunity } from "./TeacherCommunity";
+import { TeacherStudentStatus } from "./TeacherStudentStatus";
 
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Round = { roundId: string; title: string; status: string; startsAt: string; endsAt: string;
@@ -50,7 +51,7 @@ function schoolDays(start: string, end: string): string[] {
 function startOfKoreaDay(day: string): string { return new Date(`${day}T00:00:00+09:00`).toISOString(); }
 function endOfKoreaDay(day: string): string { return new Date(`${day}T23:59:59.999+09:00`).toISOString(); }
 
-export type TeacherRoundView = "overview" | "rounds" | "safety" | "history";
+export type TeacherRoundView = "overview" | "rounds" | "status" | "history";
 export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, onDirtyChange }: {
   classId: string; gradeBand: string; members: Member[]; view: TeacherRoundView;
   onNavigate: (view: TeacherRoundView | "assignments") => void; onDirtyChange?: (dirty: boolean) => void;
@@ -138,7 +139,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
     try {
       const result = await call<object, {messages: MonitoredMessage[]; nextCursor: string | null}>(
         "listTeacherMessages", {classId, roundId, ...(cursor ? {cursor} : {})});
-      if (view !== "safety" || chosenRef.current !== roundId) return;
+      if (view !== "status" || chosenRef.current !== roundId) return;
       setMonitoredMessages((old) => cursor ? [...old, ...result.messages] : result.messages);
       setMessageCursor(result.nextCursor);
       setMessageListError(false);
@@ -173,20 +174,20 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   const orderedRounds = [...rounds].sort((a,b) => roundOrder(a.status) - roundOrder(b.status)
     || b.startsAt.localeCompare(a.startsAt));
   const chosenRound = rounds.find((item) => item.roundId === chosen);
-  const current = view === "safety" ? activeRound : chosenRound;
+  const current = view === "status" ? activeRound : chosenRound;
   useEffect(() => {
     if (view === "overview") {
       if (activeRound) void loadSummary(activeRound.roundId).catch(() => setOverviewError(true));
       else setSummary(null);
     }
-    if (view === "safety" && activeRound) {
+    if (view === "status" && activeRound) {
       if (chosenRef.current !== activeRound.roundId) void selectRound(activeRound.roundId);
       else {void loadOverview(activeRound.roundId).catch(() => setOverviewError(true));
         void loadMonitoredMessages(activeRound.roundId);}
     }
   }, [view, activeRound?.roundId]);
   useEffect(() => {
-    if (view !== "safety") { safetyRequest.current++; setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
+    if (view !== "status") { safetyRequest.current++; setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
       setMonitoredMessages([]); setMessageCursor(null); }
     if (view !== "rounds" && creating) { setCreating(false); setDirty(false); }
   }, [view]);
@@ -195,7 +196,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
     setBusy(true); setError(""); setNotice("");
     try { await action();
       try { await load(); if (chosenRef.current) {
-        if (view === "safety") await loadOverview(chosenRef.current);
+        if (view === "status") await loadOverview(chosenRef.current);
         else await loadSummary(chosenRef.current);
       } }
       catch { setError("작업은 완료됐어요. 최신 목록을 다시 불러와 주세요."); }
@@ -261,7 +262,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       setDates(settings.activityDates.length ? settings.activityDates.join(", ") : schoolDays(koreaDay(), addDays(koreaDay(), 4)).join(", "));
       setExcludedPairs(settings.excludedPairs);
       setStep(1); setDirty(false);
-    if (view === "safety") {await loadOverview(roundId); await loadMonitoredMessages(roundId);}
+    if (view === "status") {await loadOverview(roundId); await loadMonitoredMessages(roundId);}
       else await loadSummary(roundId);
     } catch { setOverviewError(true); setError("시즌 현황을 불러오지 못했어요. 다시 시도해 주세요."); }
   }
@@ -281,7 +282,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
     await run(async () => {
       const result = await call<object, SafetyMessage>("getMessageForReview", {classId,
         roundId: current.roundId, messageId});
-      if (version === safetyRequest.current && view === "safety" && document.visibilityState === "visible"
+      if (version === safetyRequest.current && view === "status" && document.visibilityState === "visible"
         && chosenRef.current === current.roundId) setSafetyMessages((old) => ({...old, [messageId]: result}));
     });
   }
@@ -343,8 +344,8 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   const confirmation = confirmAction ? confirmLabels[confirmAction.name] : null;
 
   return <section className="panel round-panel">
-    <div className="page-header"><div><h2>{view === "overview" ? "운영 요약" : view === "rounds" ? "시즌 설정" : view === "safety" ? "안전 확인" : "지난 활동"}</h2>
-      <p>{view === "overview" ? "도움 요청과 쪽지 대화를 먼저 확인하세요." : view === "rounds" ? "준비부터 공개까지 시즌별로 운영해요." : view === "safety" ? "요청과 쪽지를 비공개로 확인하고 처리해요." : "지난 기록과 다음 활동 준비를 살펴봐요."}</p></div>
+    <div className="page-header"><div><h2>{view === "overview" ? "운영 요약" : view === "rounds" ? "시즌 설정" : view === "status" ? "상태 확인" : "지난 활동"}</h2>
+      <p>{view === "overview" ? "도움 요청과 쪽지 대화를 먼저 확인하세요." : view === "rounds" ? "준비부터 공개까지 시즌별로 운영해요." : view === "status" ? "학생별 미션·쪽지와 도움 요청을 비공개로 확인해요." : "지난 기록과 다음 활동 준비를 살펴봐요."}</p></div>
       {view === "rounds" && <div className="page-actions"><button type="button" className="outline" onClick={() => chooseRound("")}>시즌 목록</button>
         <button type="button" onClick={() => chooseRound("", true)}>새 시즌 준비</button></div>}
     </div>
@@ -355,10 +356,10 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       {overviewError ? <p className="message error" role="alert">현황을 불러오지 못했어요. <button className="small outline" onClick={() => activeRound && void loadSummary(activeRound.roundId).catch(() => setOverviewError(true))}>다시 시도</button></p>
         : activeRound && !summary ? <p>현황을 불러오는 중이에요…</p> : null}
       <h3>먼저 확인해 주세요</h3><div className="teacher-overview-grid">
-        <button type="button" className="task-card" onClick={() => onNavigate("safety")}><strong>도움 요청 {summary?.helpCount ?? "확인 중"}건</strong><span>안전 확인에서 살펴보기</span></button>
-        <button type="button" className="task-card" onClick={() => onNavigate("safety")}><strong>쪽지 대화 모니터링</strong><span>주고받은 쪽지 살펴보기</span></button>
+        <button type="button" className="task-card" onClick={() => onNavigate("status")}><strong>도움 요청 {summary?.helpCount ?? "확인 중"}건</strong><span>상태 확인에서 살펴보기</span></button>
+        <button type="button" className="task-card" onClick={() => onNavigate("status")}><strong>쪽지 대화 모니터링</strong><span>주고받은 쪽지 살펴보기</span></button>
       </div>
-      {summary && <><h3>접속·활동 확인</h3><p className="field-help">학생별 지원 현황은 안전 확인에서 비공개로 볼 수 있어요.</p>
+      {summary && <><h3>접속·활동 확인</h3><p className="field-help">학생별 지원 현황은 상태 확인에서 비공개로 볼 수 있어요.</p>
         <p>참가 학생 {summary.participantCount ?? activeRound?.participantCount ?? 0}명</p>
         <h3>일정</h3><p>{summary.activityDates.join(" · ") || "수업일 정보가 없어요."}</p></>}
       <div className="overview-next-action"><button className="outline" onClick={() => onNavigate("rounds")}>{activeRound ? "진행 시즌 자세히 보기" : "새 시즌 준비하기"}</button></div>
@@ -391,7 +392,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
         {catalogError && <p className="message error" role="alert">미션 목록을 불러오지 못했어요. <button type="button" className="small outline" onClick={() => void loadCatalog()}>다시 시도</button></p>}
         {missionCategoryNames.filter((category) => catalog.some((mission) => mission.category === category)).map((category) => <section className="mission-category" key={category} aria-label={category}><h4>{category} <span>{catalog.filter((mission) => mission.category === category).length}개</span></h4><div className="mission-grid">{catalog.filter((mission) => mission.category === category).map((m) => <CheckboxRow key={m.missionId} checked={missionIds.includes(m.missionId)} onChange={(checked) => { setMissionIds((old) => checked ? [...old,m.missionId] : old.filter((id) => id !== m.missionId)); markChanged(); }}>{m.text}</CheckboxRow>)}</div></section>)}
         <div className="custom-mission-form"><h4>우리 반 미션 추가</h4><p className="field-help">학교에서 돈 없이 안전하게 할 수 있는 행동을 적어 주세요. 외모·성적·신체 접촉·구매·개인정보 질문은 제외해 주세요.</p><label>새 미션 내용<input maxLength={100} value={customMission} onChange={(event) => setCustomMission(event.target.value)} placeholder="예: 친구의 의견을 끝까지 들어주기" /></label><button type="button" className="outline" disabled={busy || !customMission.trim()} onClick={() => void addCustomMission()}>미션 추가</button></div></>}
-      {step === 4 && <><h3>4. 쪽지</h3><p>학생은 배정된 친구에게 쪽지를 보내고, 받은 쪽지에는 익명으로 답장할 수 있어요.</p><div className="review-card"><strong>바로 전달</strong><p>준비된 문구와 직접 쓴 쪽지가 선생님 승인 없이 전달돼요. 학생끼리는 발신자 이름이 보이지 않고, 선생님은 안전 확인에서 대화를 보고 문제가 있는 쪽지를 숨길 수 있어요.</p><p className="field-help">수업일마다 학생 한 명이 최대 10건, 한 건에 200자까지 보낼 수 있어요. 학생은 받은 쪽지를 숨기거나 선생님께 알릴 수 있어요.</p></div></>}
+      {step === 4 && <><h3>4. 쪽지</h3><p>학생은 배정된 친구에게 쪽지를 보내고, 받은 쪽지에는 익명으로 답장할 수 있어요.</p><div className="review-card"><strong>바로 전달</strong><p>준비된 문구와 직접 쓴 쪽지가 선생님 승인 없이 전달돼요. 학생끼리는 발신자 이름이 보이지 않고, 선생님은 상태 확인에서 대화를 보고 문제가 있는 쪽지를 숨길 수 있어요.</p><p className="field-help">수업일마다 학생 한 명이 최대 10건, 한 건에 200자까지 보낼 수 있어요. 학생은 받은 쪽지를 숨기거나 선생님께 알릴 수 있어요.</p></div></>}
       {step === 5 && <><h3>5. 준비 내용 확인</h3><p>여기서 저장하면 시즌 초안이 만들어져요. 시작은 조건 확인 뒤 별도로 진행합니다.</p>
         <dl className="review-summary"><div><dt>주제</dt><dd>{title}</dd></div><div><dt>기간</dt><dd>{start} ~ {end}</dd></div><div><dt>활동일</dt><dd>평일 {selectedDates.length}일</dd></div><div><dt>참가자</dt><dd>{participants.length}명</dd></div><div><dt>필수 제외</dt><dd>{excludedPairs.length}쌍</dd></div><div><dt>미션</dt><dd>{missionIds.length}개 선택<ol className="mission-review-list">{missionIds.map((id) => <li key={id}>{catalog.find((mission) => mission.missionId === id)?.text ?? "미션 확인 필요"}</li>)}</ol></dd></div><div><dt>쪽지</dt><dd>자유 입력·익명 답장 즉시 전달 · 교사 모니터링</dd></div></dl></>}
       {stepError && <p id="round-step-error" className="field-error" role="alert">{stepError}</p>}
@@ -412,22 +413,29 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
         {["draft", "ready", "active", "paused"].includes(current.status) && <button className="danger" disabled={busy} onClick={() => askAction("cancel")}>시즌 취소</button>}
       </div>
       {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료일<input type="date" min={koreaDay(new Date(current.endsAt))} value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 3~20일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:endOfKoreaDay(end), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
-      {current.status === "reveal_pending" && summary && (summary.helpCount + summary.pendingMessageCount > 0) && <p className="message error">도움 요청 {summary.helpCount}건과 검토할 쪽지 {summary.pendingMessageCount}건을 처리한 뒤 공개해 주세요. <button className="small outline" onClick={() => onNavigate("safety")}>안전 확인으로</button></p>}
+      {current.status === "reveal_pending" && summary && (summary.helpCount + summary.pendingMessageCount > 0) && <p className="message error">도움 요청 {summary.helpCount}건과 검토할 쪽지 {summary.pendingMessageCount}건을 처리한 뒤 공개해 주세요. <button className="small outline" onClick={() => onNavigate("status")}>상태 확인으로</button></p>}
       <TeacherCommunity key={current.roundId} classId={classId} roundId={current.roundId} roundStatus={current.status} />
       {["active", "paused", "reveal_pending", "revealed", "archived"].includes(current.status) && <button className="small outline" type="button" onClick={() => onNavigate("assignments")}>학생별 배정 확인</button>}
     </div>}
 
-    {view === "safety" && <div className="stack">
-      {!current ? <p>진행 중인 활동이 없어요. 지난 시즌는 시즌 목록에서 확인해 주세요.</p> : <><p><strong>{current.title}</strong> · {roundStatusLabels[current.status] ?? current.status}</p>
-        <button className="small outline" disabled={busy} onClick={() => void loadOverview(current.roundId).catch(() => setOverviewError(true))}>안전 목록 새로고침</button>
+    {view === "status" && <div className="stack">
+      {current && <div className="teacher-overview-grid" aria-label="우선 확인할 항목">
+        <button type="button" className="task-card" onClick={() => document.getElementById("teacher-help-requests")?.scrollIntoView()}>
+          <strong>도움 요청 {overview?.helps.length ?? "확인 중"}건</strong><span>요청 확인과 처리로 이동</span></button>
+        <button type="button" className="task-card" onClick={() => document.getElementById("teacher-mail-monitoring")?.scrollIntoView()}>
+          <strong>쪽지 대화</strong><span>모니터링과 숨김으로 이동</span></button>
+      </div>}
+      {current && <TeacherStudentStatus classId={classId} roundId={current.roundId} />}
+      {!current ? <p>진행 중인 활동이 없어요. 지난 시즌은 시즌 목록에서 확인해 주세요.</p> : <><p><strong>{current.title}</strong> · {roundStatusLabels[current.status] ?? current.status}</p>
+        <button className="small outline" disabled={busy} onClick={() => void loadOverview(current.roundId).catch(() => setOverviewError(true))}>도움·쪽지 새로고침</button>
         {overviewError && <p className="message error" role="alert">목록을 불러오지 못했어요. 다시 시도해 주세요.</p>}
-        {!overview && !overviewError && <p>안전 목록을 불러오는 중이에요…</p>}
-        {overview && <><h3>도움 요청 · {overview.helps.length}건</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {helpCategoryLabels[h.category] ?? h.category}</strong><button className="small outline" onClick={() => {setOpenHelpId((old) => old === h.helpId ? null : h.helpId); setOpenReviewMessageId(null); setSafetyMessages({});}}>{openHelpId === h.helpId ? "내용 닫기" : "내용 확인"}</button>{openHelpId === h.helpId && <><p>{h.note}</p>
+        {!overview && !overviewError && <p>도움·쪽지 목록을 불러오는 중이에요…</p>}
+        {overview && <><h3 id="teacher-help-requests">도움 요청 · {overview.helps.length}건</h3>{overview.helps.length === 0 ? <p>대기 중인 요청이 없어요.</p> : overview.helps.map((h) => <div className="review-card" key={h.helpId}><strong>{h.studentName} · {helpCategoryLabels[h.category] ?? h.category}</strong><button className="small outline" onClick={() => {setOpenHelpId((old) => old === h.helpId ? null : h.helpId); setOpenReviewMessageId(null); setSafetyMessages({});}}>{openHelpId === h.helpId ? "내용 닫기" : "내용 확인"}</button>{openHelpId === h.helpId && <><p>{h.note}</p>
           {h.messageId && <><button className="small outline" disabled={busy} onClick={() => safetyMessages[h.messageId!] ? setSafetyMessages((old) => { const next = {...old}; delete next[h.messageId!]; return next; }) : void inspectMessage(h.messageId!)}>{safetyMessages[h.messageId] ? "원문 닫기" : "신고 쪽지 원문 확인"}</button>
             {safetyMessages[h.messageId] && <p className="safety-secret">발신 {safetyMessages[h.messageId].senderName} → 수신 {safetyMessages[h.messageId].receiverName}: {safetyMessages[h.messageId].text}</p>}</>}
           <label>처리 내용<input value={resolution[h.helpId] ?? ""} onChange={(e) => setResolution((old) => ({...old, [h.helpId]: e.target.value}))} /></label><button disabled={busy || !resolution[h.helpId]?.trim()} onClick={() => void resolve(h.helpId)}>처리 완료</button></>}</div>)}
           <h3>검토할 쪽지 · {overview.pendingMessages.length}건</h3>{overview.pendingMessages.length === 0 ? <p>대기 중인 쪽지가 없어요.</p> : overview.pendingMessages.map((m,index) => <div className="review-card" key={m.messageId}><strong>검토할 쪽지 {index + 1}</strong><button className="small outline" onClick={() => {setOpenReviewMessageId((old) => old === m.messageId ? null : m.messageId); setOpenHelpId(null); setSafetyMessages({});}}>{openReviewMessageId === m.messageId ? "원문 닫기" : "원문 확인"}</button>{openReviewMessageId === m.messageId && <><p>{m.senderName} → {m.receiverName}</p><p>{m.text}</p><button disabled={busy} onClick={() => void review(m.messageId, "approve")}>승인</button><button className="outline" disabled={busy} onClick={() => void review(m.messageId, "reject")}>반려</button></>}</div>)}
-          <div className="section-heading"><h3>쪽지 대화 모니터링</h3><button className="small outline" type="button" onClick={() => void loadMonitoredMessages(current.roundId)}>최근 쪽지 새로고침</button></div>
+          <div className="section-heading" id="teacher-mail-monitoring"><h3>쪽지 대화 모니터링</h3><button className="small outline" type="button" onClick={() => void loadMonitoredMessages(current.roundId)}>최근 쪽지 새로고침</button></div>
           <p className="field-help">배정된 친구 사이의 쪽지와 답장을 최신순으로 확인해요. 원문은 열 때마다 열람 기록이 남습니다.</p>
           {messageListError && <p className="message error" role="alert">쪽지 목록을 불러오지 못했어요. 새로고침을 눌러 다시 시도해 주세요.</p>}
           {monitoredMessages.length === 0 && !messageListError ? <p>아직 주고받은 쪽지가 없어요.</p> : <div className="monitored-list">{monitoredMessages.map((item) => <div className="review-card" key={item.messageId}><div className="monitored-heading"><strong>{item.senderName} → {item.receiverName}</strong><span>{item.date} · {item.replyToMessageId ? "답장" : "첫 쪽지"} · {item.status === "moderated" ? "교사가 숨김" : item.status === "pending" ? "이전 방식 검토 대기" : "전달됨"}</span></div><div className="action-row"><button type="button" className="small outline" disabled={busy} onClick={() => safetyMessages[item.messageId] ? setSafetyMessages((old) => {const next={...old}; delete next[item.messageId]; return next;}) : void inspectMessage(item.messageId)}>{safetyMessages[item.messageId] ? "원문 가리기" : "원문 확인"}</button>{item.status === "delivered" && <button type="button" className="small danger" disabled={busy} onClick={() => setModerationTarget(item.messageId)}>학생 화면에서 숨기기</button>}</div>{safetyMessages[item.messageId] && <p className="safety-secret">{safetyMessages[item.messageId].text}</p>}</div>)}</div>}

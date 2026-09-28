@@ -142,6 +142,8 @@ response: {
 | `createHelpRequest` | `{roundId?,category,note?,messageId?,requestId}` | 현재 또는 지난 회차의 본인 도움 요청. `messageId`는 본인 수신함 항목만 |
 | `resolveHelpRequest` | `{classId,roundId,helpId,resolution,requestId}` | 교사 처리, 감사 기록 |
 | `getTeacherRoundOverview` | `{classId,roundId,summaryOnly?:boolean}` | 기본 조회는 도움 요청·대기 쪽지의 비공개 상세와 참가 상태·일정, 감사 기록. `summaryOnly:true`는 원문·이름 없이 `helpCount`, `pendingMessageCount`, `participantCount`, `activityDates`만 반환 |
+| `getTeacherStudentStatus` | `{classId,roundId}` | 담당 교사에게 해당 시즌 참가자별 표시 이름·참여 상태·현재 유효 미션의 완료/전체 수·실제 발송 쪽지 수를 명부순으로 반환. 쪽지 원문 없이 감사 기록 |
+| `getTeacherStudentDetail` | `{classId,roundId,studentUid}` | 담당 교사와 시즌 참가자를 재검증하고 그 학생의 현재 유효 미션 상태 및 직접 보낸/받은 시즌 쪽지 원문 전체를 최신순으로 반환. 감사 인사 포함. 민감 열람마다 감사 기록, 타 교사·학생·비참가자 거절 |
 | `getMessageForReview` | `{classId,roundId,messageId}` | 담당 교사의 안전 대응용 발신자·원문 열람. 매번 감사 기록 |
 | `listTeacherMessages` | `{classId,roundId,cursor?}` | 최신순 50건의 발신·수신자와 상태, `nextCursor`. 원문은 미포함, 조회 감사 |
 | `moderateMessage` | `{classId,roundId,messageId,requestId}` | 담당 교사가 전달된 쪽지를 수신 화면에서 숨기고 답장 차단, 감사·멱등 처리 |
