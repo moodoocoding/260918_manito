@@ -156,6 +156,20 @@ button[aria-busy="true"]{cursor:wait}
 @media print{.teacher-sidebar,.mobile-teacher-menu,.no-print{display:none!important}.printed-card{page-break-inside:avoid;break-inside:avoid;page-break-after:always;break-after:page}.printed-card:last-child{page-break-after:auto;break-after:auto}}
 @page{size:A4;margin:14mm}
 @media print{:root,body,.app-shell{background:#fff!important}}
+@media print{
+  .printed-card{width:100%;max-width:700px;margin:24px auto;padding:30px 34px;color:#17212f;border:2px solid #17212f}
+  .printed-card h1{margin:12px 0 24px;font-size:25pt;overflow-wrap:anywhere}
+  .printed-card-brand{font-size:14pt;font-weight:800}
+  .printed-card-entry{display:grid;grid-template-columns:160px minmax(0,1fr);align-items:center;gap:22px;margin:0 0 22px}
+  .printed-card-entry img{display:block;width:160px;height:160px;image-rendering:pixelated}
+  .printed-card-entry strong{font-size:16pt;letter-spacing:0}
+  .printed-card-entry p{font-size:12pt;line-height:1.45;margin:9px 0 0}
+  .printed-card-url{overflow-wrap:anywhere}
+  .printed-card-codes{display:grid;grid-template-columns:1fr 1fr;gap:14px;border-block:1px solid #17212f;padding:12px 0}
+  .printed-card-codes p{font-size:13pt;margin:4px 0}
+  .printed-card-codes strong{display:block;font-size:18pt;margin-top:5px;overflow-wrap:anywhere}
+  .printed-card-secret{font-size:11pt;margin:18px 0 0}
+}
 /* Student experience v2.3: one reading column and one owner for each gap. */
 .student-app .topbar,.student-app .content{max-width:808px;width:100%;padding-inline:24px}
 .student-app .topbar{padding-block:18px;flex-wrap:wrap;gap:8px 12px}

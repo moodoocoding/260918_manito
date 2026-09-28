@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
@@ -29,6 +30,7 @@ type ClassItem = { classId: string; name: string; schoolYear: number; gradeBand:
 type ClassInfo = ClassItem & { classCode: string };
 type Member = { studentUid: string; displayName: string; accessStatus: string; printableCardAvailable: boolean };
 type Card = { studentUid: string; displayName: string; cardCode: string };
+type PrintSheet = { cards: Card[]; qrDataUrl: string; entryUrl: string };
 type StudentHome = { displayName: string; className: string; gradeBand?: string; round: null | {
   roundId: string; title: string; status: string;
 } };
@@ -67,7 +69,7 @@ function App() {
   const [cardCodesLoading, setCardCodesLoading] = useState(false);
   const [cardCodesError, setCardCodesError] = useState(false);
   const [cardCodesHidden, setCardCodesHidden] = useState(false);
-  const [printCards, setPrintCards] = useState<Card[]>([]);
+  const [printSheet, setPrintSheet] = useState<PrintSheet | null>(null);
   const [selectedCardUids, setSelectedCardUids] = useState<string[]>([]);
   const [pendingPrint, setPendingPrint] = useState<{studentUids: string[]; missingStudentUids: string[]} | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
@@ -103,7 +105,7 @@ function App() {
   const clearPrivate = useCallback(() => {
     generation.current += 1;
     setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
-    setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setHome(null);
+    setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setHome(null);
     cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(false);
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
@@ -255,7 +257,7 @@ function App() {
     if (page !== teacherPage && roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
     if (page !== teacherPage) roundDirty.current = false;
     setTeacherPage(page); setError(""); setNotice("");
-    setPrintCards([]); setPendingPrint(null);
+    setPrintSheet(null); setPendingPrint(null);
     if (page !== "students") setSelectedCardUids([]);
     history.pushState(null, "", `/teacher/classes/${selected.classId}/${page}`);
     lastTeacherPath.current = window.location.pathname;
@@ -265,7 +267,7 @@ function App() {
   function openClasses() {
     if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급 목록으로 이동할까요?")) return;
     roundDirty.current = false;
-    setTeacherPage("classes"); setPrintCards([]); setPendingPrint(null); setSelectedCardUids([]);
+    setTeacherPage("classes"); setPrintSheet(null); setPendingPrint(null); setSelectedCardUids([]);
     history.pushState(null, "", "/teacher");
     lastTeacherPath.current = "/teacher";
     window.scrollTo(0, 0);
@@ -292,7 +294,7 @@ function App() {
     roundDirty.current = false;
     await task(async () => {
       const current = generation.current;
-      setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
+      setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
       const info = await call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
       const result = await getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey")));
       if (current !== generation.current) return;
@@ -350,7 +352,7 @@ function App() {
       });
       setMembers((old) => old.map((item) => item.studentUid === member.studentUid
         ? {...item, printableCardAvailable: true} : item));
-      print([{studentUid: member.studentUid, displayName: member.displayName, cardCode: result.cardCode}]);
+      await print([{studentUid: member.studentUid, displayName: member.displayName, cardCode: result.cardCode}]);
       setNotice(`${member.displayName} 학생의 새 카드를 출력합니다. 이전 카드는 사용할 수 없어요.`);
     });
   }
@@ -374,24 +376,37 @@ function App() {
     if (!window.confirm(`${selected.name} 학급의 시즌·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
     await task(async () => {
       await call<object, object>("deleteClassData", {classId: selected.classId, requestId: crypto.randomUUID()});
-      setSelected(null); setMembers([]); setPrintCards([]); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
+      setSelected(null); setMembers([]); setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
       await loadTeacher(); setNotice("학급 데이터를 삭제했어요.");
     });
   }
 
-  function print(cardsToPrint: Card[]) {
+  async function print(cardsToPrint: Card[]) {
     if (!cardsToPrint.length) return;
+    const printGeneration = generation.current;
+    const entryUrl = new URL("/student", window.location.origin).href;
+    let qrDataUrl: string;
+    try {
+      const QRCode = (await import("qrcode")).default;
+      qrDataUrl = await QRCode.toDataURL(entryUrl, {errorCorrectionLevel:"M", margin:4, width:300});
+      const image = new Image();
+      image.src = qrDataUrl;
+      await image.decode();
+    } catch {
+      throw new Error("입장 QR을 만들지 못했어요. 다시 출력해 주세요.");
+    }
+    if (printGeneration !== generation.current) return;
     if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
     const clear = () => {
-      setPrintCards([]);
+      setPrintSheet(null);
       if (window.onafterprint === clear) window.onafterprint = null;
       if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
       printTimeout.current = null;
     };
     window.onafterprint = clear;
     printTimeout.current = window.setTimeout(clear, 2 * 60_000);
-    setPrintCards(cardsToPrint);
-    window.setTimeout(() => window.print(), 100);
+    flushSync(() => setPrintSheet({cards:cardsToPrint, qrDataUrl, entryUrl}));
+    window.setTimeout(() => window.print(), 50);
   }
 
   async function preparePrint(studentUids: string[]) {
@@ -402,7 +417,7 @@ function App() {
       if (result.missingStudentUids.length) {
         setPendingPrint({studentUids, missingStudentUids: result.missingStudentUids});
       } else {
-        print(result.cards);
+        await print(result.cards);
       }
     });
   }
@@ -419,7 +434,7 @@ function App() {
       const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
         {classId: selected.classId, studentUids: target.studentUids});
       if (result.missingStudentUids.length) throw new Error("카드 준비가 끝나지 않았어요. 다시 출력해 주세요.");
-      print(result.cards);
+      await print(result.cards);
       setNotice("새 카드로 발급했어요. 이전 카드는 사용할 수 없어요.");
     });
   }
@@ -558,7 +573,14 @@ function App() {
         </section> : null}
     </main>
 
-    {printCards.length > 0 && selected && <div className="print-only">{printCards.map((card) => <div className="printed-card" key={card.studentUid}><span>💌 우리 반 비밀친구</span><h1>{card.displayName} 입장 카드</h1><p>접속 주소: {window.location.origin}/student</p><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p><p>나만 쓰는 코드예요. 친구에게 보여주지 마세요.</p></div>)}</div>}
+    {printSheet && selected && <div className="print-only">{printSheet.cards.map((card) => <div className="printed-card" key={card.studentUid}>
+      <span className="printed-card-brand">💌 우리 반 비밀친구</span>
+      <h1>{card.displayName} 입장 카드</h1>
+      <div className="printed-card-entry"><img src={printSheet.qrDataUrl} alt="학생 입장 페이지 QR 코드" width="160" height="160" />
+        <div><strong>QR로 입장 페이지 열기</strong><p>스캔한 뒤 아래 학급 코드와 내 카드 코드를 입력하세요.</p><p className="printed-card-url">QR을 쓸 수 없다면: {printSheet.entryUrl}</p></div></div>
+      <div className="printed-card-codes"><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p></div>
+      <p className="printed-card-secret">내 카드 코드는 나만 써요. 친구에게 보여주지 마세요.</p>
+    </div>)}</div>}
   </div>;
 }
 
