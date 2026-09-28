@@ -499,5 +499,7 @@
 - `getAssignmentsForTeacher`는 담당 교사 열람을 감사한 뒤 확정 참가자·시즌 인원·저장된 배정을 대조한다. 누락, 중복 수신, 자기 배정, 명단 밖 학생, 이름 누락이면 결과를 정상 표로 내보내지 않고 `failed-precondition`을 반환한다. 응답에는 `participantCount`를 추가했다. 화면은 이동·탭 숨김·5분 경과 시 관계를 가린다.
 - [6개 가상 전문가 역할의 사전·사후 검토](design-reviews/2026-09-28-teacher-assignments.md)를 기록했다. 실제 외부 전문가·교사 관찰은 아니다.
 - TypeScript/Vite 전체 빌드, 함수 단위 10건, Firestore Rules 13건, 가상 두 시즌과 40명 통합 3건이 통과했다. 통합 시험에서 다른 교사·학생 열람 거절과 손상 데이터 거절을 확인했다.
-- Firebase 개발 프로젝트 `manito-938cc`의 `getAssignmentsForTeacher` 함수 업데이트가 성공했다. GitHub 푸시, Vercel 배포, 실제 브라우저 검증은 후속 결과에 구분해 기록한다.
-- 남은 확인: 배포 교사 화면의 데스크톱·모바일 배치와 키보드, 200% 확대 및 실제 교사 이해도.
+- Firebase 개발 프로젝트 `manito-938cc`의 `getAssignmentsForTeacher` 함수 업데이트가 성공했다. GitHub 푸시·Vercel 배포·브라우저 검증은 다음 항목에 구분해 기록한다.
+- 코드·문서 커밋 `812d569`을 GitHub `main`에 푸시했고 Vercel 상태가 `success`였다. 배포 교사 화면의 가상 4명 시즌에서 4건의 일대일 배정과 학생별 두 방향 관계를 확인했다. 키보드 Enter로 배정표 가리기가 동작하고 콘솔 오류는 0건이었다.
+- 첫 모바일 검증에서 390px 표 제목이 세로 한 글자씩 보이는 레이아웃 결함을 발견해 수정했다. 수정 커밋 `e24c6c8`도 GitHub `main`에 푸시됐고 Vercel 상태가 `success`다. 후속 배포에서 320·360·390·768·1280px 실화면과 가로 넘침 0을 확인했다. 모바일은 학생별 카드, 큰 화면은 세 열 표로 보인다.
+- 후속 배포 검증 기록은 [배정 확인 검토](design-reviews/2026-09-28-teacher-assignments.md)에 반영했다. 아직 200% 확대·VoiceOver·긴 이름 40명 실화면·실제 교사 과업 관찰은 미확인이다.
