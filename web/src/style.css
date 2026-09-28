@@ -217,7 +217,7 @@ button[aria-busy="true"]{cursor:wait}
 .student-mission-list small{color:#52647a;margin-bottom:4px}
 .student-mission-list button{flex:none}
 .student-mission-detail h3{font-size:1.22rem;line-height:1.5;overflow-wrap:anywhere}
-.student-mission-detail h3:focus{outline:0}
+.student-mission-detail h3:focus{outline:3px solid #557dc5;outline-offset:4px;border-radius:3px}
 .student-mission-actions{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 16px}
 .student-replace-confirm{border:1px solid #e8d9ca;background:#fff8ed;padding:16px;border-radius:12px;margin-top:16px}
 .student-mail-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}
@@ -291,3 +291,32 @@ button[aria-busy="true"]{cursor:wait}
 .teacher-status-messages p{margin-top:8px;line-height:1.55;white-space:pre-wrap}
 @media(max-width:1100px){.teacher-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.teacher-status-grid{grid-template-columns:1fr}.teacher-student-detail{padding:16px}.teacher-status-section .section-heading{display:flex;align-items:flex-start;flex-wrap:wrap}}
+
+/* 상태 확인은 업무를 먼저 고르고 해당 기록만 읽는다. */
+.teacher-status-layout{display:grid;gap:16px;margin-top:24px;min-width:0}
+.teacher-status-layout>p,.teacher-status-layout>h4{margin:0}
+.status-round-context{margin:0;color:#52647a;line-height:1.5}
+.status-round-context strong{color:#283449}
+.teacher-status-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.teacher-status-nav button{min-width:0;padding:12px 10px;border:1px solid #e0cfc1;border-radius:12px;background:#fff;color:#354158;text-align:center;overflow-wrap:anywhere}
+.teacher-status-nav button[aria-pressed="true"]{background:#b94440;border-color:#b94440;color:#fff}
+.status-section-title{margin:4px 0 0;font-size:1.22rem;line-height:1.4}
+.status-section-title:focus{outline:3px solid #557dc5;outline-offset:4px;border-radius:3px}
+.status-refresh{justify-self:start}
+@media(max-width:700px){.teacher-status-nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:360px){.teacher-status-nav{grid-template-columns:1fr}}
+
+/* 학생 화면에서는 버튼 자체의 margin 대신 부모의 gap으로 간격을 관리한다. */
+.student-app .action-row{margin:16px 0;gap:8px}
+.student-app .action-row button{flex-grow:0;margin:0}
+.student-app .review-card{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px}
+.student-app .review-card>strong,.student-app .review-card>p{flex:0 0 100%;margin:0}
+.student-app .review-card button{margin:0}
+.student-app .student-mission-actions{margin:24px 0 16px}
+.student-app .student-mission-actions button:first-child{flex:1 1 100%}
+.student-app .conversation-compose>button{width:100%;margin-top:16px}
+@media(max-width:599px){
+  .student-app .student-mission-actions button{flex:1 1 100%}
+  .student-app .student-next-mission>button,.student-app .student-link-row button{width:100%}
+  .student-app .conversation-actions button{flex:1 1 100%;margin:0}
+}

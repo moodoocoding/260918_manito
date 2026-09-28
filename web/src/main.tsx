@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
-import { TeacherRounds } from "./TeacherRounds";
+import { TeacherRounds, type TeacherStatusSection } from "./TeacherRounds";
 import { TeacherAssignments } from "./TeacherAssignments";
 import { StudentRound, type StudentMissionUi } from "./StudentRound";
 import { emptyStudentMailDraft, type StudentMailDraft } from "./StudentMail";
@@ -53,6 +53,7 @@ function errorText(error: unknown): string {
 function App() {
   const [route, setRoute] = useState<"student" | "teacher">(window.location.pathname.startsWith("/teacher") ? "teacher" : "student");
   const [teacherPage, setTeacherPage] = useState<TeacherPage>(() => teacherLocation(window.location.pathname).page);
+  const [teacherStatusTarget, setTeacherStatusTarget] = useState<TeacherStatusSection | null>(null);
   const [studentPage, setStudentPage] = useState<StudentPage>(() => {
     const page = window.location.pathname.split("/")[2];
     return ["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today";
@@ -248,14 +249,16 @@ function App() {
   function navigate(next: "student" | "teacher") {
     history.pushState(null, "", next === "teacher" ? "/teacher" : "/student");
     setRoute(next); setTeacherPage("classes"); setStudentPage("today");
+    setTeacherStatusTarget(null);
     setError(""); setNotice(""); setShowCardInput(false);
   }
 
-  function openTeacherPage(page: TeacherPage) {
+  function openTeacherPage(page: TeacherPage, section?: TeacherStatusSection) {
     if (!selected) return;
     if (page !== teacherPage && roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
     if (page !== teacherPage) roundDirty.current = false;
     setTeacherPage(page); setError(""); setNotice("");
+    setTeacherStatusTarget(page === "status" ? section ?? null : null);
     setPrintSheet(null); setPendingPrint(null);
     if (page !== "students") setSelectedCardUids([]);
     history.pushState(null, "", `/teacher/classes/${selected.classId}/${page}`);
@@ -266,7 +269,7 @@ function App() {
   function openClasses() {
     if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급 목록으로 이동할까요?")) return;
     roundDirty.current = false;
-    setTeacherPage("classes"); setPrintSheet(null); setPendingPrint(null); setSelectedCardUids([]);
+    setTeacherPage("classes"); setTeacherStatusTarget(null); setPrintSheet(null); setPendingPrint(null); setSelectedCardUids([]);
     history.pushState(null, "", "/teacher");
     lastTeacherPath.current = "/teacher";
     window.scrollTo(0, 0);
@@ -301,6 +304,7 @@ function App() {
       setMembers(result.docs.map((item) => ({ studentUid: item.id, displayName: String(item.get("displayName")),
         accessStatus: String(item.get("accessStatus")), printableCardAvailable: item.get("printableCardAvailable") === true })));
       setTeacherPage(page);
+      setTeacherStatusTarget(null);
       if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
       lastTeacherPath.current = window.location.pathname;
       window.scrollTo(0, 0);
@@ -564,7 +568,7 @@ function App() {
                       </li>;
                     })}</ol>}
               </section>}
-              {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} onNavigate={(page) => openTeacherPage(page)} onDirtyChange={(value) => { roundDirty.current = value; }} />}
+              {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} />}
               {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
               {teacherPage === "settings" && <><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요.</p></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
