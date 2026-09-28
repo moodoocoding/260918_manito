@@ -12,7 +12,6 @@ type Overview = { helps: Array<{helpId: string; studentName: string; category: s
   lastLoginAt: string | null; hasActivity: boolean}>; activityDates: string[] };
 type Summary = { helpCount: number; pendingMessageCount: number; participantCount: number; activityDates: string[];
   helps?: Overview["helps"]; pendingMessages?: Overview["pendingMessages"] };
-type Assignment = { giverUid: string; giverName: string; receiverName: string };
 type SafetyMessage = { text: string; senderName: string; receiverName: string; status: string };
 type Mission = {missionId: string; text: string; category: string};
 type MonitoredMessage = {messageId: string; senderName: string; receiverName: string;
@@ -54,7 +53,7 @@ function endOfKoreaDay(day: string): string { return new Date(`${day}T23:59:59.9
 export type TeacherRoundView = "overview" | "rounds" | "safety" | "history";
 export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, onDirtyChange }: {
   classId: string; gradeBand: string; members: Member[]; view: TeacherRoundView;
-  onNavigate: (view: TeacherRoundView) => void; onDirtyChange?: (dirty: boolean) => void;
+  onNavigate: (view: TeacherRoundView | "assignments") => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [roundsError, setRoundsError] = useState(false);
@@ -62,8 +61,6 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   const chosenRef = useRef("");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[] | null>(null);
-  const assignmentRequest = useRef(0);
   const [catalog, setCatalog] = useState<Mission[]>([]);
   const [catalogError, setCatalogError] = useState(false);
   const [customMission, setCustomMission] = useState("");
@@ -118,7 +115,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       participantCount: result.participantCount, activityDates: result.activityDates });
     setOverviewError(false);
   }, [classId]);
-  useEffect(() => { assignmentRequest.current++; summaryRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); setAssignments(null); void load().catch(() => {setRoundsError(true); setError("시즌 목록을 불러오지 못했어요.");}); }, [load]);
+  useEffect(() => { summaryRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); void load().catch(() => {setRoundsError(true); setError("시즌 목록을 불러오지 못했어요.");}); }, [load]);
   async function loadCatalog() {
     try {
       const result = await call<object, {missions: Mission[]}>("getMissionCatalog", {classId, gradeBand});
@@ -163,7 +160,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   useEffect(() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); }, [members]);
   useEffect(() => {
     const hide = () => { if (document.visibilityState !== "visible") {
-      assignmentRequest.current++; safetyRequest.current++; setAssignments(null); setSafetyMessages({});
+      safetyRequest.current++; setSafetyMessages({});
       setOpenHelpId(null); setOpenReviewMessageId(null); setMonitoredMessages([]);
     } };
     document.addEventListener("visibilitychange", hide);
@@ -191,7 +188,6 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   useEffect(() => {
     if (view !== "safety") { safetyRequest.current++; setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
       setMonitoredMessages([]); setMessageCursor(null); }
-    if (view !== "rounds") { assignmentRequest.current++; setAssignments(null); }
     if (view !== "rounds" && creating) { setCreating(false); setDirty(false); }
   }, [view]);
 
@@ -229,8 +225,6 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
   }
   async function action(name: string) {
     if (!current) return;
-    assignmentRequest.current++;
-    setAssignments(null);
     await run(async () => {
       const key = JSON.stringify([name, current.roundId, current.rosterVersion]);
       if (pendingStatusAction.current?.key !== key) pendingStatusAction.current = {key, requestId: crypto.randomUUID()};
@@ -251,9 +245,8 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
     });
   }
   async function selectRound(roundId: string) {
-    assignmentRequest.current++;
     chosenRef.current = roundId;
-    setChosen(roundId); setAssignments(null); setOverview(null); setSummary(null); setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
+    setChosen(roundId); setOverview(null); setSummary(null); setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
     if (!roundId) { setTitle(""); setExcludedPairs([]); setMissionIds([]);
       setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid));
       const today = koreaDay(); const lastDay = addDays(today, 4);
@@ -421,7 +414,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, onNavigate, o
       {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료일<input type="date" min={koreaDay(new Date(current.endsAt))} value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 3~20일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:endOfKoreaDay(end), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
       {current.status === "reveal_pending" && summary && (summary.helpCount + summary.pendingMessageCount > 0) && <p className="message error">도움 요청 {summary.helpCount}건과 검토할 쪽지 {summary.pendingMessageCount}건을 처리한 뒤 공개해 주세요. <button className="small outline" onClick={() => onNavigate("safety")}>안전 확인으로</button></p>}
       <TeacherCommunity key={current.roundId} classId={classId} roundId={current.roundId} roundStatus={current.status} />
-      {["active", "paused", "reveal_pending", "revealed"].includes(current.status) && <><button className="small outline" disabled={busy} onClick={() => { if (assignments) { assignmentRequest.current++; setAssignments(null); return; } const version = ++assignmentRequest.current; void run(async () => { const result = await call<object, {assignments: Assignment[]}>("getAssignmentsForTeacher", {classId, roundId: current.roundId}); if (version === assignmentRequest.current && document.visibilityState === "visible") setAssignments(result.assignments); }); }}>{assignments ? "배정표 가리기" : "안전 대응용 배정표 열람"}</button>{assignments && <table><thead><tr><th>챙기는 학생</th><th>챙겨 줄 친구</th></tr></thead><tbody>{assignments.map((a) => <tr key={a.giverUid}><td>{a.giverName}</td><td>{a.receiverName}</td></tr>)}</tbody></table>}</>}
+      {["active", "paused", "reveal_pending", "revealed", "archived"].includes(current.status) && <button className="small outline" type="button" onClick={() => onNavigate("assignments")}>학생별 배정 확인</button>}
     </div>}
 
     {view === "safety" && <div className="stack">

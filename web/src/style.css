@@ -28,6 +28,19 @@ button[aria-busy="true"]{cursor:wait}
 .teacher-sidebar button,.mobile-teacher-menu button{background:transparent;color:#354158;text-align:left;font-weight:650}
 .teacher-sidebar button[aria-current="page"],.mobile-teacher-menu button[aria-current="page"]{background:#fbe5dc;color:#8d302b}
 .teacher-main{min-width:0;display:grid;gap:18px}
+.teacher-assignments{min-width:0}
+.assignment-controls{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:22px 0}
+.assignment-controls label{flex-basis:100%;font-weight:700;color:#354158}
+.assignment-controls select{min-width:0;max-width:100%;flex:1 1 260px;min-height:48px;padding:10px 12px;border:1px solid #a8aeb8;border-radius:10px;background:#fff;color:#283449}
+.assignment-summary{display:grid;gap:4px;padding:16px 18px;border:1px solid #c6dfd4;border-radius:14px;background:#f0f8f3;color:#234c3c}
+.assignment-summary strong{font-size:1.1rem}
+.assignment-table-wrap{max-width:100%;overflow-x:auto}
+.teacher-assignments table{width:100%;border-collapse:collapse;table-layout:fixed}
+.teacher-assignments caption{text-align:left;font-weight:750;padding:16px 0 8px}
+.teacher-assignments th,.teacher-assignments td{text-align:left;padding:14px 12px;border-bottom:1px solid #eadfd3;overflow-wrap:anywhere;vertical-align:top}
+.teacher-assignments thead th{background:#fff8ef;color:#354158}
+.teacher-assignments tbody th{font-weight:750}
+@media(max-width:600px){.assignment-controls button{flex:1 1 100%}.teacher-assignments table,.teacher-assignments tbody,.teacher-assignments tr,.teacher-assignments th,.teacher-assignments td{display:block;width:100%}.teacher-assignments thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.teacher-assignments tbody{display:grid;gap:10px}.teacher-assignments tbody tr{border:1px solid #eadfd3;border-radius:14px;padding:12px;background:#fffdf9}.teacher-assignments tbody th,.teacher-assignments tbody td{border:0;padding:5px 2px}.teacher-assignments tbody td::before{content:attr(data-label) " · ";color:#52647a;font-weight:650}.teacher-assignments tbody th{font-size:1.06rem}}
 .teacher-context{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .teacher-context h1{margin:0;font-size:clamp(1.55rem,3vw,2rem)}
 .teacher-context p{margin:3px 0;color:#546177}

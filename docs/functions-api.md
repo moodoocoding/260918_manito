@@ -124,7 +124,7 @@ response: {
 | `changeRoundStatus` | `{classId,roundId,action,requestId}` | `pause`, `resume`, `end`, `cancel`, `archive` 전이. `resume`은 종료 전만 |
 | `extendRound` | `{classId,roundId,endsAt,activityDates,requestId}` | 종료 시각 전 일시정지 회차만 기간 연장. 기존 수업일 유지, 전체 기간 30일 이내 |
 | `stopRoundParticipation` | `{classId,roundId,studentUid,requestId}` | 학생 제출·공개 차단, 감사 기록 |
-| `getAssignmentsForTeacher` | `{classId,roundId}` | 안전 대응용 전체 관계. 매 열람 감사 |
+| `getAssignmentsForTeacher` | `{classId,roundId}` | `{participantCount,assignments:[{giverUid,giverName,receiverUid,receiverName}]}`. 담당 교사 열람마다 감사. 확정 참가자 모두가 서로 다른 한 명을 맡고 서로 다른 한 명에게 맡겨지는지 검증하며 누락·중복·자기 배정·명단 불일치면 `failed-precondition` |
 | `getMissionCatalog` | `{classId,gradeBand}` | 담당 학급의 학년군별 4개 카테고리×10개 기본 미션과 학급 전용 미션 |
 | `createCustomMission` | `{classId,text,requestId}` | 담당 교사가 학급 미션을 100자 이내로 추가. 학급당 최대 40개, 멱등 처리 |
 | `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 관계 이름은 `revealed`·`archived`에서만 반환하며 그 전에는 `targetDisplayName`·`incomingDisplayName` 모두 `null`. 한국 날짜 `koreaDate`, 시즌 날짜 `startsOn`·`endsOn`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함. `missions[]`에 공개 범주 `category`를, `missionSummary`에 본인 현재 유효 미션의 `done`·`todo`·`skipped`·`total` 수를 반환한다. `replaced` 원본은 요약에서 제외한다. 유효한 개인 선택 `focusMissionId`는 본인에게만 반환한다. 구 시즌의 불명 범주는 `기타 미션`이다. |

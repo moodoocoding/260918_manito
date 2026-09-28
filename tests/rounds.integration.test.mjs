@@ -136,10 +136,23 @@ test("four students complete two isolated rounds with review, help, reveal and h
     rosterVersion:ready.rosterVersion, requestId:rid()}), teacher.call("startRound", {classId, roundId,
     rosterVersion:ready.rosterVersion, requestId:rid()})]);
   assert.equal(starts.filter((r)=>r.status==="fulfilled").length,1);
-  const assignments = (await teacher.call("getAssignmentsForTeacher", {classId, roundId})).assignments;
+  const assignmentResponse = await teacher.call("getAssignmentsForTeacher", {classId, roundId});
+  const assignments = assignmentResponse.assignments;
+  assert.equal(assignmentResponse.participantCount,4);
   assert.equal(assignments.length,4);
+  assert.equal(new Set(assignments.map((a)=>a.giverUid)).size,4);
   assert.equal(new Set(assignments.map((a)=>a.receiverUid)).size,4);
   assert.ok(assignments.every((a)=>a.giverUid!==a.receiverUid));
+  assert.deepEqual(new Set(assignments.map((a)=>a.giverUid)),new Set(assignments.map((a)=>a.receiverUid)));
+  await assert.rejects(other.call("getAssignmentsForTeacher", {classId, roundId}),
+    {code:"functions/permission-denied"});
+  await assert.rejects(students[0].call("getAssignmentsForTeacher", {classId, roundId}),
+    {code:"functions/permission-denied"});
+  const changedAssignment = adminDb.doc(`classes/${classId}/rounds/${roundId}/assignmentSecrets/${ids[0]}`);
+  await changedAssignment.update({receiverUid:ids[0]});
+  await assert.rejects(teacher.call("getAssignmentsForTeacher", {classId, roundId}),
+    {code:"functions/failed-precondition"});
+  await changedAssignment.update({receiverUid:assignments.find((a)=>a.giverUid===ids[0]).receiverUid});
   const firstHome = await students[0].call("getStudentHome",null);
   assert.equal(firstHome.round.status,"active");
   assert.equal(firstHome.gradeBand,"middle");

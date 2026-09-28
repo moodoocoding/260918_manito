@@ -364,14 +364,27 @@ export const getAssignmentsForTeacher = onCall(async (request) => {
   const input = requireRecord(request.data);
   const classId = requireDocumentId(input.classId, "학급");
   const roundId = requireDocumentId(input.roundId, "회차");
-  const { classRef, roundRef } = await requireTeacherRound(teacherUid, classId, roundId);
-  const [assignments, members] = await Promise.all([
-    roundRef.collection("assignmentSecrets").get(), classRef.collection("members").get(),
+  const { classRef, roundRef, roundDoc } = await requireTeacherRound(teacherUid, classId, roundId);
+  const [assignments, participants, members] = await Promise.all([
+    roundRef.collection("assignmentSecrets").get(), roundRef.collection("participants").get(),
+    classRef.collection("members").get(),
   ]);
-  const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
   await classRef.collection("auditLogs").add({ action: "assignment.teacher_read", actorUid: teacherUid,
     roundId, createdAt: FieldValue.serverTimestamp() });
-  return { assignments: assignments.docs.map((doc) => ({ giverUid: doc.id,
-    giverName: names.get(doc.id), receiverUid: doc.get("receiverUid"),
-    receiverName: names.get(doc.get("receiverUid")) })) };
+  const participantIds = new Set(participants.docs.map((doc) => doc.id));
+  const receiverIds = assignments.docs.map((doc) => doc.get("receiverUid") as unknown);
+  const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));
+  if (participantIds.size < 4 || participantIds.size !== roundDoc.get("participantCount")
+    || assignments.size !== participantIds.size
+    || new Set(receiverIds).size !== participantIds.size
+    || assignments.docs.some((doc, index) => !participantIds.has(doc.id)
+      || typeof receiverIds[index] !== "string" || !participantIds.has(receiverIds[index] as string)
+      || doc.id === receiverIds[index]
+      || !names.has(doc.id) || !names.has(receiverIds[index] as string))) {
+    throw new HttpsError("failed-precondition", "배정 상태를 확인할 수 없어요. 시즌을 중단하고 관리자에게 문의해 주세요.");
+  }
+  return { participantCount: participantIds.size,
+    assignments: assignments.docs.map((doc, index) => ({ giverUid: doc.id,
+      giverName: names.get(doc.id), receiverUid: receiverIds[index],
+      receiverName: names.get(receiverIds[index] as string) })) };
 });
