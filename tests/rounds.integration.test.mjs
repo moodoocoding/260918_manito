@@ -215,10 +215,31 @@ test("four students complete two isolated rounds with review, help, reveal and h
   const receiver0 = students[ids.indexOf(target0)];
   const stranger = students[ids.findIndex((id)=>id!==ids[0] && id!==target0)];
   assert.equal((await receiver0.call("getStudentActivity",null)).inbox.length,2);
+  assert.equal((await students[0].call("getStudentActivity",null)).sent
+    .find((message)=>message.messageId===firstMsg.messageId).conversation,"caredFor");
+  assert.equal((await receiver0.call("getStudentActivity",null)).inbox
+    .find((message)=>message.messageId===firstMsg.messageId).conversation,"carer");
+  assert.equal((await stranger.call("getStudentActivity",null)).inbox
+    .some((message)=>message.messageId===firstMsg.messageId),false);
   const reply = await receiver0.call("sendMessage",{kind:"free",text:"응원 고마워!",
     replyToMessageId:firstMsg.messageId,requestId:rid()});
   assert.equal(reply.status,"delivered");
   assert.ok((await students[0].call("getStudentActivity",null)).inbox.some((m)=>m.messageId===reply.messageId));
+  assert.equal((await students[0].call("getStudentActivity",null)).inbox
+    .find((message)=>message.messageId===reply.messageId).conversation,"caredFor");
+  const carerUid0 = assignments.find((assignment)=>assignment.receiverUid===ids[0]).giverUid;
+  const carer0 = students[ids.indexOf(carerUid0)];
+  const carerFirst = await carer0.call("sendMessage",{kind:"preset",text:"오늘도 응원해!",requestId:rid()});
+  assert.equal((await students[0].call("getStudentActivity",null)).inbox
+    .find((message)=>message.messageId===carerFirst.messageId).conversation,"carer");
+  const carerReply = await students[0].call("sendMessage",{kind:"free",text:"응원 고마워!",
+    replyToMessageId:carerFirst.messageId,requestId:rid()});
+  const ownMail = await students[0].call("getStudentActivity",null);
+  assert.equal(ownMail.sent.find((message)=>message.messageId===carerReply.messageId).conversation,"carer");
+  assert.equal((await carer0.call("getStudentActivity",null)).inbox
+    .find((message)=>message.messageId===carerReply.messageId).conversation,"caredFor");
+  assert.ok(ownMail.inbox.find((message)=>message.messageId===reply.messageId).sequence
+    < ownMail.inbox.find((message)=>message.messageId===carerFirst.messageId).sequence);
   await assert.rejects(stranger.call("sendMessage",{kind:"free",text:"허용되지 않은 답장",
     replyToMessageId:firstMsg.messageId,requestId:rid()}),{code:"functions/permission-denied"});
   const monitored = await teacher.call("listTeacherMessages",{classId,roundId});
@@ -230,7 +251,7 @@ test("four students complete two isolated rounds with review, help, reveal and h
   assert.equal((await students[0].call("getStudentActivity",null)).inbox.find((m)=>m.messageId===reply.messageId).hidden,true);
   await assert.rejects(students[0].call("sendMessage",{kind:"free",text:"숨긴 쪽지 답장",
     replyToMessageId:reply.messageId,requestId:rid()}),{code:"functions/permission-denied"});
-  for (let i=0;i<8;i++) await students[0].call("sendMessage",{
+  for (let i=0;i<7;i++) await students[0].call("sendMessage",{
     kind:"preset",text:"고마워!",requestId:rid()});
   assert.equal((await students[0].call("getStudentActivity",null)).messagesSentToday,10);
   await assert.rejects(students[0].call("sendMessage",{kind:"preset",text:"고마워!",requestId:rid()}),

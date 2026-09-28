@@ -7,6 +7,7 @@ import { assertStudentTransaction, requireStudentRound } from "../shared/student
 import { requireDocumentId, requireRecord, requireRequestId, requireText } from "../shared/validation.js";
 import { koreaDate, requireTeacherRound } from "./common.js";
 import { builtInMissions } from "./missions.js";
+import { classifyMail, type MailCopy } from "./mailTimeline.js";
 
 const presetMessages = [
   "오늘도 응원해!", "함께해서 즐거웠어.", "네 생각이 참 좋았어.",
@@ -59,6 +60,15 @@ export const getStudentActivity = onCall(async (request) => {
     total: currentMissions.length,
   } : null;
   const identityRevealed = ["revealed", "archived"].includes(student.roundDoc.get("status"));
+  const mailCopies: MailCopy[] = [
+    ...inbox.docs.map((doc) => ({messageId: doc.id, direction: "inbox" as const,
+      replyToMessageId: doc.get("replyToMessageId") ?? null,
+      createdAtMillis: Number(doc.get("createdAt")?.toMillis() ?? 0)})),
+    ...sent.docs.map((doc) => ({messageId: doc.id, direction: "sent" as const,
+      replyToMessageId: doc.get("replyToMessageId") ?? null,
+      createdAtMillis: Number(doc.get("createdAt")?.toMillis() ?? 0)})),
+  ];
+  const mailTimeline = classifyMail(mailCopies);
   return {
     roundId: student.roundId, status: student.roundDoc.get("status"),
     title: student.roundDoc.get("title"),
@@ -84,11 +94,15 @@ export const getStudentActivity = onCall(async (request) => {
     inbox: inbox.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
       reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true,
-      replyToMessageId: doc.get("replyToMessageId") ?? null })),
+      replyToMessageId: doc.get("replyToMessageId") ?? null,
+      conversation: mailTimeline.get(doc.id)?.conversation ?? "unknown",
+      sequence: mailTimeline.get(doc.id)?.sequence ?? -1 })),
     sent: sent.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), status: doc.get("status"),
       date: doc.get("date"), reacted: doc.get("reacted") === true,
-      replyToMessageId: doc.get("replyToMessageId") ?? null })),
+      replyToMessageId: doc.get("replyToMessageId") ?? null,
+      conversation: mailTimeline.get(doc.id)?.conversation ?? "unknown",
+      sequence: mailTimeline.get(doc.id)?.sequence ?? -1 })),
     help: help.docs.map((doc) => ({ helpId: doc.id, status: doc.get("status"),
       category: doc.get("category"), createdAt: doc.get("createdAt")?.toDate()?.toISOString() })),
   };

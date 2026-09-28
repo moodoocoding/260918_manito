@@ -222,6 +222,27 @@ button[aria-busy="true"]{cursor:wait}
 .student-replace-confirm{border:1px solid #e8d9ca;background:#fff8ed;padding:16px;border-radius:12px;margin-top:16px}
 .student-mail-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}
 .student-mail-tabs button{flex:1 1 130px;padding-inline:12px}
+.student-conversations{min-width:0}
+.student-conversations>p{line-height:1.6}
+.conversation-heading{padding:16px;border-radius:14px;background:#fff8ef;border:1px solid #ead9c9}
+.conversation-heading h3,.conversation-heading p{margin:0}
+.conversation-heading p{margin-top:6px;color:#52647a;line-height:1.5}
+.conversation-messages{list-style:none;padding:18px 0;margin:0;display:grid;gap:12px}
+.conversation-message{min-width:0;max-width:90%;padding:14px 16px;border:1px solid #e7dcd0;border-radius:18px;background:#fffdf8;overflow-wrap:anywhere}
+.conversation-message.sent{justify-self:end;background:#fff0e9;border-color:#e9c4b6}
+.conversation-message.received{justify-self:start}
+.conversation-direction{font-size:.88rem;font-weight:750;color:#52647a}
+.conversation-message p{margin:6px 0;line-height:1.6;white-space:pre-wrap}
+.conversation-message small{color:#52647a}
+.conversation-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:12px}
+.conversation-actions button{margin:0}
+.conversation-empty{padding:20px;border:1px dashed #d6c8bd;border-radius:14px;color:#52647a;line-height:1.5}
+.conversation-compose{padding:18px;border:1px solid #e9dbcc;border-radius:16px;background:#fffaf5}
+.conversation-compose h3{margin:0 0 8px}
+.conversation-compose>p{line-height:1.5}
+.conversation-compose>button{margin-top:8px}
+.conversation-unknown{margin-top:22px;padding:14px;border:1px solid #ead9c9;border-radius:12px}
+.conversation-unknown summary{cursor:pointer;font-weight:700}
 .student-app .review-card,.student-app .sent-message{overflow-wrap:anywhere}
 @media(max-width:599px){
   .student-app .topbar,.student-app .content{padding-inline:16px}

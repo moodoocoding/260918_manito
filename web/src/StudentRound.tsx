@@ -1,24 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { call } from "./firebase";
 import { StudentCommunity } from "./StudentCommunity";
+import { StudentMail, type StudentMailData, type StudentMailDraft } from "./StudentMail";
+export type {StudentMailDraft} from "./StudentMail";
 
 type Mission = { missionId: string; text: string; category: string; status: string };
-type Activity = { roundId: string; title: string; status: string; startsOn?: string; endsOn?: string;
+type Activity = StudentMailData & { roundId: string; title: string; startsOn?: string; endsOn?: string;
   targetDisplayName: string | null; incomingDisplayName: string | null;
-  activityDates: string[]; canSubmit: boolean; koreaDate?: string; canSendMessage?: boolean;
-  messagesSentToday?: number; dailyMessageLimit?: number; nextActivityDate?: string | null;
+  canSubmit: boolean;
   reflectionText?: string | null; thankYouSent?: boolean; allowFreeTextMessages: boolean;
-  presetMessages: string[]; missions: Mission[];
+  missions: Mission[];
   missionSummary?: { done: number; todo: number; skipped: number; total: number } | null;
   focusMissionId?: string | null;
-  inbox: Array<{messageId: string; text: string; hidden: boolean; reported: boolean; type: string; reacted: boolean; replyToMessageId: string | null}>;
-  sent: Array<{messageId: string; text: string; status: string; date: string; reacted: boolean; replyToMessageId: string | null}>;
   help: Array<{helpId: string; status: string; category: string}> };
 
 type View = "home" | "missions" | "mail" | "help" | "history";
 export type StudentMissionUi = {filter: "all" | "todo" | "done" | "skipped"; category: string; limit: number};
-export type StudentMailDraft = {selectedMessage:string; freeText:string; replyToMessageId:string|null;
-  replyText:string; mode:"preset"|"free"; section:"inbox"|"sent"|"compose"};
 const statusCopy: Record<string,string> = {
   active: "활동 중", paused: "잠시 쉬는 중", reveal_pending: "친구 공개 준비 중",
   revealed: "친구 공개 완료", archived: "지난 활동",
@@ -37,18 +34,12 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [selectedMessage, setSelectedMessage] = useState(() => mailDraftRef.current.selectedMessage);
-  const [freeText, setFreeText] = useState(() => mailDraftRef.current.freeText);
-  const [replyToMessageId, setReplyToMessageId] = useState<string | null>(() => mailDraftRef.current.replyToMessageId);
-  const [replyText, setReplyText] = useState(() => mailDraftRef.current.replyText);
   const [helpNote, setHelpNote] = useState("");
   const [helpReason, setHelpReason] = useState("걱정되는 일이 있어요");
   const [reflection, setReflection] = useState("");
   const [incomingVisible, setIncomingVisible] = useState(false);
   const [targetVisible, setTargetVisible] = useState(false);
   const [thankYouSentLocal, setThankYouSentLocal] = useState(false);
-  const [messageMode, setMessageMode] = useState<"preset" | "free">(() => mailDraftRef.current.mode);
-  const [mailSection, setMailSection] = useState<"inbox" | "sent" | "compose">(() => mailDraftRef.current.section);
   const missionFilter = missionUi.filter;
   const category = missionUi.category;
   const missionLimit = missionUi.limit;
@@ -64,8 +55,6 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
       .catch(() => { if (active) setError("활동을 불러오지 못했어요."); });
     return () => { active = false; };
   }, [load, status, refreshVersion]);
-  useEffect(() => {mailDraftRef.current = {selectedMessage,freeText,replyToMessageId,replyText,
-    mode:messageMode,section:mailSection};}, [mailDraftRef,selectedMessage,freeText,replyToMessageId,replyText,messageMode,mailSection]);
   useEffect(() => { setIncomingVisible(false); setTargetVisible(false); }, [view]);
   useEffect(() => {
     const hide = () => { if (document.visibilityState !== "visible") { setIncomingVisible(false); setTargetVisible(false); } };
@@ -161,12 +150,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
       </section>}
       {view === "history" && <section className="panel"><h2>이번 활동의 미션</h2>{summaryElement}<ul className="student-mission-list">{missions.map((mission) => <li key={mission.missionId}><div><small>{missionStatus[mission.status] ?? "기록 확인"}</small><strong>{mission.text}</strong></div></li>)}</ul></section>}
       {view === "history" && <section className="panel"><h2>지난 쪽지</h2><h3>받은 쪽지</h3>{data.inbox.filter((message) => !message.hidden).length === 0 ? <p>받은 쪽지가 없어요.</p> : data.inbox.filter((message) => !message.hidden).map((message) => <div className="review-card" key={message.messageId}><p>{message.text}</p><button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("hideMessage", {roundId,messageId:message.messageId});setNotice("쪽지를 숨겼어요.");})}>숨기기</button>{!message.reported && <button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"message",messageId:message.messageId,requestId:crypto.randomUUID()});setNotice("선생님께 알렸어요.");})}>선생님께 알리기</button>}</div>)}<h3>보낸 쪽지</h3>{data.sent.length === 0 ? <p>보낸 쪽지가 없어요.</p> : data.sent.map((message) => <div className="sent-message" key={message.messageId}><small>{message.date}</small><p>{message.text}</p></div>)}</section>}
-      {view === "mail" && <section className="panel"><h2>비밀친구 쪽지</h2><p>이름은 서로 알 수 없어요. 선생님은 안전을 위해 대화를 확인할 수 있어요.</p>
-        <div className="student-mail-tabs" role="group" aria-label="우편함 보기">{([{id:"inbox",label:"받은 쪽지"},{id:"sent",label:"보낸 쪽지"},{id:"compose",label:"새 쪽지 쓰기"}] as const).map((item) => <button key={item.id} className={mailSection === item.id ? "" : "outline"} aria-pressed={mailSection === item.id} onClick={() => setMailSection(item.id)}>{item.label}</button>)}</div>
-        {mailSection === "inbox" && <><h3>받은 쪽지</h3>{data.inbox.filter((message) => !message.hidden).length === 0 ? <p>아직 받은 쪽지가 없어요.</p> : data.inbox.filter((message) => !message.hidden).map((message) => <div className="review-card" key={message.messageId}><p>{message.text}</p>{message.reacted && <p>고마워요를 전했어요.</p>}{canSend && <button className="small outline" disabled={busy} onClick={() => {setReplyToMessageId((old) => old === message.messageId ? null : message.messageId);setReplyText("");}}>{replyToMessageId === message.messageId ? "답장 닫기" : "익명으로 답장"}</button>}{replyToMessageId === message.messageId && canSend && <div className="reply-form"><label>이 쪽지에 답장<textarea rows={3} maxLength={200} value={replyText} onChange={(event) => setReplyText(event.target.value)} /></label><button disabled={busy || !replyText.trim()} onClick={() => void run(async () => {await call<object,object>("sendMessage", {kind:"free",text:replyText,replyToMessageId:message.messageId,requestId:crypto.randomUUID()});setReplyText("");setReplyToMessageId(null);setNotice("답장을 바로 전했어요.");})}>답장 보내기</button></div>}{message.type === "encouragement" && !message.reacted && data.status !== "archived" && <button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("reactToMessage", {roundId,messageId:message.messageId,requestId:crypto.randomUUID()});setNotice("고마워요를 전했어요.");})}>고마워요</button>}<button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("hideMessage", {roundId,messageId:message.messageId});setNotice("쪽지를 숨겼어요.");})}>숨기기</button>{!message.reported && <button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"message",messageId:message.messageId,requestId:crypto.randomUUID()});setNotice("선생님께 알렸어요.");})}>선생님께 알리기</button>}</div>)}</>}
-        {mailSection === "sent" && <><h3>보낸 쪽지</h3>{data.sent.length === 0 ? <p>아직 보낸 쪽지가 없어요.</p> : data.sent.map((message) => <div className="sent-message" key={message.messageId}><small>{message.date} · {message.replyToMessageId ? "답장" : "첫 쪽지"} · {message.status === "pending" ? "이전 방식 검토 중" : message.status === "rejected" ? "전달되지 않음" : message.status === "moderated" ? "선생님이 숨김" : "전달됨"}{message.reacted ? " · 친구가 고마워했어요" : ""}</small><p>{message.text}</p></div>)}</>}
-        {mailSection === "compose" && <><h3>새 쪽지 쓰기</h3><p>배정된 친구에게 자동으로 전해져요.</p>{data.status !== "active" ? <p>{statusCopy[data.status] ?? "지금은 쪽지를 보낼 수 없어요."}</p> : !canSend ? <p>{data.activityDates.includes(today) ? "오늘 보낼 수 있는 쪽지를 모두 사용했어요." : `오늘은 쪽지를 쉬는 날이에요. ${nextDay ? `다음 수업일은 ${niceDate(nextDay)}이에요.` : "다음 활동일은 선생님께 확인해 주세요."}`}</p> : <><p className="field-help">오늘 {data.messagesSentToday ?? 0}/{data.dailyMessageLimit ?? 10}건 보냈어요.</p><div className="action-row"><button type="button" className={messageMode === "preset" ? "small" : "small outline"} onClick={() => setMessageMode("preset")}>준비된 문구</button><button type="button" className={messageMode === "free" ? "small" : "small outline"} onClick={() => setMessageMode("free")}>직접 쓰기</button></div>{messageMode === "preset" ? <><label>전할 말<select value={selectedMessage} onChange={(event) => setSelectedMessage(event.target.value)}><option value="">문구 선택</option>{data.presetMessages.map((text) => <option key={text}>{text}</option>)}</select></label><button disabled={busy || !selectedMessage} onClick={() => void run(async () => {await call<object,object>("sendMessage", {kind:"preset",text:selectedMessage,requestId:crypto.randomUUID()});setSelectedMessage("");setNotice("쪽지를 바로 전했어요.");})}>쪽지 보내기</button></> : <><label>직접 쓰기<textarea rows={3} maxLength={200} value={freeText} onChange={(event) => setFreeText(event.target.value)} /></label><p className="field-help">{freeText.length}/200자</p><button disabled={busy || !freeText.trim()} onClick={() => void run(async () => {await call<object,object>("sendMessage", {kind:"free",text:freeText,requestId:crypto.randomUUID()});setFreeText("");setNotice("쪽지를 바로 전했어요.");})}>쪽지 보내기</button></>}</>}</>}
-      </section>}
+      {view === "mail" && <StudentMail roundId={roundId} data={data} busy={busy} run={run} setNotice={setNotice} draftRef={mailDraftRef} />}
       {view === "help" && <section className="panel"><h2>도움이 필요해요</h2><p>불편하거나 걱정되는 일이 있으면 선생님께 알려 주세요. 공개되거나 감점되지 않아요.</p><label>어떤 일이 걱정되나요?<select value={helpReason} onChange={(event) => setHelpReason(event.target.value)}><option>걱정되는 일이 있어요</option><option>활동이 어려워요</option><option>친구와의 일이 불편해요</option></select></label><label>더 전할 말 (선택)<textarea rows={3} maxLength={260} value={helpNote} onChange={(event) => setHelpNote(event.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"uncomfortable",note:`${helpReason}${helpNote.trim() ? ` · ${helpNote.trim()}` : ""}`,requestId:crypto.randomUUID()});setHelpNote("");setNotice("선생님께 도움을 요청했어요.");})}>도움 요청하기</button><h3>내 요청</h3>{data.help.length === 0 ? <p>접수한 요청이 없어요.</p> : <ul>{data.help.map((item) => <li key={item.helpId}>{item.category === "message" ? "쪽지에 관해 알림" : "도움 요청"} · {item.status === "open" ? "선생님 확인 중" : "처리됨"}</li>)}</ul>}</section>}
     </>}
   </div>;

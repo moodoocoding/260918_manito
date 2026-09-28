@@ -6,7 +6,8 @@ import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
 import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
 import { TeacherRounds } from "./TeacherRounds";
 import { TeacherAssignments } from "./TeacherAssignments";
-import { StudentRound, type StudentMailDraft, type StudentMissionUi } from "./StudentRound";
+import { StudentRound, type StudentMissionUi } from "./StudentRound";
+import { emptyStudentMailDraft, type StudentMailDraft } from "./StudentMail";
 import { StudentCommunity } from "./StudentCommunity";
 import { StudentRights, TeacherRights } from "./RightsRequests";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
@@ -91,8 +92,7 @@ function App() {
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block"} | null>(null);
   const generation = useRef(0);
   const studentRoundId = useRef<string | null>(null);
-  const studentMailDraft = useRef<StudentMailDraft>({selectedMessage:"",freeText:"",replyToMessageId:null,
-    replyText:"",mode:"preset",section:"inbox"});
+  const studentMailDraft = useRef<StudentMailDraft>(emptyStudentMailDraft());
   const roundDirty = useRef(false);
   const lastTeacherPath = useRef(window.location.pathname);
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
@@ -111,8 +111,7 @@ function App() {
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
     setHistoryRounds([]); setOpenHistoryRoundId(null);
     studentRoundId.current = null; setStudentMissionUi({filter:"all",category:"전체",limit:8});
-    studentMailDraft.current = {selectedMessage:"",freeText:"",replyToMessageId:null,
-      replyText:"",mode:"preset",section:"inbox"};
+    studentMailDraft.current = emptyStudentMailDraft();
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
     roundDirty.current = false;
@@ -150,8 +149,7 @@ function App() {
     if (studentRoundId.current !== result.round?.roundId) {
       studentRoundId.current = result.round?.roundId ?? null;
       setStudentMissionUi({filter:"all",category:"전체",limit:8});
-      studentMailDraft.current = {selectedMessage:"",freeText:"",replyToMessageId:null,
-        replyText:"",mode:"preset",section:"inbox"};
+      studentMailDraft.current = emptyStudentMailDraft();
     }
     setHome(result);
     setHistoryRounds(historyResult.rounds);
@@ -276,7 +274,7 @@ function App() {
 
   function openStudentPage(page: StudentPage) {
     if (studentPage === "mail" && page !== "mail"
-      && (studentMailDraft.current.freeText.trim() || studentMailDraft.current.replyText.trim())
+      && Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim())
       && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) return;
     setStudentPage(page); setOpenHistoryRoundId(null);
     setError(""); setNotice("");
