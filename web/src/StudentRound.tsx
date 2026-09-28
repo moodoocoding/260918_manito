@@ -47,6 +47,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const [confirmReplace, setConfirmReplace] = useState(false);
   const missionButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusAfterExpand = useRef<string | null>(null);
   const load = useCallback(() => call<{roundId: string}, Activity>("getStudentActivity", {roundId}), [roundId]);
   useEffect(() => {
     let active = true;
@@ -62,11 +63,15 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
   useEffect(() => { if (openMissionId) detailHeadingRef.current?.focus(); }, [openMissionId]);
+  useEffect(() => {
+    const id = focusAfterExpand.current;
+    if (id) { missionButtonRefs.current.get(id)?.focus(); focusAfterExpand.current = null; }
+  }, [missionLimit]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
     try {
       await action();
-      try { setData(await load()); } catch { setError("작업은 완료됐어요. 최신 내용을 다시 확인해 주세요."); }
+      try { setData(await load()); } catch { setNotice(""); setError("저장은 완료됐어요. 화면을 다시 불러와 최신 내용을 확인해 주세요. 같은 작업을 다시 누르지 마세요."); }
     } catch (caught) { setError(caught instanceof Error ? caught.message : "처리하지 못했어요."); }
     finally { setBusy(false); }
   }
@@ -98,16 +103,16 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     {error && !data && <button className="outline" onClick={() => { setError(""); void load().then(setData).catch(() => setError("다시 불러오지 못했어요.")); }}>다시 시도</button>}
     {data && <>
       {view === "home" && <>
-        <section className="panel student-season"><span className="eyebrow">{statusCopy[data.status] ?? "시즌 안내"}</span>
-          <h2>{data.title}</h2><p>{niceDate(data.startsOn)}~{niceDate(data.endsOn)} · {data.status === "active" ? `다음 쪽지 활동일 ${niceDate(canSend ? today : nextDay) || "선생님께 확인"}` : statusCopy[data.status] ?? "상태 확인"}</p>
-          <p className="field-help">{revealed ? "선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요." : "진행 중에는 친구의 이름을 볼 수 없어요. 쪽지는 서버가 배정된 친구에게 전해요."}</p>
-        </section>
-        <section className="panel"><h2>내 미션</h2>{summaryElement}<p className="field-help">모두 해야 하는 것은 아니에요. 내 기록만 보여 줘요.</p></section>
-        <section className="panel student-next-mission"><h2>이번에 해볼 미션</h2>
+        <section className="panel student-season student-home-primary"><span className="eyebrow">{statusCopy[data.status] ?? "시즌 안내"}</span>
+          <h2>{data.title}</h2><p className="student-season-dates">{niceDate(data.startsOn)}~{niceDate(data.endsOn)}</p>
+          <div className="student-home-summary"><strong>내 미션</strong>{summary ? <p>해봤어요 {summary.done} · 골라볼 미션 {summary.todo} · 쉬었어요 {summary.skipped}</p> : <p>기록은 미션 화면에서 볼 수 있어요.</p>}</div>
+          <div className="student-next-mission"><h3>이번에 해볼 미션</h3>
           {firstTodo ? <><p className="student-mission-text">{firstTodo.text}</p><p className="muted">{firstTodo.category ?? "기타 미션"}</p>
             {data.canSubmit && <button disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button>}
           </> : <p>{missions.length ? "지금 골라볼 미션이 없어요. 내 기록을 확인해 보세요." : "아직 미션이 없어요."}</p>}
           <div className="student-link-row"><button className="outline" onClick={() => onNavigate?.("missions")}>{firstTodo ? "미션 골라보기" : "내 기록 보기"}</button></div>
+          </div>
+          <p className="field-help">{data.status === "active" ? `다음 쪽지 활동일 ${niceDate(canSend ? today : nextDay) || "선생님께 확인"}. ` : ""}{revealed ? "선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요." : "진행 중에는 친구의 이름을 볼 수 없어요. 쪽지는 서버가 배정된 친구에게 전해요."}</p>
         </section>
         <StudentCommunity roundId={roundId} preview onMore={() => onNavigate?.("community")} />
         <button className="outline student-history-link" onClick={() => onNavigate?.("history")}>지난 활동 보기</button>
@@ -131,9 +136,9 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
             <div className="student-mission-filters"><label>기록 상태<select value={missionFilter} onChange={(event) => onMissionUiChange({...missionUi,filter:event.target.value as StudentMissionUi["filter"],limit:8})}><option value="all">전체</option><option value="todo">골라볼 미션</option><option value="done">해봤어요</option><option value="skipped">쉬었어요</option></select></label>
               <label>미션 종류<select value={category} onChange={(event) => onMissionUiChange({...missionUi,category:event.target.value,limit:8})}><option>전체</option>{availableCategories.map((item) => <option key={item}>{item}</option>)}</select></label></div>
             <p className="field-help">{filtered.length}개 중 {Math.min(filtered.length, missionLimit)}개를 보여 줘요.</p>
-            {filtered.length === 0 ? <p>이 조건에 맞는 미션이 없어요. 다른 상태나 종류를 골라 주세요.</p>
+            {filtered.length === 0 ? <div className="student-filter-empty"><p>이 조건에 맞는 미션이 없어요.</p><button className="outline" onClick={() => onMissionUiChange({filter:"all",category:"전체",limit:8})}>전체 미션 보기</button></div>
               : <ul className="student-mission-list">{filtered.slice(0,missionLimit).map((mission) => <li key={mission.missionId}><div><small>{mission.category ?? "기타 미션"} · {missionStatus[mission.status] ?? "기록 확인"}</small><strong>{mission.text}</strong></div><button className="outline small" ref={(node) => {if(node) missionButtonRefs.current.set(mission.missionId,node);}} onClick={() => setOpenMissionId(mission.missionId)}>이 미션 보기</button></li>)}</ul>}
-            {missionLimit < filtered.length && <button className="outline" onClick={() => onMissionUiChange({...missionUi,limit:missionLimit+8})}>{Math.min(8, filtered.length-missionLimit)}개 더 보기</button>}
+            {missionLimit < filtered.length && <button className="outline" onClick={() => {focusAfterExpand.current = filtered[missionLimit]?.missionId ?? null;onMissionUiChange({...missionUi,limit:missionLimit+8});}}>{Math.min(8, filtered.length-missionLimit)}개 더 보기</button>}
           </>}
         </section>
       </>}

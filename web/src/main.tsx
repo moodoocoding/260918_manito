@@ -36,7 +36,8 @@ type PrintSheet = { cards: Card[]; qrDataUrl: string; entryUrl: string };
 type StudentHome = { displayName: string; className: string; gradeBand?: string; round: null | {
   roundId: string; title: string; status: string;
 } };
-type HistoryRound = {roundId: string; title: string; status: string};
+type HistoryRound = {roundId: string; title: string; status: string; startsAt?: string};
+const koreaDateLabel = (iso?: string) => iso ? new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul",year:"numeric",month:"numeric",day:"numeric"}).format(new Date(iso)) : "";
 
 function errorText(error: unknown): string {
   if (error && typeof error === "object" && "code" in error) {
@@ -103,6 +104,13 @@ function App() {
   const cardReadVersion = useRef(0);
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
+  const focusStudentTitleAfterNavigation = useRef(false);
+
+  useEffect(() => {
+    if (!focusStudentTitleAfterNavigation.current) return;
+    focusStudentTitleAfterNavigation.current = false;
+    document.querySelector<HTMLElement>(".student-page-title")?.focus();
+  }, [studentPage]);
 
   const clearPrivate = useCallback(() => {
     generation.current += 1;
@@ -177,6 +185,7 @@ function App() {
         else { setSelected(null); setTeacherPage("classes"); }
       } else {
         const page = path.split("/")[2];
+        focusStudentTitleAfterNavigation.current = true;
         setStudentPage(["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today");
       }
     };
@@ -276,9 +285,11 @@ function App() {
   }
 
   function openStudentPage(page: StudentPage) {
+    if (studentPage === page) return;
     if (studentPage === "mail" && page !== "mail"
       && Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim())
       && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) return;
+    focusStudentTitleAfterNavigation.current = true;
     setStudentPage(page); setOpenHistoryRoundId(null);
     setError(""); setNotice("");
     history.pushState(null, "", page === "today" ? "/student" : `/student/${page}`);
@@ -501,17 +512,17 @@ function App() {
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
         role === "student" ? <section className="student-grid student-shell">
           <nav className="student-nav" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"우편함"},{id:"community",label:"우리 반"}] as const).map((item) =>
-            <button key={item.id} aria-current={studentPage === item.id ? "page" : undefined} onClick={() => openStudentPage(item.id)}>{item.label}</button>)}</nav>
-          {studentPage === "today" && <><h1 className="student-page-title">안녕, {home?.displayName}!</h1><p className="student-intro">{home?.className} · 오늘도 편하게 참여해요.</p>
+            <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
+          {studentPage === "today" && <><h1 className="student-page-title" tabIndex={-1}>안녕, {home?.displayName}!</h1><p className="student-intro">{home?.className} · 오늘도 편하게 참여해요.</p>
             {home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} onNavigate={openStudentPage} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />
               : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p><button className="outline" onClick={() => openStudentPage("history")}>지난 활동 보기</button></section>}
             <button className="outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></>}
-          {studentPage === "missions" && <><h1 className="student-page-title">미션</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
-          {studentPage === "mail" && <><h2 className="student-page-title">우편함</h2>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
-          {studentPage === "community" && <><h1 className="student-page-title">우리 반</h1>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
-          {studentPage === "help" && <><h2 className="student-page-title">선생님 도움</h2>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
+          {studentPage === "missions" && <><h1 className="student-page-title" tabIndex={-1}>미션</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
+          {studentPage === "mail" && <><h1 className="student-page-title" tabIndex={-1}>우편함</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
+          {studentPage === "community" && <><h1 className="student-page-title" tabIndex={-1}>우리 반</h1>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
+          {studentPage === "help" && <><h1 className="student-page-title" tabIndex={-1}>선생님 도움</h1>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
             <StudentRights /></>}
-          {studentPage === "history" && <><h2 className="student-page-title">지난 활동</h2><section className="panel"><p>예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p>{historyRounds.length === 0 ? <p>아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
+          {studentPage === "history" && <><h1 className="student-page-title" tabIndex={-1}>지난 활동</h1><section className="panel"><p>예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p>{historyRounds.length === 0 ? <p>아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
             {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}</>}
         </section> : route === "student" && role === "none" ? <section className="entry-layout">
           <div className="hero"><span className="eyebrow">학생 입장</span><h1>비밀친구 작전,<br />시작해 볼까요?</h1><p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p><div className="envelope">💌</div></div>

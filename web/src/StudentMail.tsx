@@ -1,4 +1,4 @@
-import {useEffect, useState, type RefObject} from "react";
+import {useEffect, useRef, useState, type RefObject} from "react";
 import {call} from "./firebase";
 
 type Side = "caredFor" | "carer";
@@ -28,6 +28,7 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef}: {
 }) {
   const [section,setSection] = useState<Side>(() => draftRef.current.section);
   const [drafts,setDrafts] = useState(() => draftRef.current.drafts);
+  const composeHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { draftRef.current = {section,drafts}; }, [draftRef,section,drafts]);
   const draft = drafts[section];
   const updateDraft = (change:Partial<Draft>) => setDrafts((old) => ({...old,
@@ -68,6 +69,7 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef}: {
     </div>
     <div className="conversation-heading"><h3>{labels[section]}와 나</h3>
       <p>{section === "caredFor" ? "새 쪽지는 내가 맡은 친구에게만 보내요." : "받은 쪽지에 답장하면 나를 맡은 친구에게만 보내요."}</p></div>
+    {canWrite && <button type="button" className="outline student-compose-jump" onClick={() => composeHeadingRef.current?.focus()}>이 친구에게 쪽지 쓰기</button>}
     <ol className="conversation-messages" aria-label={`${labels[section]}와 주고받은 쪽지`}>
       {messages.length === 0 && <li className="conversation-empty">{section === "caredFor"
         ? "아직 주고받은 쪽지가 없어요. 첫 쪽지를 보내 보세요."
@@ -94,7 +96,7 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef}: {
           </div>}
       </li>)}
     </ol>
-    <div className="conversation-compose"><h3>{section === "caredFor" ? "이 친구에게 쪽지 쓰기" : "이 친구에게 답장 쓰기"}</h3>
+    <div className="conversation-compose"><h3 tabIndex={-1} ref={composeHeadingRef}>{section === "caredFor" ? "이 친구에게 쪽지 쓰기" : "이 친구에게 답장 쓰기"}</h3>
       {data.status !== "active" ? <p>지금은 쪽지를 보낼 수 없어요.</p>
         : !data.canSendMessage ? <p>{data.activityDates.includes(data.koreaDate ?? "")
           ? "오늘 보낼 수 있는 쪽지를 모두 사용했어요."

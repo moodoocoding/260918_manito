@@ -196,7 +196,10 @@ button[aria-busy="true"]{cursor:wait}
 .student-app .student-grid .panel p{line-height:1.6;overflow-wrap:anywhere}
 .student-app .student-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .student-app .student-nav button{min-width:0;border-radius:12px;padding:10px 8px;min-height:48px}
+.student-app .student-nav a{display:flex;align-items:center;justify-content:center;min-width:0;min-height:48px;padding:10px 8px;border:1px solid #e2cfc2;border-radius:12px;background:#fff;color:#354158;font-weight:700;text-align:center;overflow-wrap:anywhere}
+.student-app .student-nav a[aria-current="page"]{background:#b94440;border-color:#b94440;color:#fff}
 .student-app .student-page-title{font-size:clamp(1.5rem,4vw,1.75rem);line-height:1.35;margin:0}
+.student-app .student-page-title:focus{outline:3px solid #557dc5;outline-offset:4px;border-radius:3px}
 .student-intro{margin:-16px 0 0;color:#52647a;line-height:1.6}
 .student-app .student-season{background:linear-gradient(135deg,#fff 70%,#fff2df)}
 .student-app .student-season .eyebrow{margin-bottom:16px}
@@ -319,4 +322,27 @@ button[aria-busy="true"]{cursor:wait}
   .student-app .student-mission-actions button{flex:1 1 100%}
   .student-app .student-next-mission>button,.student-app .student-link-row button{width:100%}
   .student-app .conversation-actions button{flex:1 1 100%;margin:0}
+}
+
+/* 학생 홈의 첫 과업과 우편함 작성 위치를 분명히 한다. */
+.student-app .student-home-primary{display:grid;gap:14px}
+.student-app .student-home-primary .eyebrow{justify-self:start;margin:0}
+.student-app .student-home-primary h2,.student-app .student-home-primary h3,.student-app .student-home-primary p{margin:0}
+.student-app .student-home-primary h2{font-size:1.4rem;line-height:1.35}
+.student-app .student-season-dates{color:#52647a}
+.student-home-summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding-block:10px;border-block:1px solid #eadfd2}
+.student-home-summary p{color:#52647a;font-size:.95rem}
+.student-app .student-next-mission h3{font-size:1.12rem;margin:0}
+.student-app .student-next-mission{display:grid;gap:10px}
+.student-app .student-next-mission .student-mission-text{margin:0}
+.student-app .student-next-mission .student-link-row{margin:0}
+.student-app .student-next-mission button{justify-self:start}
+.student-filter-empty{display:grid;justify-items:start;gap:12px;padding:16px;border:1px dashed #d8c9bc;border-radius:12px}
+.student-filter-empty p{margin:0}
+.student-compose-jump{margin-top:14px;width:100%}
+.conversation-compose h3:focus{outline:3px solid #557dc5;outline-offset:4px;border-radius:3px}
+.student-app .round-list button{width:100%;min-height:64px;overflow-wrap:anywhere}
+@media(max-width:599px){
+  .student-app .student-next-mission button{width:100%}
+  .student-app .student-home-primary{gap:12px}
 }
