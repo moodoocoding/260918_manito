@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type RefObject} from "react";
+import {useEffect, useRef, useState, type ReactNode, type RefObject} from "react";
 import {call} from "./firebase";
 
 type Side = "caredFor" | "carer";
@@ -21,10 +21,10 @@ export function emptyStudentMailDraft(): StudentMailDraft {
 const labels: Record<Side,string> = {caredFor:"내가 맡은 친구", carer:"나를 맡은 친구"};
 const dateLabel = (day?: string | null) => day ? `${Number(day.slice(5,7))}월 ${Number(day.slice(8,10))}일` : "";
 
-export function StudentMail({roundId, data, busy, run, setNotice, draftRef}: {
+export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feedback}: {
   roundId:string; data:StudentMailData; busy:boolean;
   run:(action:()=>Promise<void>)=>Promise<void>; setNotice:(value:string)=>void;
-  draftRef:RefObject<StudentMailDraft>;
+  draftRef:RefObject<StudentMailDraft>; feedback:ReactNode;
 }) {
   const [section,setSection] = useState<Side>(() => draftRef.current.section);
   const [drafts,setDrafts] = useState(() => draftRef.current.drafts);
@@ -69,6 +69,7 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef}: {
     </div>
     <div className="conversation-heading"><h3>{labels[section]}와 나</h3>
       <p>{section === "caredFor" ? "새 쪽지는 내가 맡은 친구에게만 보내요." : "받은 쪽지에 답장하면 나를 맡은 친구에게만 보내요."}</p></div>
+    {feedback}
     {canWrite && <button type="button" className="outline student-compose-jump" onClick={() => composeHeadingRef.current?.focus()}>이 친구에게 쪽지 쓰기</button>}
     <ol className="conversation-messages" aria-label={`${labels[section]}와 주고받은 쪽지`}>
       {messages.length === 0 && <li className="conversation-empty">{section === "caredFor"

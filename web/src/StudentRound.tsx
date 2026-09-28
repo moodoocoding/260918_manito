@@ -96,9 +96,9 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     <span>해봤어요 <strong>{summary.done}</strong></span><span>골라볼 미션 <strong>{summary.todo}</strong></span>
     <span>쉬었어요 <strong>{summary.skipped}</strong></span>
   </div> : <p>이전 미션 기록은 아래 목록에서 확인해 주세요.</p>;
+  const feedback = <>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>;
   return <div className="student-activities">
-    {error && <p className="message error" role="alert">{error}</p>}
-    {notice && <p className="message success" role="status">{notice}</p>}
+    {!data && feedback}
     {!data && !error && <section className="panel"><p role="status">활동을 불러오는 중이에요…</p></section>}
     {error && !data && <button className="outline" onClick={() => { setError(""); void load().then(setData).catch(() => setError("다시 불러오지 못했어요.")); }}>다시 시도</button>}
     {data && <>
@@ -110,7 +110,10 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
           {firstTodo ? <><p className="student-mission-text">{firstTodo.text}</p><p className="muted">{firstTodo.category ?? "기타 미션"}</p>
             {data.canSubmit && <button disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button>}
           </> : <p>{missions.length ? "지금 골라볼 미션이 없어요. 내 기록을 확인해 보세요." : "아직 미션이 없어요."}</p>}
-          <div className="student-link-row"><button className="outline" onClick={() => onNavigate?.("missions")}>{firstTodo ? "미션 골라보기" : "내 기록 보기"}</button></div>
+          {view === "home" && feedback}
+          <div className="student-link-row"><button className="outline" onClick={() => onNavigate?.("missions")}>{firstTodo ? "미션 골라보기" : "내 기록 보기"}</button>
+            {firstTodo && data.canSubmit && <button className="outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("setMissionStatus", {missionId:firstTodo.missionId,status:"skipped"});setNotice("이 미션은 쉬기로 기록했어요.");})}>이 미션 쉬기</button>}
+          </div>
           </div>
           <p className="field-help">{data.status === "active" ? `다음 쪽지 활동일 ${niceDate(canSend ? today : nextDay) || "선생님께 확인"}. ` : ""}{revealed ? "선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요." : "진행 중에는 친구의 이름을 볼 수 없어요. 쪽지는 서버가 배정된 친구에게 전해요."}</p>
         </section>
@@ -119,12 +122,13 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
       </>}
       {view === "missions" && <>
         <section className="panel"><h2>내 미션 기록</h2>{summaryElement}<p className="field-help">기록은 나에게만 보여요. 미션을 모두 해야 하는 것은 아니에요.</p></section>
-        <section className="panel"><h2>미션 골라보기</h2>
+        <section className="panel"><h2>미션 골라보기</h2>{!selectedMission && feedback}
           {selectedMission ? <div className="student-mission-detail">
             <button className="outline small" onClick={closeMission}>목록으로 돌아가기</button>
             <h3 tabIndex={-1} ref={detailHeadingRef}>{selectedMission.text}</h3>
             <p className="muted">{selectedMission.category ?? "기타 미션"} · {missionStatus[selectedMission.status] ?? "기록 확인"}</p>
             <p>교실에서 돈을 쓰지 않고 편하게 해 볼 수 있어요. 상대가 부담스러워하면 멈춰도 괜찮아요.</p>
+            {feedback}
             {data.canSubmit && selectedMission.status === "todo" && <>
               <button className="outline" disabled={busy || data.focusMissionId === selectedMission.missionId} onClick={() => void run(async () => {await call<object,object>("setStudentMissionFocus", {roundId,missionId:selectedMission.missionId,requestId:crypto.randomUUID()});setNotice("이번에 해볼 미션으로 골랐어요.");})}>{data.focusMissionId === selectedMission.missionId ? "이번에 해볼 미션으로 선택됨" : "이번에 해볼래요"}</button>
               <div className="student-mission-actions"><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:selectedMission.missionId,status:"done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button>
@@ -142,7 +146,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
           </>}
         </section>
       </>}
-      {(view === "home" || view === "history") && revealed && <section className="panel"><h2>친구 공개 결과</h2>
+      {(view === "home" || view === "history") && revealed && <section className="panel"><h2>친구 공개 결과</h2>{view === "history" && feedback}
         <h3>내가 챙긴 친구</h3><div className="student-secret">{targetVisible ? data.targetDisplayName ?? "안전 사안으로 공개되지 않았어요" : "•••"}</div><p><button onClick={() => setTargetVisible((value) => !value)}>{targetVisible ? "내가 챙긴 친구 가리기" : "내가 챙긴 친구 보기"}</button></p>
         <h3>나를 챙긴 친구</h3><div className="student-secret">{incomingVisible ? data.incomingDisplayName ?? "안전 사안으로 공개되지 않았어요" : "•••"}</div><p><button onClick={() => setIncomingVisible((value) => !value)}>{incomingVisible ? "나를 챙긴 친구 가리기" : "나를 챙긴 친구 보기"}</button></p>
         {view === "history" ? data.reflectionText && <p>돌아보기: {data.reflectionText}</p> : data.status === "revealed" && <>
@@ -153,10 +157,11 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
           <button disabled={busy || !reflection.trim()} onClick={() => void run(async () => { await call<object, object>("saveReflection", {roundId, text: reflection}); setNotice("돌아보기를 저장했어요."); })}>돌아보기 저장</button>
         </>}
       </section>}
+      {view === "history" && !revealed && feedback}
       {view === "history" && <section className="panel"><h2>이번 활동의 미션</h2>{summaryElement}<ul className="student-mission-list">{missions.map((mission) => <li key={mission.missionId}><div><small>{missionStatus[mission.status] ?? "기록 확인"}</small><strong>{mission.text}</strong></div></li>)}</ul></section>}
       {view === "history" && <section className="panel"><h2>지난 쪽지</h2><h3>받은 쪽지</h3>{data.inbox.filter((message) => !message.hidden).length === 0 ? <p>받은 쪽지가 없어요.</p> : data.inbox.filter((message) => !message.hidden).map((message) => <div className="review-card" key={message.messageId}><p>{message.text}</p><button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("hideMessage", {roundId,messageId:message.messageId});setNotice("쪽지를 숨겼어요.");})}>숨기기</button>{!message.reported && <button className="small outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"message",messageId:message.messageId,requestId:crypto.randomUUID()});setNotice("선생님께 알렸어요.");})}>선생님께 알리기</button>}</div>)}<h3>보낸 쪽지</h3>{data.sent.length === 0 ? <p>보낸 쪽지가 없어요.</p> : data.sent.map((message) => <div className="sent-message" key={message.messageId}><small>{message.date}</small><p>{message.text}</p></div>)}</section>}
-      {view === "mail" && <StudentMail roundId={roundId} data={data} busy={busy} run={run} setNotice={setNotice} draftRef={mailDraftRef} />}
-      {view === "help" && <section className="panel"><h2>도움이 필요해요</h2><p>불편하거나 걱정되는 일이 있으면 선생님께 알려 주세요. 공개되거나 감점되지 않아요.</p><label>어떤 일이 걱정되나요?<select value={helpReason} onChange={(event) => setHelpReason(event.target.value)}><option>걱정되는 일이 있어요</option><option>활동이 어려워요</option><option>친구와의 일이 불편해요</option></select></label><label>더 전할 말 (선택)<textarea rows={3} maxLength={260} value={helpNote} onChange={(event) => setHelpNote(event.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"uncomfortable",note:`${helpReason}${helpNote.trim() ? ` · ${helpNote.trim()}` : ""}`,requestId:crypto.randomUUID()});setHelpNote("");setNotice("선생님께 도움을 요청했어요.");})}>도움 요청하기</button><h3>내 요청</h3>{data.help.length === 0 ? <p>접수한 요청이 없어요.</p> : <ul>{data.help.map((item) => <li key={item.helpId}>{item.category === "message" ? "쪽지에 관해 알림" : "도움 요청"} · {item.status === "open" ? "선생님 확인 중" : "처리됨"}</li>)}</ul>}</section>}
+      {view === "mail" && <StudentMail roundId={roundId} data={data} busy={busy} run={run} setNotice={setNotice} draftRef={mailDraftRef} feedback={feedback} />}
+      {view === "help" && <section className="panel"><h2>도움이 필요해요</h2><p>불편하거나 걱정되는 일이 있으면 선생님께 알려 주세요. 공개되거나 감점되지 않아요.</p><label>어떤 일이 걱정되나요?<select value={helpReason} onChange={(event) => setHelpReason(event.target.value)}><option>걱정되는 일이 있어요</option><option>활동이 어려워요</option><option>친구와의 일이 불편해요</option></select></label><label>더 전할 말 (선택)<textarea rows={3} maxLength={260} value={helpNote} onChange={(event) => setHelpNote(event.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => {await call<object,object>("createHelpRequest", {roundId,category:"uncomfortable",note:`${helpReason}${helpNote.trim() ? ` · ${helpNote.trim()}` : ""}`,requestId:crypto.randomUUID()});setHelpNote("");setNotice("선생님께 도움을 요청했어요.");})}>도움 요청하기</button>{feedback}<h3>내 요청</h3>{data.help.length === 0 ? <p>접수한 요청이 없어요.</p> : <ul>{data.help.map((item) => <li key={item.helpId}>{item.category === "message" ? "쪽지에 관해 알림" : "도움 요청"} · {item.status === "open" ? "선생님 확인 중" : "처리됨"}</li>)}</ul>}</section>}
     </>}
   </div>;
 }

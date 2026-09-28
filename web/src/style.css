@@ -336,7 +336,9 @@ button[aria-busy="true"]{cursor:wait}
 .student-app .student-next-mission{display:grid;gap:10px}
 .student-app .student-next-mission .student-mission-text{margin:0}
 .student-app .student-next-mission .student-link-row{margin:0}
+.student-app .student-link-row{display:flex;flex-wrap:wrap;gap:8px}
 .student-app .student-next-mission button{justify-self:start}
+.student-app .student-next-mission .message,.student-app .student-mission-detail .message,.student-app .student-conversations>.message,.student-app .panel>.message{margin:0}
 .student-filter-empty{display:grid;justify-items:start;gap:12px;padding:16px;border:1px dashed #d8c9bc;border-radius:12px}
 .student-filter-empty p{margin:0}
 .student-compose-jump{margin-top:14px;width:100%}
