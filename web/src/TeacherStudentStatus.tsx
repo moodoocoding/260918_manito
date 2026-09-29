@@ -80,35 +80,34 @@ export function TeacherStudentStatus({classId, roundId, loadStatus = fetchStatus
       if (version === detailRequest.current) setDetailLoading(false);
     }
   }
-  return <section className="teacher-status-section" aria-labelledby="teacher-student-status-heading">
-    <div className="section-heading"><div><h3 id="teacher-student-status-heading">학생별 상태</h3>
-      <p className="field-help">이번 시즌의 지원용 기록이에요. 비교하거나 평가하는 수치로 사용하지 마세요.</p></div>
+  return <section className="teacher-status-section" aria-label="학생별 상태">
+    <div className="status-toolbar"><p className="field-help">이번 시즌의 지원용 기록이에요. 비교하거나 평가하는 수치로 사용하지 마세요.</p>
       <button type="button" className="small outline" onClick={() => void load()}>상태 새로고침</button></div>
     {loading && <p role="status">학생 상태를 불러오는 중이에요…</p>}
     {error && <p className="message error" role="alert">{error} <button className="small outline" onClick={() => void load()}>다시 시도</button></p>}
-    {!loading && !error && students.length === 0 && <p>이 시즌에 참가한 학생이 없어요.</p>}
+    {!loading && !error && students.length === 0 && <p className="muted">이 시즌에 참가한 학생이 없어요.</p>}
     {selected && <section ref={detailElement} id="teacher-student-detail" className="teacher-student-detail" aria-label="선택한 학생의 기록">
-      <div className="section-heading"><h3>{detail?.displayName ?? students.find((item) => item.studentUid === selected)?.displayName}의 기록</h3>
+      <div className="section-heading"><h4>{detail?.displayName ?? students.find((item) => item.studentUid === selected)?.displayName}의 기록</h4>
         <button type="button" className="small outline" onClick={() => void open(selected)}>닫기</button></div>
       {detailLoading && <p role="status">기록을 불러오는 중이에요…</p>}
       {detailError && <p className="message error" role="alert">{detailError}</p>}
-      {detail && <><div className="teacher-detail-tabs" role="group" aria-label="학생 기록 종류">
-        <button type="button" className={detailSection === "missions" ? "small" : "small outline"}
+      {detail && <><div className="teacher-detail-tabs segmented-track" role="group" aria-label="학생 기록 종류">
+        <button type="button" className={detailSection === "missions" ? "small is-active" : "small outline"}
           aria-pressed={detailSection === "missions"} onClick={() => setDetailSection("missions")}>미션 · {detail.missions.length}개</button>
-        <button type="button" className={detailSection === "messages" ? "small" : "small outline"}
+        <button type="button" className={detailSection === "messages" ? "small is-active" : "small outline"}
           aria-pressed={detailSection === "messages"} onClick={() => setDetailSection("messages")}>쪽지 · {detail.messages.length}건</button>
       </div>
-      {detailSection === "missions" && <><h4>미션</h4>
-        {detail.missions.length === 0 ? <p>저장된 미션이 없어요.</p> : <div className="teacher-status-missions">
+      {detailSection === "missions" && <>
+        {detail.missions.length === 0 ? <p className="muted">저장된 미션이 없어요.</p> : <div className="teacher-status-missions">
           {(["done","todo","skipped"] as const).map((status) => <section key={status}>
             <h5>{missionLabels[status]} · {detail.missions.filter((item) => item.status === status).length}개</h5>
             {detail.missions.some((item) => item.status === status) && <ul>{detail.missions.filter((item) => item.status === status)
               .map((item) => <li key={item.missionId}>{item.text}</li>)}</ul>}
           </section>)}
         </div>}</>}
-      {detailSection === "messages" && <><h4>주고받은 쪽지 · {detail.messages.length}건</h4>
+      {detailSection === "messages" && <>
         <p className="field-help">이 학생과 직접 주고받은 이번 시즌 쪽지 전체를 최신순으로 보여줘요. 이 열람은 기록됩니다.</p>
-        {detail.messages.length === 0 ? <p>주고받은 쪽지가 없어요.</p> : <ol className="teacher-status-messages">
+        {detail.messages.length === 0 ? <p className="muted">주고받은 쪽지가 없어요.</p> : <ol className="teacher-status-messages">
           {detail.messages.map((message) => <li key={message.messageId}>
             <div><strong>{message.direction === "sent" ? "보냄" : "받음"}</strong>
               <span>{message.senderName} → {message.receiverName}</span>
@@ -123,10 +122,14 @@ export function TeacherStudentStatus({classId, roundId, loadStatus = fetchStatus
         className="teacher-status-card" aria-expanded={selected === student.studentUid}
         aria-controls={selected === student.studentUid ? "teacher-student-detail" : undefined}
         onClick={() => void open(student.studentUid)}>
-        <strong>{student.displayName}</strong>
-        <span>{student.participationStatus === "stopped" ? "참여 중단" : "참여 중"}</span>
-        <span>완료한 미션 <b>{student.completedMissions}/{student.totalMissions}개</b></span>
-        <span>보낸 쪽지 <b>{student.sentMessages}건</b></span>
+        <div className="status-card-head">
+          <strong>{student.displayName}</strong>
+          <span className={`meta-pill${student.participationStatus === "stopped" ? " is-stopped" : ""}`}>{student.participationStatus === "stopped" ? "참여 중단" : "참여 중"}</span>
+        </div>
+        <div className="status-card-metrics">
+          <span>완료한 미션 <b>{student.completedMissions}/{student.totalMissions}개</b></span>
+          <span>보낸 쪽지 <b>{student.sentMessages}건</b></span>
+        </div>
         <small>{selected === student.studentUid ? "기록 닫기" : "미션·쪽지 기록 보기"}</small>
       </button>)}
     </div>}

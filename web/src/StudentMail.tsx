@@ -60,17 +60,24 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
     });
   }
 
-  return <section className="panel student-conversations"><h2>비밀친구 쪽지</h2>
-    <p>두 대화는 따로 보관돼요. 쪽지 한 건은 선택한 관계의 친구 한 명에게만 전해집니다. 친구 이름은 지금 볼 수 없고, 선생님은 안전을 위해 대화를 확인할 수 있어요.</p>
-    <div className="student-mail-tabs" role="group" aria-label="대화 선택">
+  return <section className="panel student-conversations">
+    <div className="panel-section-head">
+      <h2>비밀친구 쪽지</h2>
+      <p className="field-help">두 대화는 따로 보관돼요. 쪽지 한 건은 선택한 관계의 친구 한 명에게만 전해집니다. 친구 이름은 지금 볼 수 없고, 선생님은 안전을 위해 대화를 확인할 수 있어요.</p>
+    </div>
+    <div className="student-mail-tabs segmented-track" role="group" aria-label="대화 선택">
       {(["caredFor","carer"] as const).map((side) => <button key={side} type="button"
-        className={section === side ? "" : "outline"} aria-pressed={section === side} disabled={busy}
+        className={section === side ? "is-active" : "outline"} aria-pressed={section === side} disabled={busy}
         onClick={() => setSection(side)}>{labels[side]}</button>)}
     </div>
-    <div className="conversation-heading"><h3>{labels[section]}와 나</h3>
-      <p>{section === "caredFor" ? "새 쪽지는 내가 맡은 친구에게만 보내요." : "받은 쪽지에 답장하면 나를 맡은 친구에게만 보내요."}</p></div>
+    <div className="conversation-heading">
+      <div>
+        <h3>{labels[section]}와 나</h3>
+        <p>{section === "caredFor" ? "새 쪽지는 내가 맡은 친구에게만 보내요." : "받은 쪽지에 답장하면 나를 맡은 친구에게만 보내요."}</p>
+      </div>
+      {canWrite && <button type="button" className="small outline student-compose-jump" onClick={() => composeHeadingRef.current?.focus()}>이 친구에게 쪽지 쓰기</button>}
+    </div>
     {feedback}
-    {canWrite && <button type="button" className="outline student-compose-jump" onClick={() => composeHeadingRef.current?.focus()}>이 친구에게 쪽지 쓰기</button>}
     <ol className="conversation-messages" aria-label={`${labels[section]}와 주고받은 쪽지`}>
       {messages.length === 0 && <li className="conversation-empty">{section === "caredFor"
         ? "아직 주고받은 쪽지가 없어요. 첫 쪽지를 보내 보세요."
@@ -97,16 +104,20 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
           </div>}
       </li>)}
     </ol>
-    <div className="conversation-compose"><h3 tabIndex={-1} ref={composeHeadingRef}>{section === "caredFor" ? "이 친구에게 쪽지 쓰기" : "이 친구에게 답장 쓰기"}</h3>
+    <div className="conversation-compose">
+      <div className="compose-head">
+        <h3 tabIndex={-1} ref={composeHeadingRef}>{section === "caredFor" ? "이 친구에게 쪽지 쓰기" : "이 친구에게 답장 쓰기"}</h3>
+        {canWrite && <span className="meta-pill">오늘 {data.messagesSentToday ?? 0}/{data.dailyMessageLimit ?? 10}건 전송</span>}
+      </div>
       {data.status !== "active" ? <p>지금은 쪽지를 보낼 수 없어요.</p>
         : !data.canSendMessage ? <p>{data.activityDates.includes(data.koreaDate ?? "")
           ? "오늘 보낼 수 있는 쪽지를 모두 사용했어요."
           : `오늘은 쪽지를 쉬는 날이에요. ${data.nextActivityDate ? `다음 수업일은 ${dateLabel(data.nextActivityDate)}이에요.` : "다음 활동일은 선생님께 확인해 주세요."}`}</p>
         : section === "carer" && !replyToMessageId ? <p>이 친구에게서 먼저 쪽지를 받아야 답장할 수 있어요.</p>
-        : <><p className="field-help">{labels[section]} 한 명에게만 전해요. 오늘 {data.messagesSentToday ?? 0}/{data.dailyMessageLimit ?? 10}건 보냈어요.</p>
-          <div className="action-row"><button type="button" className={draft.mode === "preset" ? "small" : "small outline"}
+        : <><p className="field-help">{labels[section]} 한 명에게만 전해요.</p>
+          <div className="compose-mode-tabs segmented-track" role="group" aria-label="작성 방식"><button type="button" className={draft.mode === "preset" ? "small is-active" : "small outline"} aria-pressed={draft.mode === "preset"}
             onClick={() => updateDraft({mode:"preset"})}>준비된 문구</button>
-            <button type="button" className={draft.mode === "free" ? "small" : "small outline"}
+            <button type="button" className={draft.mode === "free" ? "small is-active" : "small outline"} aria-pressed={draft.mode === "free"}
               onClick={() => updateDraft({mode:"free"})}>직접 쓰기</button></div>
           {draft.mode === "preset" ? <label>전할 말<select value={draft.selectedMessage}
             onChange={(event) => updateDraft({selectedMessage:event.target.value})}><option value="">문구 선택</option>
@@ -114,7 +125,7 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
             : <><label>직접 쓰기<textarea rows={3} maxLength={200} value={draft.freeText}
               onChange={(event) => updateDraft({freeText:event.target.value})} /></label>
               <p className="field-help">{draft.freeText.length}/200자</p></>}
-          <button type="button" disabled={busy || !selectedText} onClick={() => void send()}>
+          <button type="button" className="primary-cta" disabled={busy || !selectedText} onClick={() => void send()}>
             {section === "caredFor" ? "맡은 친구에게 보내기" : "나를 맡은 친구에게 답장"}</button></>}
     </div>
     {unknown.length > 0 && <details className="conversation-unknown"><summary>연결을 확인할 수 없는 이전 쪽지 {unknown.length}건</summary>

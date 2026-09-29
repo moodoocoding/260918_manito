@@ -522,55 +522,89 @@ function App() {
     && (memberFilter === "all" || member.accessStatus === memberFilter));
 
   return <div className={`app-shell${role === "student" ? " student-app" : ""}`}>
-    <header className="topbar no-print">
-      <a className="brand" href={role === "teacher" ? "/teacher" : "/student"} onClick={(event) => { event.preventDefault();
-        if (role === "teacher") openClasses();
-        else if (role === "student") openStudentPage("today"); else navigate("student");
-      }}>✉️ <span>우리 반 비밀친구</span></a>
-      {role === "none" && <nav aria-label="서비스 선택">
-        <button className={route === "student" ? "nav-active" : "nav-link"} onClick={() => navigate("student")}>학생 입장</button>
-        <button className={route === "teacher" ? "nav-active" : "nav-link"} onClick={() => navigate("teacher")}>선생님 방</button>
-      </nav>}
-      {role === "student" && <button className="small outline" onClick={() => openStudentPage("help")}>선생님 도움</button>}
-      {role !== "none" && <button className="small outline" onClick={() => void exit()}>{role === "teacher" ? "로그아웃" : "활동 마치기"}</button>}
-    </header>
+    <div className="topbar-surface no-print">
+      <header className="topbar">
+        <a className="brand" href={role === "teacher" ? "/teacher" : "/student"} onClick={(event) => { event.preventDefault();
+          if (role === "teacher") openClasses();
+          else if (role === "student") openStudentPage("today"); else navigate("student");
+        }}><span className="brand-icon" aria-hidden="true">✉️</span> <span>우리 반 비밀친구</span></a>
+        {role === "none" && <nav className="service-switch" aria-label="서비스 선택">
+          <button type="button" className={route === "student" ? "nav-active" : "nav-link"} aria-pressed={route === "student"} onClick={() => navigate("student")}>학생 입장</button>
+          <button type="button" className={route === "teacher" ? "nav-active" : "nav-link"} aria-pressed={route === "teacher"} onClick={() => navigate("teacher")}>선생님 방</button>
+        </nav>}
+        {role !== "none" && <div className="topbar-actions">
+          {role === "student" && <button className="small outline" onClick={() => openStudentPage("help")}>선생님 도움</button>}
+          <button className="small outline" onClick={() => void exit()}>{role === "teacher" ? "로그아웃" : "활동 마치기"}</button>
+        </div>}
+      </header>
+    </div>
 
     <main className="content no-print">
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
         role === "student" ? <section className="student-grid student-shell">
-          <nav className="student-nav" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"우편함"},{id:"community",label:"우리 반"}] as const).map((item) =>
+          <nav className="student-nav segmented-track" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"우편함"},{id:"community",label:"우리 반"}] as const).map((item) =>
             <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
-          {studentPage === "today" && <><h1 className="student-page-title" tabIndex={-1}>안녕, {home?.displayName}!</h1><p className="student-intro">{home?.className} · 오늘도 편하게 참여해요.</p>
+          {studentPage === "today" && <><div className="student-page-header"><div><span className="context-badge">{home?.className}</span><h1 className="student-page-title" tabIndex={-1}>안녕, {home?.displayName}!</h1><p className="student-intro">오늘도 친구를 위한 작은 배려에 편하게 참여해요.</p></div><button className="small outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></div>
             {home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} onNavigate={openStudentPage} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />
-              : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p><button className="outline" onClick={() => openStudentPage("history")}>지난 활동 보기</button></section>}
-            <button className="outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></>}
-          {studentPage === "missions" && <><h1 className="student-page-title" tabIndex={-1}>미션</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
-          {studentPage === "mail" && <><h1 className="student-page-title" tabIndex={-1}>우편함</h1>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
-          {studentPage === "community" && <><h1 className="student-page-title" tabIndex={-1}>우리 반</h1>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
-          {studentPage === "help" && <><h1 className="student-page-title" tabIndex={-1}>선생님 도움</h1>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
+              : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p><button className="outline" onClick={() => openStudentPage("history")}>지난 활동 보기</button></section>}</>}
+          {studentPage === "missions" && <><div className="student-page-header"><div><span className="context-badge">나의 활동</span><h1 className="student-page-title" tabIndex={-1}>미션</h1><p className="student-intro">원하는 미션을 골라 해 보거나 부담 없이 쉬어 갈 수 있어요.</p></div></div>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
+          {studentPage === "mail" && <><div className="student-page-header"><div><span className="context-badge">익명 응원 대화</span><h1 className="student-page-title" tabIndex={-1}>우편함</h1><p className="student-intro">내가 맡은 친구와 나를 맡은 친구, 두 대화가 따로 보관돼요.</p></div></div>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
+          {studentPage === "community" && <><div className="student-page-header"><div><span className="context-badge">{home?.className}</span><h1 className="student-page-title" tabIndex={-1}>우리 반</h1><p className="student-intro">교실에서 실천할 수 있는 배려 아이디어와 선생님 안내를 확인해요.</p></div></div>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
+          {studentPage === "help" && <><div className="student-page-header"><div><span className="context-badge">안전·도움 센터</span><h1 className="student-page-title" tabIndex={-1}>선생님 도움</h1><p className="student-intro">불편하거나 걱정되는 점은 언제든 비공개로 선생님께 알릴 수 있어요.</p></div></div>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
             <StudentRights /></>}
-          {studentPage === "history" && <><h1 className="student-page-title" tabIndex={-1}>지난 활동</h1><section className="panel"><p>예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p>{historyRounds.length === 0 ? <p>아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
+          {studentPage === "history" && <><div className="student-page-header"><div><span className="context-badge">활동 보관함</span><h1 className="student-page-title" tabIndex={-1}>지난 활동</h1><p className="student-intro">예전 시즌의 공개 결과와 미션·쪽지 기록을 돌아볼 수 있어요.</p></div></div><section className="panel"><div className="panel-section-head"><h2>시즌 목록</h2><p className="field-help">예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p></div>{historyRounds.length === 0 ? <p className="muted">아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
             {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}</>}
         </section> : route === "student" && role === "none" ? <section className="entry-layout">
-          <div className="hero"><span className="eyebrow">학생 입장</span><h1>비밀친구 작전,<br />시작해 볼까요?</h1><p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p><div className="envelope">💌</div></div>
+          <div className="hero">
+            <span className="eyebrow">초등 학급 마니또 · 학생용</span>
+            <h1>비밀친구 작전,<br />시작해 볼까요?</h1>
+            <p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p>
+            <ul className="hero-highlights" aria-label="활동 안내">
+              <li><strong>오늘의 미션</strong> 교실에서 바로 해 볼 수 있는 따뜻한 배려 미션</li>
+              <li><strong>비밀 우편함</strong> 이름 없이 주고받는 안전한 응원 쪽지</li>
+            </ul>
+          </div>
           <form className="panel entry-form" onSubmit={(event) => { event.preventDefault(); void task(async () => {
             await studentLogin(classCodeInput, cardCodeInput);
             setCardCodeInput("");
           }); }}>
-            <h2>내 카드로 입장하기</h2>
-            <label>학급 코드<input autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value)} placeholder="예: ABCD2345" required /></label>
-            <label>개인 카드 코드<input type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 코드" required /></label>
-            <button type="button" className="small outline" onClick={() => setShowCardInput((value) => !value)}>{showCardInput ? "코드 가리기" : "코드 보기"}</button>
+            <div className="entry-form-head">
+              <span className="context-badge">입장 카드 로그인</span>
+              <h2>내 카드로 입장하기</h2>
+            </div>
+            <label htmlFor="student-class-code">학급 코드
+              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value)} placeholder="예: ABCD2345" required />
+            </label>
+            <div className="field-group">
+              <div className="field-label-row">
+                <label htmlFor="student-card-code">개인 카드 코드</label>
+                <button type="button" className="small outline inline-toggle" onClick={() => setShowCardInput((value) => !value)}>{showCardInput ? "코드 가리기" : "코드 보기"}</button>
+              </div>
+              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 코드" required />
+            </div>
             <p className="field-help">영어 대소문자와 코드 사이의 공백·하이픈은 구분하지 않아요.</p>
-            <button className="wide" disabled={busy}>{busy ? "확인 중…" : "입장하기"}</button>
+            <button className="wide primary-cta" disabled={busy}>{busy ? "확인 중…" : "입장하기"}</button>
             <p className="help">카드를 잃어버렸거나 입장이 안 되면 선생님께 말씀해 주세요. 이름만으로는 입장할 수 없어요.</p>
           </form>
         </section> : route === "teacher" && role === "none" ? <section className="entry-layout">
-          <div className="hero teacher-hero"><span className="eyebrow">선생님 방</span><h1>우리 반의 작은 배려를<br />준비해요</h1><p>선생님 Google 계정으로 학급을 만들고 입장 카드를 관리할 수 있어요.</p></div>
-          <div className="panel entry-form"><h2>선생님 로그인</h2><p>Google 계정으로 로그인하면 바로 학급을 만들고 운영할 수 있어요.</p>
-            <button className="wide" disabled={busy} onClick={() => void task(teacherLogin)}>{busy ? "로그인 중…" : "Google로 로그인"}</button>
+          <div className="hero teacher-hero">
+            <span className="eyebrow">초등 학급 마니또 · 교사용</span>
+            <h1>우리 반의 작은 배려를<br />준비해요</h1>
+            <p>선생님 Google 계정으로 학급을 만들고 입장 카드와 시즌을 안전하게 운영할 수 있어요.</p>
+            <ul className="hero-highlights" aria-label="교사 기능 안내">
+              <li><strong>간편한 카드 발급</strong> 이메일·휴대전화 없이 학급 코드와 개인 카드로 학생 참여</li>
+              <li><strong>안전한 모니터링</strong> 도움 요청 우선 확인, 쪽지 숨김, 교사 승인 후 정체 공개</li>
+            </ul>
+          </div>
+          <div className="panel entry-form">
+            <div className="entry-form-head">
+              <span className="context-badge">교사 인증</span>
+              <h2>선생님 로그인</h2>
+            </div>
+            <p>Google 계정으로 로그인하면 바로 학급을 만들고 운영할 수 있어요.</p>
+            <button className="wide primary-cta" disabled={busy} onClick={() => void task(teacherLogin)}>{busy ? "로그인 중…" : "Google로 로그인"}</button>
             <button type="button" className="wide outline" disabled={busy} onClick={() => void task(teacherLoginRedirect)}>팝업이 안 열리면 현재 창에서 로그인</button>
           </div>
         </section> : role === "teacher" && teacher?.status !== "verified" ? <section className="panel centered">
@@ -578,15 +612,15 @@ function App() {
           <p>학급 정보는 확인이 끝난 계정에서만 볼 수 있어요.</p>
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
         </section> : role === "teacher" ? <section className="teacher-layout">
-          {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><h1>내 학급</h1><p>운영할 학급을 선택해 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
-            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button onClick={() => void selectClass(item.classId)}>{item.name}<small>{item.schoolYear} · {item.memberCount}명</small></button></li>)}</ul>}
-            {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form"><h2>새 학급</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
+          {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
+            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명</small></button></li>)}</ul>}
+            {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
               <label>학년도<input type="number" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))} required /></label>
               <label>학년군<select value={newGrade} onChange={(event) => setNewGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label>
               <button disabled={busy}>학급 만들기</button></form>}</section> : <div className="teacher-shell">
-            <nav className="teacher-sidebar" aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav>
+            <nav className="teacher-sidebar" aria-label="학급 메뉴"><span className="sidebar-label">학급 운영 메뉴</span>{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav>
             <div className="teacher-main">
-              <div className="teacher-context"><div><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
+              <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
               <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
               {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
                 <div className="class-code"><span>학급 코드</span><strong>{selected.classCode}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
