@@ -14,24 +14,25 @@
 
 ## `createClass`
 
-확인된 교사만 호출한다.
+확인된 교사만 호출한다. `classCode`를 생략하면 6자리 영문·숫자 난수가 자동 생성되며, 지정 시 4~12자 영문·숫자 중복 검사를 거쳐 등록한다.
 
 ```ts
 request: {
   name: string;                         // 1~40자
   schoolYear: number;                   // 현재 연도 ±1
   gradeBand: "lower" | "middle" | "upper";
+  classCode?: string;                   // 4~12자 영문 대소문자·숫자 (선택)
   requestId: string;
 }
 response: {
   classId: string;
-  classCode: string;                    // 8자, 학급 입장용
+  classCode: string;                    // 확정된 4~12자 학급 코드
 }
 ```
 
 ## `registerStudents`
 
-담당 교사가 학급에 학생 1~40명을 추가한다. 학급 전체 최대 인원도 40명이다. 동일 이름은 허용하며 UID로 구분한다.
+담당 교사가 학급에 학생 1~40명을 추가한다. 학급 전체 최대 인원도 40명이다. 동일 이름은 허용하며 UID로 구분한다. 신규 카드는 4자리 영문·숫자 난수(`cardCode`)로 발급된다.
 
 ```ts
 request: {
@@ -43,7 +44,7 @@ response: {
   students: Array<{
     studentUid: string;
     displayName: string;
-    cardCode: string;                   // 최초 성공 응답에서만 제공
+    cardCode: string;                   // 4자리 영문·숫자 난수 (최초 성공 응답에서만 제공)
   }>;
   requiresCredentialRotation: boolean; // 재시도 응답이면 true
 }
@@ -54,12 +55,12 @@ response: {
 
 ## `loginStudent`
 
-로그인 전 학생이 호출한다. 오류는 학급·학생 존재 여부를 구분하지 않는 공통 메시지로 반환한다. 알려진 카드의 비밀번호가 5회 틀리면 15분간 잠근다.
+로그인 전 학생이 호출한다. 오류는 학급·학생 존재 여부를 구분하지 않는 공통 메시지로 반환한다. 알려진 카드의 비밀번호가 5회 틀리면 15분간 잠근다. 신규 4자리 카드(`XXXX`)와 기존 12자리 카드(`XXXX-YYYYYYYY`)를 모두 지원한다.
 
 ```ts
 request: {
-  classCode: string;
-  cardCode: string; // `ABCD-EFGHJKLM` 형태
+  classCode: string; // 4~12자 영문·숫자
+  cardCode: string;  // 4자리(신규) 또는 12자리(기존) 영문·숫자
 }
 response: {
   customToken: string;
@@ -130,7 +131,7 @@ Google 로그인한 교사(비학생 인증 계정)는 `getTeacherStatus` 또는
 | `createCustomMission` | `{classId,text,requestId}` | 담당 교사가 학급 미션을 100자 이내로 추가. 학급당 최대 40개, 멱등 처리 |
 | `updateCustomMission` | `{classId,missionId,text,requestId}` | 담당 교사가 학급 전용 미션(`custom_*`) 문구를 1~100자로 수정. 감사 기록 및 멱등 처리 |
 | `deleteCustomMission` | `{classId,missionId,requestId}` | 담당 교사가 학급 전용 미션(`custom_*`)을 삭제하고 `draft`·`ready` 회차 설정의 `missionIds`에서 제거하며 `customMissionCount`를 차감 |
-| `updateClassInfo` | `{classId,name,schoolYear,gradeBand,requestId}` | 담당 교사가 학급 기본 정보(이름·학년도·학년군)를 수정. 감사 기록 및 멱등 처리 |
+| `updateClassInfo` | `{classId,name,schoolYear,gradeBand,classCode?,requestId}` | 담당 교사가 학급 기본 정보(이름·학년도·학년군·학급 코드)를 수정. 중복 학급 코드 검사, 기존 코드 정리, 감사 기록 및 멱등 처리 |
 | `updateStudentName` | `{classId,studentUid,displayName,requestId}` | 담당 교사가 학생 표시 이름을 수정하고 진행·준비 회차의 `participants` 표시 이름도 함께 동기화 |
 | `removeStudentMember` | `{classId,studentUid,requestId}` | 진행 중 회차에 참여 중이지 않은 학생을 명부에서 제거하고 카드 자격·조회 키·준비 회차 설정 및 Auth 계정을 정리하며 `memberCount`를 차감 |
 | `getRoundReflectionsForTeacher` | `{classId,roundId}` | `revealed`·`archived` 회차에서 참가 학생별 챙긴 친구·마니또·보낸 감사 인사·받은 감사 인사·활동 소감을 일괄 조회. 열람 감사 기록 |

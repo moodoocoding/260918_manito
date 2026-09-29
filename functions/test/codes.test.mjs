@@ -12,14 +12,19 @@ import {
 
 test("class codes exclude ambiguous characters and have a fixed length", () => {
   const code = generateClassCode();
-  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
+  assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
 });
 
 test("student card codes can be normalized and parsed", () => {
   const card = generateStudentCard();
+  assert.match(card.cardCode, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/);
   const parsed = parseStudentCard(card.cardCode.toLowerCase());
   assert.deepEqual(parsed, { loginId: card.loginId, secret: card.secret });
-  assert.equal(normalizeCode(` ${card.loginId}-${card.secret} `), `${card.loginId}${card.secret}`);
+  assert.equal(normalizeCode(` ${card.cardCode} `), card.cardCode);
+
+  // 12자리 기존 카드 파싱 하위 호환성 검증
+  const legacyParsed = parseStudentCard("ABCD-EFGHJKLM");
+  assert.deepEqual(legacyParsed, { loginId: "ABCD", secret: "EFGHJKLM" });
 });
 
 test("student secrets are salted and verified without storing the original", async () => {

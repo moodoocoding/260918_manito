@@ -31,6 +31,11 @@ export function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+export function isValidClassCode(value: string): boolean {
+  const normalized = normalizeCode(value);
+  return normalized.length >= 4 && normalized.length <= 12 && /^[A-Z0-9]+$/.test(normalized);
+}
+
 export interface GeneratedStudentCard {
   loginId: string;
   secret: string;
@@ -38,22 +43,29 @@ export interface GeneratedStudentCard {
 }
 
 export function generateClassCode(): string {
-  return randomCode(8);
+  return randomCode(6);
 }
 
 export function generateStudentCard(): GeneratedStudentCard {
-  const loginId = randomCode(4);
-  const secret = randomCode(8);
-  return { loginId, secret, cardCode: `${loginId}-${secret}` };
+  const code = randomCode(4);
+  return { loginId: code, secret: code, cardCode: code };
 }
 
 export function parseStudentCard(value: string): { loginId: string; secret: string } | null {
   const normalized = normalizeCode(value);
-  if (normalized.length !== 12) return null;
-  return {
-    loginId: normalized.slice(0, 4),
-    secret: normalized.slice(4),
-  };
+  if (normalized.length === 4) {
+    return {
+      loginId: normalized,
+      secret: normalized,
+    };
+  }
+  if (normalized.length === 12) {
+    return {
+      loginId: normalized.slice(0, 4),
+      secret: normalized.slice(4),
+    };
+  }
+  return null;
 }
 
 export function credentialLookupDigest(classId: string, loginId: string): string {

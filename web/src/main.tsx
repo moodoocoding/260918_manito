@@ -91,6 +91,7 @@ function App() {
   const [cardCodeInput, setCardCodeInput] = useState("");
   const [showCardInput, setShowCardInput] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [newClassCode, setNewClassCode] = useState("");
   const [newYear, setNewYear] = useState(new Date().getFullYear());
   const [newGrade, setNewGrade] = useState("middle");
   const [namesInput, setNamesInput] = useState("");
@@ -102,6 +103,7 @@ function App() {
   const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
   const [editingMemberName, setEditingMemberName] = useState("");
   const [editClassName, setEditClassName] = useState("");
+  const [editClassCode, setEditClassCode] = useState("");
   const [editClassYear, setEditClassYear] = useState(new Date().getFullYear());
   const [editClassGrade, setEditClassGrade] = useState("middle");
   const generation = useRef(0);
@@ -124,10 +126,11 @@ function App() {
   useEffect(() => {
     if (selected) {
       setEditClassName(selected.name);
+      setEditClassCode(selected.classCode || "");
       setEditClassYear(selected.schoolYear);
       setEditClassGrade(selected.gradeBand);
     }
-  }, [selected?.classId, selected?.name, selected?.schoolYear, selected?.gradeBand]);
+  }, [selected?.classId, selected?.name, selected?.classCode, selected?.schoolYear, selected?.gradeBand]);
 
   useEffect(() => {
     if (!focusStudentTitleAfterNavigation.current) return;
@@ -442,13 +445,19 @@ function App() {
     event.preventDefault();
     await task(async () => {
       const createdName = newClassName.trim();
-      const key = JSON.stringify([createdName, newYear, newGrade]);
+      const createdCode = newClassCode.trim().toUpperCase();
+      const key = JSON.stringify([createdName, newYear, newGrade, createdCode]);
       if (pendingCreate.current?.key !== key) pendingCreate.current = { key, requestId: crypto.randomUUID() };
       const result = await call<object, { classId: string; classCode?: string }>("createClass", {
-        name: createdName, schoolYear: newYear, gradeBand: newGrade, requestId: pendingCreate.current.requestId,
+        name: createdName,
+        schoolYear: newYear,
+        gradeBand: newGrade,
+        ...(createdCode ? { classCode: createdCode } : {}),
+        requestId: pendingCreate.current.requestId,
       });
       pendingCreate.current = null;
       setNewClassName("");
+      setNewClassCode("");
       const optimisticItem: ClassItem = {
         classId: result.classId,
         classCode: result.classCode,
@@ -561,24 +570,27 @@ function App() {
     if (!selected) return;
     const trimmed = editClassName.trim();
     if (!trimmed) { setError("학급 이름을 입력해 주세요."); return; }
+    const trimmedCode = editClassCode.trim().toUpperCase();
     await task(async () => {
-      const result = await call<object, { classId: string; name: string; schoolYear: number; gradeBand: string }>("updateClassInfo", {
+      const result = await call<object, { classId: string; name: string; schoolYear: number; gradeBand: string; classCode: string }>("updateClassInfo", {
         classId: selected.classId,
         name: trimmed,
         schoolYear: editClassYear,
         gradeBand: editClassGrade,
+        ...(trimmedCode ? { classCode: trimmedCode } : {}),
         requestId: crypto.randomUUID(),
       });
       const updatedSelected: ClassInfo = {
         ...selected,
         name: result.name,
+        classCode: result.classCode || selected.classCode,
         schoolYear: result.schoolYear,
         gradeBand: result.gradeBand,
       };
       setSelected(updatedSelected);
       const updatedClasses = classesRef.current.map((item) =>
         item.classId === selected.classId
-          ? { ...item, name: result.name, schoolYear: result.schoolYear, gradeBand: result.gradeBand }
+          ? { ...item, name: result.name, classCode: result.classCode || item.classCode, schoolYear: result.schoolYear, gradeBand: result.gradeBand }
           : item,
       );
       classesRef.current = updatedClasses;
@@ -748,14 +760,14 @@ function App() {
               <h2>내 카드로 입장하기</h2>
             </div>
             <label htmlFor="student-class-code">학급 코드
-              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value)} placeholder="예: ABCD2345" required />
+              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value)} placeholder="선생님이 알려준 학급 코드" required />
             </label>
             <div className="field-group">
               <div className="field-label-row">
                 <label htmlFor="student-card-code">개인 카드 코드</label>
                 <button type="button" className="small outline inline-toggle" onClick={() => setShowCardInput((value) => !value)}>{showCardInput ? "코드 가리기" : "코드 보기"}</button>
               </div>
-              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 코드" required />
+              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 4자리 코드 (예: 7K9X)" required />
             </div>
             <p className="field-help">영어 대소문자와 코드 사이의 공백·하이픈은 구분하지 않아요.</p>
             <button className="wide primary-cta" disabled={busy}>{busy ? "확인 중…" : "입장하기"}</button>
@@ -788,6 +800,7 @@ function App() {
           {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
             {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button disabled={busy} onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명</small></button></li>)}</ul>}
             {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
+              <label>학급 코드 (선택)<input value={newClassCode} maxLength={12} onChange={(event) => setNewClassCode(event.target.value.toUpperCase())} placeholder="미입력 시 6자리 영문·숫자 자동 생성 (예: SUN2026)" /><small className="field-help">선생님이 기억하기 쉬운 4~12자 영문 대소문자·숫자를 직접 지정할 수 있어요.</small></label>
               <label>학년도<input type="number" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))} required /></label>
               <label>학년군<select value={newGrade} onChange={(event) => setNewGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label>
               <button disabled={busy}>학급 만들기</button></form>}</section> : <div className="teacher-shell">
@@ -824,7 +837,7 @@ function App() {
               </section>}
               {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} />}
               {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
-              {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
+              {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학급 코드·학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학급 코드<input value={editClassCode} maxLength={12} onChange={(event) => setEditClassCode(event.target.value.toUpperCase())} placeholder="예: SUN2026" required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><p className="field-help">학급 코드를 바꾸면 기존에 인쇄한 카드의 학급 코드도 변경되므로 학생들에게 바뀐 코드를 안내해 주세요.</p><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
           {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : confirmMember.action === "remove" ? "이 학생을 명단에서 삭제할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : confirmMember.action === "remove" ? `${confirmMember.member.displayName} 학생의 입장 카드와 명단 정보를 삭제합니다. 진행 중인 시즌에 참여하고 있는 학생은 먼저 시즌을 중지하거나 학생 참여를 중단해야 삭제할 수 있어요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : confirmMember.action === "remove" ? "학생 삭제" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else if (target.action === "remove") void removeMember(target.member); else void changeAccess(target.member); }} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}

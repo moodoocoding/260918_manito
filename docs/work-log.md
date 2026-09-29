@@ -604,3 +604,18 @@
      - `공개 완료`(`revealed`) 및 `보관`(`archived`) 시즌의 `시즌 설정`과 `지난 활동` 화면에서 참가 학생 전원의 챙긴 친구·나를 챙긴 마니또·마니또에게 보낸 감사 인사·이번 시즌 활동 소감을 카드 그리드로 한눈에 모아보고 `window.print()`로 인쇄할 수 있게 했다.
 - `npm run build`(Functions·Web TypeScript 및 Vite 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 모두 통과했다.
 - Firebase 개발 프로젝트 `manito-938cc`(`asia-northeast3`)에 신규 함수 6개(`updateClassInfo`, `updateStudentName`, `removeStudentMember`, `updateCustomMission`, `deleteCustomMission`, `getRoundReflectionsForTeacher`)를 배포하고, GitHub `main`에 푸시해 Vercel 프론트엔드 배포에 반영한다.
+
+## 2026-09-30 — 학급 코드 교사 직접 지정·수정 및 학생 개인 카드 4자리 축소
+
+- 초등학생이 교실에서 긴 학급 코드(8자리)와 개인 카드 코드(12자리 `XXXX-YYYYYYYY`)를 일일이 타이핑하기 어려웠던 문제를 근본적으로 개선했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-custom-class-code-and-4digit-student-card.md)를 기록했다.
+  1. **학급 코드(`classCode`) 교사 직접 지정 및 수정 지원**:
+     - `createClass`와 `updateClassInfo`에 `classCode` 파라미터를 추가하여, 교사가 원하는 4~12자 영문 대소문자·숫자(예: `SUN2026`, `HAPPY2`)로 학급 코드를 직접 지정할 수 있도록 했다. 미입력 시 6자리 영문·숫자 난수가 자동 추천된다.
+     - 대소문자 무관 대문자 정규화(`normalizeCode`) 및 중복 검사(`already-exists`)를 트랜잭션에서 처리하며, 학급 코드 변경 시 이전 코드를 정리하고 감사 로그(`class.code_updated`)를 남긴다.
+     - 새 학급 만들기 폼과 학급 기본 정보 수정 폼에 학급 코드 입력란을 추가하고 변경 시 카드 안내 주의사항을 표기했다.
+  2. **학생 개인 카드 코드(`cardCode`) 4자리 축소 및 12자리 구 카드 하위 호환**:
+     - 신규 학생 등록(`registerStudents`) 및 재발급(`rotateStudentCredential`) 시 발급되는 개인 카드 코드를 4자리 영문·숫자 난수(`XXXX`, $32^4 = 1,048,576$가지 경우의 수)로 축소했다.
+     - `parseStudentCard`에서 4자리 코드와 기존 12자리 코드(`XXXX-YYYYYYYY`)를 모두 정상 파싱하도록 하여, 기존 발급된 카드를 소지한 학생도 문제없이 로그인할 수 있도록 100% 하위 호환성을 보장했다.
+     - `loginStudent`의 학급 코드 유효성 검사를 4~12자로 확장하고, 5회 실패 시 15분 잠금 및 `scrypt` 단방향 해시 보안 체계를 온전히 유지했다.
+     - 학생 로그인 폼의 안내 문구를 `"카드에 적힌 4자리 코드 (예: 7K9X)"`로 정돈했다.
+- `git diff --check`, `npm run build`, `npm run test:functions`(12/12 통과, 4자리 카드 및 12자리 구 카드 파싱 검증), `node --test tests/entry-card-qr.test.mjs`(1/1 통과)가 모두 통과했다.
+- Firebase 개발 프로젝트 `manito-938cc`에 변경된 백엔드 함수(`createClass`, `updateClassInfo`, `loginStudent`, `registerStudents`, `rotateStudentCredential`, `printStudentCards`)를 배포하고, GitHub `main`에 푸시해 Vercel 배포에 반영한다.

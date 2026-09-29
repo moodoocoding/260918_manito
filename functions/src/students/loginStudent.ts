@@ -25,7 +25,7 @@ export const loginStudent = onCall(
     }
     const classCode = normalizeCode(input.classCode);
     const parsedCard = parseStudentCard(input.cardCode);
-    if (classCode.length !== 8 || !parsedCard) throw invalidLogin();
+    if (classCode.length < 4 || classCode.length > 12 || !parsedCard) throw invalidLogin();
 
     const classCodeSnapshot = await db.doc(`classCodes/${classCode}`).get();
     if (!classCodeSnapshot.exists || classCodeSnapshot.get("status") !== "active") {
