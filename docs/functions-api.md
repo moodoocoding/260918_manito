@@ -102,7 +102,7 @@ Google 로그인한 교사(비학생 인증 계정)는 `getTeacherStatus` 또는
 | 함수 | 요청 | 응답 | 권한·오류 |
 |---|---|---|---|
 | `getTeacherStatus` | `null` | `{ status: "verified" \| "suspended", displayName }` | 로그인한 비학생만 조회. `suspended`가 아니면 `teachers/{uid}`(`verified`)와 Custom Claims를 자동 보장한 뒤 `verified` 반환 |
-| `listClasses` | `null` | `{ classes: [{ classId, name, schoolYear, gradeBand, memberCount }] }` | 확인된 교사만 담당 활성 학급 조회 |
+| `listClasses` | `null` | `{ classes: [{ classId, classCode, name, schoolYear, gradeBand, memberCount }] }` | 확인된 교사만 담당 활성 학급 및 활성 학급 코드 조회 |
 | `getClassAccessInfo` | `{ classId }` | `{ classId, classCode, name, schoolYear, gradeBand, memberCount }` | 담당 교사만 학급 코드를 재조회. 다른 학급은 `permission-denied` |
 | `getStudentHome` | `null` | `{ displayName, className, gradeBand, round: null \| { roundId, title, status } }` | 학생 본인 토큰·세션 버전·소속 확인. 회차 없으면 `round: null`; 관계 이름과 다른 명부는 반환하지 않음 |
 | `setStudentAccess` | `{ classId, studentUid, status: "active" \| "blocked", requestId }` | `{ studentUid, status }` | 담당 교사만 변경, 세션 버전 증가, 감사 기록. 같은 요청 재시도는 동일 결과 |

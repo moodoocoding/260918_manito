@@ -25,11 +25,21 @@ export const getClassAccessInfo = onCall( async (request) => {
 export const listClasses = onCall( async (request) => {
   const teacherUid = await requireVerifiedTeacher(request);
   const classes = await db.collection("classes").where("teacherUids", "array-contains", teacherUid).get();
-  return { classes: classes.docs.filter((item) => item.get("status") === "active").map((item) => ({
-    classId: item.id,
-    name: item.get("name") as string,
-    schoolYear: item.get("schoolYear") as number,
-    gradeBand: item.get("gradeBand") as string,
-    memberCount: item.get("memberCount") as number,
-  })) };
+  const activeDocs = classes.docs.filter((item) => item.get("status") === "active");
+  const codeSnapshots = await Promise.all(
+    activeDocs.map((item) => db.collection("classCodes").where("classId", "==", item.id).get()),
+  );
+  return {
+    classes: activeDocs.map((item, index) => {
+      const activeCode = codeSnapshots[index]?.docs.find((code) => code.get("status") === "active");
+      return {
+        classId: item.id,
+        classCode: activeCode?.id ?? "",
+        name: item.get("name") as string,
+        schoolYear: item.get("schoolYear") as number,
+        gradeBand: item.get("gradeBand") as string,
+        memberCount: item.get("memberCount") as number,
+      };
+    }),
+  };
 });

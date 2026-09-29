@@ -570,3 +570,12 @@
   - `npm run build`(Functions·Web TypeScript 및 Vite 프로덕션 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 모두 통과했다.
   - 실제 Headless Chrome 브라우저에서 학생·교사 첫 입장 화면과 인증 후 학생 4개 탭·교사 운영 요약·상태 확인 화면(40명·80개 미션·50건 긴 쪽지 합성 데이터)을 `320×568`, `360×800`, `390×844`, `768×1024`, `1280×800` 및 `320×700@200%` 글자 확대(총 41개 시나리오)로 렌더링해 `overflowX = 0`, 콘솔/런타임 오류 `0건`을 확인하고 스크린샷을 `docs/design-reviews/assets/`에 보존했다.
   - 미확인: 실제 교사·학생 사용자 대면 관찰 및 macOS/iOS VoiceOver 실기기 스크린리더 탐색. Firebase 백엔드 함수·Rules는 변경하지 않았다. GitHub 푸시 및 Vercel 배포 여부는 별도로 구분한다.
+
+## 2026-09-29 — 교사 학급 선택 및 대시보드 진입 반응 속도 개선
+
+- 교사 로그인 후 `내 학급`에서 운영할 학급을 클릭했을 때 수 초간 화면이 멈추던 원인을 분석해 수정했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-29-teacher-class-selection-speed.md)를 기록했다.
+  1. **클릭 즉시(0ms) 화면 전환 및 병렬 조회**: `selectClass`가 `getClassAccessInfo`와 `getDocs(members)`를 순차 완료할 때까지 화면 전환을 가로막던 구조를 바꿔, `classes` 목록의 캐시 정보로 클릭 즉시 학급 대시보드로 화면을 전환하고 명단·코드를 `Promise.all`로 병렬 조회하도록 개선했다. 명단 로드 전 상단 문맥 바의 인원수는 `selected.memberCount`를 유지해 `0명` 깜빡임을 막았다.
+  2. **`listClasses`에서 `classCode` 포함 반환**: `listClasses`가 각 활성 학급의 `classCode`를 함께 반환하도록 개선해 학급 클릭 시 추가 `getClassAccessInfo` Cloud Function 왕복 호출과 콜드 스타트 대기를 제거했다(URL 직접 진입 등 캐시 미존재 시 폴백 유지). 또한 이미 인증 클레임이 부여된 교사의 초기 `loadTeacher`에서도 `getTeacherStatus`와 `listClasses`를 병렬 호출한다.
+  3. **시즌 목록(`rounds`) Firestore 직접 조회 우선 및 로딩 상태 분리**: `TeacherRounds`가 매번 `listRounds` Cloud Function 콜드 스타트를 기다리던 대신 교사 읽기 권한이 허용된 `classes/{classId}/rounds`를 Firestore 클라이언트에서 직접 조회(실패 시 `listRounds` 폴백)하도록 고속화했다. 또한 `roundsLoading` 상태를 추가해 로딩 중 `"현재 진행 중인 시즌이 없어요"`가 잘못 표시되던 문제를 해결했다.
+  4. **미션 카탈로그(`getMissionCatalog`) 지연 로딩**: 학급 첫 진입(`overview`) 시 무조건 호출하던 `getMissionCatalog`를 시즌 설정(`view === "rounds" && creating`) 시점에만 지연 호출하도록 변경했다.
+- `npm run build`, 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 통과했다. Firebase 개발 프로젝트 `manito-938cc`의 `listClasses` 함수 배포와 GitHub `main` 푸시(Vercel 프런트엔드 배포)를 구분해 반영한다.

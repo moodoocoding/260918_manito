@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { call } from "./firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { call, db } from "./firebase";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import { TeacherCommunity } from "./TeacherCommunity";
 import { TeacherStudentStatus } from "./TeacherStudentStatus";
@@ -60,6 +61,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [roundsLoading, setRoundsLoading] = useState(true);
   const [roundsError, setRoundsError] = useState(false);
   const [chosen, setChosen] = useState<string>("");
   const chosenRef = useRef("");
@@ -67,6 +69,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
   const [summary, setSummary] = useState<Summary | null>(null);
   const [catalog, setCatalog] = useState<Mission[]>([]);
   const [catalogError, setCatalogError] = useState(false);
+  const catalogLoadedKey = useRef("");
   const [customMission, setCustomMission] = useState("");
   const [title, setTitle] = useState("");
   const [start, setStart] = useState(() => koreaDay());
@@ -106,8 +109,41 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
   useEffect(() => { onDirtyChange?.(view === "rounds" && creating && dirty); }, [view, creating, dirty, onDirtyChange]);
 
   const load = useCallback(async () => {
-    const result = await call<{classId: string}, {rounds: Round[]}>("listRounds", {classId});
-    setRounds(result.rounds); setRoundsError(false);
+    setRoundsLoading(true);
+    try {
+      const hasPreview = Boolean((window as unknown as { __MANITTO_PREVIEW__?: unknown }).__MANITTO_PREVIEW__);
+      if (!hasPreview) {
+        try {
+          const snapshot = await getDocs(collection(db, `classes/${classId}/rounds`));
+          const directRounds: Round[] = snapshot.docs.map((doc) => {
+            const startsAtRaw = doc.get("startsAt");
+            const endsAtRaw = doc.get("endsAt");
+            const startsAt = typeof startsAtRaw?.toDate === "function" ? startsAtRaw.toDate().toISOString() : String(startsAtRaw ?? "");
+            const endsAt = typeof endsAtRaw?.toDate === "function" ? endsAtRaw.toDate().toISOString() : String(endsAtRaw ?? "");
+            return {
+              roundId: doc.id,
+              title: String(doc.get("title") ?? ""),
+              status: String(doc.get("status") ?? "draft"),
+              startsAt,
+              endsAt,
+              activityDates: Array.isArray(doc.get("activityDates")) ? doc.get("activityDates") as string[] : [],
+              participantCount: Number(doc.get("participantCount") ?? 0),
+              rosterVersion: Number(doc.get("rosterVersion") ?? 1),
+              allowFreeTextMessages: doc.get("allowFreeTextMessages") !== false,
+            };
+          }).sort((a, b) => String(b.startsAt).localeCompare(String(a.startsAt)));
+          setRounds(directRounds);
+          setRoundsError(false);
+          return;
+        } catch {
+          // Fallback to callable function if direct Firestore read fails
+        }
+      }
+      const result = await call<{classId: string}, {rounds: Round[]}>("listRounds", {classId});
+      setRounds(result.rounds); setRoundsError(false);
+    } finally {
+      setRoundsLoading(false);
+    }
   }, [classId]);
   const loadOverview = useCallback(async (roundId: string) => {
     const result = await call<object, Overview>("getTeacherRoundOverview", {classId, roundId});
@@ -126,12 +162,17 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     setOverviewError(false);
   }, [classId]);
   useEffect(() => { summaryRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); void load().catch(() => {setRoundsError(true); setError("시즌 목록을 불러오지 못했어요.");}); }, [load]);
-  async function loadCatalog() {
+  const loadCatalog = useCallback(async () => {
+    const key = `${classId}:${gradeBand}`;
     try {
       const result = await call<object, {missions: Mission[]}>("getMissionCatalog", {classId, gradeBand});
+      catalogLoadedKey.current = key;
       setCatalog(result.missions); setCatalogError(false);
-    } catch { setCatalogError(true); }
-  }
+    } catch {
+      catalogLoadedKey.current = "";
+      setCatalogError(true);
+    }
+  }, [classId, gradeBand]);
   async function addCustomMission() {
     if (!customMission.trim()) return;
     await run(async () => {
@@ -166,7 +207,17 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       setNotice("쪽지를 학생 화면에서 숨겼어요.");
     });
   }
-  useEffect(() => { void loadCatalog(); }, [classId, gradeBand]);
+  useEffect(() => {
+    const key = `${classId}:${gradeBand}`;
+    if (catalogLoadedKey.current !== key) {
+      setCatalog([]);
+      setCatalogError(false);
+    }
+    if (view === "rounds" && creating && catalogLoadedKey.current !== key) {
+      catalogLoadedKey.current = key;
+      void loadCatalog();
+    }
+  }, [classId, gradeBand, view, creating, loadCatalog]);
   useEffect(() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); }, [members]);
   useEffect(() => {
     const hide = () => { if (document.visibilityState !== "visible") {
@@ -377,11 +428,11 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     {view === "overview" && <div className="stack">
       <div className={`season-status-banner${activeRound ? " is-active" : " is-empty"}`}>
         <div>
-          <span className="eyebrow">{activeRound ? roundStatusLabels[activeRound.status] : "시즌 준비 필요"}</span>
-          <h3>{activeRound ? activeRound.title : "현재 진행 중인 시즌이 없어요"}</h3>
-          <p>{activeRound ? `참가 학생 ${activeRound.participantCount}명 · 수업일 ${activeRound.activityDates.length}일 운영` : "학생을 등록하고 새 시즌을 준비해 보세요."}</p>
+          <span className="eyebrow">{activeRound ? roundStatusLabels[activeRound.status] : roundsLoading ? "시즌 확인 중" : "시즌 준비 필요"}</span>
+          <h3>{activeRound ? activeRound.title : roundsLoading ? "시즌 정보를 확인하고 있어요…" : "현재 진행 중인 시즌이 없어요"}</h3>
+          <p>{activeRound ? `참가 학생 ${activeRound.participantCount}명 · 수업일 ${activeRound.activityDates.length}일 운영` : roundsLoading ? "학급의 최근 활동 상태를 불러오고 있어요." : "학생을 등록하고 새 시즌을 준비해 보세요."}</p>
         </div>
-        <button className={activeRound ? "outline" : "primary-cta"} onClick={() => onNavigate("rounds")}>{activeRound ? "진행 시즌 자세히 보기" : "새 시즌 준비하기"}</button>
+        {!roundsLoading && <button className={activeRound ? "outline" : "primary-cta"} onClick={() => onNavigate("rounds")}>{activeRound ? "진행 시즌 자세히 보기" : "새 시즌 준비하기"}</button>}
       </div>
       {overviewError ? <p className="message error" role="alert">현황을 불러오지 못했어요. <button className="small outline" onClick={() => activeRound && void loadSummary(activeRound.roundId).catch(() => setOverviewError(true))}>다시 시도</button></p>
         : activeRound && !summary ? <p role="status">현황을 불러오는 중이에요…</p> : null}
@@ -390,7 +441,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
         <div className="teacher-overview-grid">
           <button type="button" className={`task-card${(summary?.helpCount ?? 0) > 0 ? " is-urgent" : ""}`} onClick={() => onNavigate("status", "help")}>
             <span className={`task-badge${(summary?.helpCount ?? 0) > 0 ? " badge-urgent" : " badge-calm"}`}>{(summary?.helpCount ?? 0) > 0 ? "우선 처리 필요" : "대기 요청 없음"}</span>
-            <strong>도움 요청 {summary?.helpCount ?? "확인 중"}건</strong>
+            <strong>도움 요청 {!roundsLoading && !activeRound ? 0 : (summary?.helpCount ?? "확인 중")}건</strong>
             <span>학생이 보낸 불편·걱정 확인 및 처리로 이동</span>
           </button>
           <button type="button" className="task-card" onClick={() => onNavigate("status", "messages")}>
@@ -414,7 +465,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     </div>}
 
     {view === "rounds" && !creating && !current && <div className="round-list">
-      {roundsError ? <p className="message error" role="alert">시즌 목록을 불러오지 못했어요. <button className="small outline" onClick={() => void load().catch(() => setRoundsError(true))}>다시 시도</button></p> : rounds.length === 0 ? <p className="muted">아직 시즌이 없어요. 새 시즌을 준비해 보세요.</p> : orderedRounds.map((round) =>
+      {roundsError ? <p className="message error" role="alert">시즌 목록을 불러오지 못했어요. <button className="small outline" onClick={() => void load().catch(() => setRoundsError(true))}>다시 시도</button></p> : roundsLoading && rounds.length === 0 ? <p role="status">시즌 목록을 불러오는 중이에요…</p> : rounds.length === 0 ? <p className="muted">아직 시즌이 없어요. 새 시즌을 준비해 보세요.</p> : orderedRounds.map((round) =>
         <button key={round.roundId} type="button" onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong>
           <small>{roundStatusLabels[round.status] ?? round.status} · {round.participantCount}명 · {round.activityDates.length}수업일</small></button>)}
     </div>}
@@ -478,7 +529,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     </div>}
 
     {view === "status" && <div className="stack teacher-status-layout">
-      {!current ? <p className="muted">진행 중인 활동이 없어요. 지난 시즌은 시즌 목록에서 확인해 주세요.</p> : <>
+      {!current ? (roundsLoading ? <p role="status">시즌 상태를 확인하고 있어요…</p> : <p className="muted">진행 중인 활동이 없어요. 지난 시즌은 시즌 목록에서 확인해 주세요.</p>) : <>
         <div className="status-round-context">
           <span className="eyebrow">{roundStatusLabels[current.status] ?? current.status}</span>
           <strong>{current.title}</strong>
@@ -512,7 +563,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       </>}
     </div>}
 
-    {view === "history" && <div className="round-list">{rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).length === 0 ? <p className="muted">지난 활동이 없어요.</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).map((round) => <button key={round.roundId} onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong><small>{roundStatusLabels[round.status]} · {koreaDay(new Date(round.startsAt))} ~ {koreaDay(new Date(round.endsAt))}</small></button>)}
+    {view === "history" && <div className="round-list">{roundsLoading && rounds.length === 0 ? <p role="status">지난 활동을 불러오는 중이에요…</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).length === 0 ? <p className="muted">지난 활동이 없어요.</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).map((round) => <button key={round.roundId} onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong><small>{roundStatusLabels[round.status]} · {koreaDay(new Date(round.startsAt))} ~ {koreaDay(new Date(round.endsAt))}</small></button>)}
       {current && ["revealed","archived","cancelled"].includes(current.status) && <div className="review-card"><h3>{current.title} · {roundStatusLabels[current.status]}</h3><p>주제·참가자·미션·쪽지 설정만 다음 시즌에 복사합니다. 이전 배정과 활동 기록은 복사하지 않아요.</p><label>다음 시즌 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정 복사해 새 시즌 준비</button></div>}</div>}
     {confirmation && <ConfirmDialog title={confirmation.title} detail={confirmation.detail} confirmLabel={confirmation.button} busy={busy} onCancel={() => setConfirmAction(null)} onConfirm={confirmedAction} />}
     {moderationTarget && <ConfirmDialog title="이 쪽지를 학생 화면에서 숨길까요?" detail="받은 학생의 화면에서 숨기고 답장을 막습니다. 교사는 안전 기록을 계속 확인할 수 있어요." confirmLabel="쪽지 숨기기" busy={busy} onCancel={() => setModerationTarget(null)} onConfirm={() => {const id=moderationTarget; setModerationTarget(null); void hideForClass(id);}} />}

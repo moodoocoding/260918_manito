@@ -28,7 +28,7 @@ function teacherLocation(path: string): {classId: string | null; page: TeacherPa
 }
 
 type TeacherStatus = { status: "pending" | "verified" | "suspended"; displayName: string };
-type ClassItem = { classId: string; name: string; schoolYear: number; gradeBand: string; memberCount: number };
+type ClassItem = { classId: string; classCode?: string; name: string; schoolYear: number; gradeBand: string; memberCount: number };
 type ClassInfo = ClassItem & { classCode: string };
 type Member = { studentUid: string; displayName: string; accessStatus: string; printableCardAvailable: boolean };
 type Card = { studentUid: string; displayName: string; cardCode: string };
@@ -75,6 +75,7 @@ function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selected, setSelected] = useState<ClassInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [cardCodes, setCardCodes] = useState<Record<string, string>>({});
   const [cardCodesLoading, setCardCodesLoading] = useState(false);
   const [cardCodesError, setCardCodesError] = useState(false);
@@ -99,6 +100,8 @@ function App() {
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block"} | null>(null);
   const generation = useRef(0);
+  const classesRef = useRef<ClassItem[]>([]);
+  const classSelectVersion = useRef(0);
   const studentRoundId = useRef<string | null>(null);
   const studentMailDraft = useRef<StudentMailDraft>(emptyStudentMailDraft());
   const roundDirty = useRef(false);
@@ -125,7 +128,9 @@ function App() {
 
   const clearPrivate = useCallback(() => {
     generation.current += 1;
-    setTeacher(null); setClasses([]); setSelected(null); setMembers([]);
+    classSelectVersion.current += 1;
+    classesRef.current = [];
+    setTeacher(null); setClasses([]); setSelected(null); setMembers([]); setMembersLoading(false);
     setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setHome(null);
     cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(false);
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
@@ -149,6 +154,27 @@ function App() {
 
   const loadTeacher = useCallback(async () => {
     const current = generation.current;
+    const currentUser = auth.currentUser;
+    const initialToken = currentUser ? await getIdTokenResult(currentUser) : null;
+    const alreadyVerifiedClaim = initialToken?.claims.role === "teacher" && initialToken?.claims.teacherVerified === true;
+
+    if (alreadyVerifiedClaim) {
+      const [status, result] = await Promise.all([
+        call<null, TeacherStatus>("getTeacherStatus", null),
+        call<null, { classes: ClassItem[] }>("listClasses", null),
+      ]);
+      if (current !== generation.current) return;
+      setTeacher(status);
+      if (status.status === "verified") {
+        classesRef.current = result.classes;
+        setClasses(result.classes);
+      } else {
+        classesRef.current = [];
+        setClasses([]); setSelected(null); setMembers([]);
+      }
+      return;
+    }
+
     const status = await call<null, TeacherStatus>("getTeacherStatus", null);
     if (current !== generation.current) return;
     setTeacher(status);
@@ -162,8 +188,10 @@ function App() {
       if (current !== generation.current) return;
       const result = await call<null, { classes: ClassItem[] }>("listClasses", null);
       if (current !== generation.current) return;
+      classesRef.current = result.classes;
       setClasses(result.classes);
     } else {
+      classesRef.current = [];
       setClasses([]); setSelected(null); setMembers([]);
     }
   }, []);
@@ -334,34 +362,91 @@ function App() {
   async function selectClass(classId: string, page: TeacherPage = "overview", recordHistory = true) {
     if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급을 바꿀까요?")) return;
     roundDirty.current = false;
-    await task(async () => {
-      const current = generation.current;
-      setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
-      const info = await call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
-      const result = await getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey")));
-      if (current !== generation.current) return;
-      setSelected(info);
-      setMembers(result.docs.map((item) => ({ studentUid: item.id, displayName: String(item.get("displayName")),
-        accessStatus: String(item.get("accessStatus")), printableCardAvailable: item.get("printableCardAvailable") === true })));
+    const current = generation.current;
+    const selectVersion = ++classSelectVersion.current;
+    setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setDeleteName("");
+    setError(""); setNotice("");
+
+    const cached = classesRef.current.find((item) => item.classId === classId)
+      ?? (selected?.classId === classId ? selected : null);
+    if (cached) {
+      setSelected({
+        ...cached,
+        classCode: cached.classCode || (selected?.classId === classId ? selected.classCode : ""),
+      });
+      if (selected?.classId !== classId) setMembers([]);
+      setMembersLoading(true);
       setTeacherPage(page);
       setTeacherStatusTarget(null);
       if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
       lastTeacherPath.current = window.location.pathname;
       window.scrollTo(0, 0);
+    }
+
+    await task(async () => {
+      try {
+        const previewMembers = (window as unknown as { __MANITTO_PREVIEW__?: { members?: Member[] } }).__MANITTO_PREVIEW__?.members;
+        const membersPromise = previewMembers
+          ? Promise.resolve(previewMembers)
+          : getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey"))).then((result) =>
+            result.docs.map((item) => ({
+              studentUid: item.id,
+              displayName: String(item.get("displayName")),
+              accessStatus: String(item.get("accessStatus")),
+              printableCardAvailable: item.get("printableCardAvailable") === true,
+            })),
+          );
+        const infoPromise: Promise<ClassInfo> = cached?.classCode
+          ? Promise.resolve({ ...cached, classCode: cached.classCode })
+          : call<{ classId: string }, ClassInfo>("getClassAccessInfo", { classId });
+
+        const [info, loadedMembers] = await Promise.all([infoPromise, membersPromise]);
+        if (current !== generation.current || selectVersion !== classSelectVersion.current) return;
+        setSelected(info);
+        if (!cached?.classCode && info.classCode) {
+          const updated = classesRef.current.map((item) => item.classId === classId ? { ...item, classCode: info.classCode } : item);
+          classesRef.current = updated;
+          setClasses(updated);
+        }
+        setMembers(loadedMembers);
+        if (!cached) {
+          setTeacherPage(page);
+          setTeacherStatusTarget(null);
+          if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
+          lastTeacherPath.current = window.location.pathname;
+          window.scrollTo(0, 0);
+        }
+      } finally {
+        if (current === generation.current && selectVersion === classSelectVersion.current) {
+          setMembersLoading(false);
+        }
+      }
     });
   }
 
   async function createClass(event: React.FormEvent) {
     event.preventDefault();
     await task(async () => {
-      const key = JSON.stringify([newClassName, newYear, newGrade]);
+      const createdName = newClassName.trim();
+      const key = JSON.stringify([createdName, newYear, newGrade]);
       if (pendingCreate.current?.key !== key) pendingCreate.current = { key, requestId: crypto.randomUUID() };
-      const result = await call<object, { classId: string }>("createClass", {
-        name: newClassName, schoolYear: newYear, gradeBand: newGrade, requestId: pendingCreate.current.requestId,
+      const result = await call<object, { classId: string; classCode?: string }>("createClass", {
+        name: createdName, schoolYear: newYear, gradeBand: newGrade, requestId: pendingCreate.current.requestId,
       });
       pendingCreate.current = null;
       setNewClassName("");
-      await loadTeacher(); await selectClass(result.classId);
+      const optimisticItem: ClassItem = {
+        classId: result.classId,
+        classCode: result.classCode,
+        name: createdName,
+        schoolYear: newYear,
+        gradeBand: newGrade,
+        memberCount: 0,
+      };
+      const nextClasses = [...classesRef.current.filter((item) => item.classId !== result.classId), optimisticItem];
+      classesRef.current = nextClasses;
+      setClasses(nextClasses);
+      await Promise.all([loadTeacher(), selectClass(result.classId)]);
       setNotice("학급을 만들었어요.");
     });
   }
@@ -613,26 +698,26 @@ function App() {
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
         </section> : role === "teacher" ? <section className="teacher-layout">
           {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
-            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명</small></button></li>)}</ul>}
+            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button disabled={busy} onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명</small></button></li>)}</ul>}
             {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
               <label>학년도<input type="number" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))} required /></label>
               <label>학년군<select value={newGrade} onChange={(event) => setNewGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label>
               <button disabled={busy}>학급 만들기</button></form>}</section> : <div className="teacher-shell">
             <nav className="teacher-sidebar" aria-label="학급 메뉴"><span className="sidebar-label">학급 운영 메뉴</span>{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav>
             <div className="teacher-main">
-              <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
+              <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
               <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
               {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
-                <div className="class-code"><span>학급 코드</span><strong>{selected.classCode}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
+                <div className="class-code"><span>학급 코드</span><strong>{selected.classCode || "확인 중…"}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
                 {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
                   : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
-                <div className="card-list-heading"><div><h3>학생 명단 · {members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
+                <div className="card-list-heading"><div><h3>학생 명단 · {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
                   <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button></div>
                 <div className="card-code-notice"><span>개인 코드는 선생님에게만 표시돼요. 다른 화면으로 이동하거나 5분이 지나면 가려집니다.</span><button type="button" className="small outline" disabled={cardCodesLoading || activeMemberUids.length === 0} onClick={() => void loadCardCodes()}>{cardCodesLoading ? "코드 확인 중…" : cardCodesHidden ? "코드 다시 보기" : "코드 새로고침"}</button></div>
                 {cardCodesError && <p className="message error" role="alert">개인 코드를 불러오지 못했어요. 코드 새로고침을 눌러 다시 시도해 주세요.</p>}
                 <div className="page-actions card-filters"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 불가</option></select></label></div>
                 <div className="card-selection-toolbar"><button type="button" className="small outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setSelectedCardUids(activeMemberUids)}>전체 선택</button><button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setSelectedCardUids([])}>선택 해제</button><button type="button" disabled={busy || selectedCardUids.length === 0} onClick={() => void preparePrint(selectedCardUids)}>선택한 카드 {selectedCardUids.length}장 출력</button></div>
-                {members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요. 학생을 등록하면 입장 카드를 출력할 수 있어요.</p> :
+                {membersLoading && members.length === 0 ? <p role="status">학생 명단을 불러오는 중이에요…</p> : members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요. 학생을 등록하면 입장 카드를 출력할 수 있어요.</p> :
                   filteredMembers.length === 0 ? <p className="muted">조건에 맞는 학생이 없어요.</p> :
                     <ol className="student-card-list">{filteredMembers.map((member) => {
                       const checked = selectedCardUids.includes(member.studentUid);
