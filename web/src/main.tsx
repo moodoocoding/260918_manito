@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, getIdTokenResult } from "firebase/auth";
-import { auth, call, db, logout, studentLogin, teacherLogin } from "./firebase";
+import { auth, call, consumeAuthRedirectError, db, logout, prepareTeacherAuth, studentLogin, teacherLogin, teacherLoginRedirect } from "./firebase";
 import { TeacherRounds, type TeacherStatusSection } from "./TeacherRounds";
 import { TeacherAssignments } from "./TeacherAssignments";
 import { StudentRound, type StudentMissionUi } from "./StudentRound";
@@ -42,7 +42,13 @@ const koreaDateLabel = (iso?: string) => iso ? new Intl.DateTimeFormat("ko-KR", 
 function errorText(error: unknown): string {
   if (error && typeof error === "object" && "code" in error) {
     const code = String(error.code);
-    if (code.includes("permission-denied")) return "접근 권한이 없거나 입장 카드가 변경되었어요.";
+    if (code.includes("popup-blocked")) return "브라우저에서 Google 로그인 팝업 창이 차단되었어요. 팝업 차단을 해제하거나 아래 '팝업이 안 열리면 현재 창에서 로그인'을 눌러 주세요.";
+    if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) return "Google 로그인 창이 닫혔어요. 다시 로그인 버튼을 눌러 주세요.";
+    if (code.includes("unauthorized-domain")) return "현재 접속 주소가 로그인 허용 도메인에 등록되지 않았어요. 공식 주소(manito-one-blond.vercel.app)로 접속해 주세요.";
+    if (code.includes("web-storage-unsupported")) return "브라우저의 쿠키·저장소 차단 설정 때문에 로그인 창을 열지 못했어요. 일반 브라우저 창에서 다시 시도해 주세요.";
+    if (code.includes("operation-not-supported-in-this-environment")) return "현재 브라우저 환경에서는 팝업 로그인을 사용할 수 없어요. 아래 '팝업이 안 열리면 현재 창에서 로그인'을 눌러 주세요.";
+    if (code.includes("network-request-failed")) return "네트워크 연결을 확인하고 다시 시도해 주세요.";
+    if (code.includes("permission-denied")) return "접근 권한이 없거나 입장 정보가 변경되었어요.";
     if (code.includes("unavailable")) return "연결을 확인하고 다시 시도해 주세요.";
     if (code.includes("unauthenticated")) return "입장 정보를 다시 확인해 주세요.";
     if (code.includes("already-exists")) return "같은 요청 번호가 다른 작업에 사용되었어요. 다시 시작해 주세요.";
@@ -105,12 +111,17 @@ function App() {
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
   const focusStudentTitleAfterNavigation = useRef(false);
+  const preserveErrorOnSignOut = useRef(false);
 
   useEffect(() => {
     if (!focusStudentTitleAfterNavigation.current) return;
     focusStudentTitleAfterNavigation.current = false;
     document.querySelector<HTMLElement>(".student-page-title")?.focus();
   }, [studentPage]);
+
+  useEffect(() => {
+    if (route === "teacher" && role === "none") prepareTeacherAuth();
+  }, [route, role]);
 
   const clearPrivate = useCallback(() => {
     generation.current += 1;
@@ -126,10 +137,12 @@ function App() {
     roundDirty.current = false;
   }, []);
 
-  const exit = useCallback(async (broadcast = true) => {
+  const exit = useCallback(async (broadcast = true, keepError = false) => {
     clearPrivate();
     setRole("none");
-    setError(""); setNotice("");
+    if (!keepError) setError("");
+    setNotice("");
+    if (keepError) preserveErrorOnSignOut.current = true;
     if (broadcast) channel.current?.postMessage({ type: "logout" });
     await logout();
   }, [clearPrivate]);
@@ -140,6 +153,13 @@ function App() {
     if (current !== generation.current) return;
     setTeacher(status);
     if (status.status === "verified") {
+      if (auth.currentUser) {
+        const token = await getIdTokenResult(auth.currentUser);
+        if (token.claims.role !== "teacher" || token.claims.teacherVerified !== true) {
+          await auth.currentUser.getIdToken(true);
+        }
+      }
+      if (current !== generation.current) return;
       const result = await call<null, { classes: ClassItem[] }>("listClasses", null);
       if (current !== generation.current) return;
       setClasses(result.classes);
@@ -166,6 +186,9 @@ function App() {
   }, []);
 
   useEffect(() => {
+    void consumeAuthRedirectError().then((redirectError) => {
+      if (redirectError) setError(errorText(redirectError));
+    });
     channel.current = new BroadcastChannel("manitto-session");
     channel.current.onmessage = (event) => {
       if (event.data?.type === "logout") void exit(false);
@@ -193,7 +216,12 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearPrivate();
       const current = generation.current;
-      setLoading(true); setError("");
+      setLoading(true);
+      if (preserveErrorOnSignOut.current) {
+        preserveErrorOnSignOut.current = false;
+      } else {
+        setError("");
+      }
       if (!user) { setRole("none"); setLoading(false); return; }
       try {
         const token = await getIdTokenResult(user);
@@ -212,8 +240,9 @@ function App() {
           else if (!window.location.pathname.startsWith("/teacher")) history.replaceState(null, "", "/teacher");
         }
       } catch (caught) {
-        await exit();
-        setError(errorText(caught));
+        const message = errorText(caught);
+        await exit(true, true);
+        setError(message);
       } finally { if (current === generation.current) setLoading(false); }
     });
     return () => { unsubscribe(); channel.current?.close(); window.removeEventListener("popstate", onPop); };
@@ -539,8 +568,11 @@ function App() {
             <p className="help">카드를 잃어버렸거나 입장이 안 되면 선생님께 말씀해 주세요. 이름만으로는 입장할 수 없어요.</p>
           </form>
         </section> : route === "teacher" && role === "none" ? <section className="entry-layout">
-          <div className="hero teacher-hero"><span className="eyebrow">선생님 방</span><h1>우리 반의 작은 배려를<br />준비해요</h1><p>확인된 선생님 계정으로 학급을 만들고 학생 카드를 관리할 수 있어요.</p></div>
-          <div className="panel entry-form"><h2>선생님 로그인</h2><p>Google 계정으로 로그인한 뒤 운영자의 확인을 기다려 주세요.</p><button className="wide" disabled={busy} onClick={() => void task(teacherLogin)}>{busy ? "로그인 중…" : "Google로 로그인"}</button></div>
+          <div className="hero teacher-hero"><span className="eyebrow">선생님 방</span><h1>우리 반의 작은 배려를<br />준비해요</h1><p>선생님 Google 계정으로 학급을 만들고 입장 카드를 관리할 수 있어요.</p></div>
+          <div className="panel entry-form"><h2>선생님 로그인</h2><p>Google 계정으로 로그인하면 바로 학급을 만들고 운영할 수 있어요.</p>
+            <button className="wide" disabled={busy} onClick={() => void task(teacherLogin)}>{busy ? "로그인 중…" : "Google로 로그인"}</button>
+            <button type="button" className="wide outline" disabled={busy} onClick={() => void task(teacherLoginRedirect)}>팝업이 안 열리면 현재 창에서 로그인</button>
+          </div>
         </section> : role === "teacher" && teacher?.status !== "verified" ? <section className="panel centered">
           <div className="big-icon">🔒</div><h1>{teacher?.status === "suspended" ? "이용이 중지됐어요" : "선생님 확인을 기다리고 있어요"}</h1>
           <p>학급 정보는 확인이 끝난 계정에서만 볼 수 있어요.</p>

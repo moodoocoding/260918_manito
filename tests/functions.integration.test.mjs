@@ -245,4 +245,16 @@ test("teacher creates a class, registers students, and rotates a student card", 
   await assert.rejects(httpsCallable(teacherFunctions, "listClasses")(), {
     code: "functions/permission-denied",
   });
+
+  const freshTeacherUid = `teacher-fresh-${crypto.randomUUID().slice(0, 8)}`;
+  await adminAuth.createUser({ uid: freshTeacherUid, email: `${freshTeacherUid}@example.test`, displayName: "새 선생님" });
+  await signInWithCustomToken(otherTeacherAuth, await adminAuth.createCustomToken(freshTeacherUid));
+  const freshStatus = await httpsCallable(otherTeacherFunctions, "getTeacherStatus")();
+  assert.equal(freshStatus.data.status, "verified");
+  const freshDoc = await adminDb.doc(`teachers/${freshTeacherUid}`).get();
+  assert.equal(freshDoc.get("verificationStatus"), "verified");
+  const freshUser = await adminAuth.getUser(freshTeacherUid);
+  assert.equal(freshUser.customClaims?.role, "teacher");
+  assert.equal(freshUser.customClaims?.teacherVerified, true);
+  assert.deepEqual((await httpsCallable(otherTeacherFunctions, "listClasses")()).data.classes, []);
 });

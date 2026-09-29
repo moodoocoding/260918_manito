@@ -779,8 +779,8 @@ Cloud Functions 운영 배포에는 Blaze 요금제와 결제 계정 연결이 �
 ### 12.6 웹 연결과 인증의 선행 작업 · D1
 
 1. **개발환경 연결:** `manito-938cc` 웹 앱을 등록하고 개발용 환경 변수 예제를 작성한다. Emulator 연결은 명시적 개발 모드에서만 허용하며 실제 환경 설정과 섞이지 않게 한다.
-2. **교사 로그인:** Google 제공업체와 허용 도메인을 설정한다. Google 로그인 성공, 서비스 교사 승인, 특정 학급 담당 권한은 각각 별도로 검사한다.
-3. **교사 승인:** 시범 교사는 운영자가 확인한 뒤 관리자용 도구로 Claims의 `role: teacher`, `teacherVerified: true`와 `teachers/{uid}.verificationStatus: verified`를 설정한다. 두 작업 사이 실패·재시도를 복구 가능하게 만들고 불일치 시 접근을 거절한다. 신청/승인 대기 상태를 본인이 볼 수 있는 조회 계약도 추가한다. 승인 도구는 서버·관리 실행 환경의 운영자 권한을 검사하고 일반 교사·학생 요청을 거절한다. 최초 운영자 권한은 신뢰된 관리 절차로만 부여하며 사용자가 스스로 역할을 승격하지 못하게 한다.
+2. **교사 로그인:** Google 제공업체와 허용 도메인을 설정한다. 데스크톱에서도 팝업 리졸버를 사전 초기화하고, 팝업이 차단되는 브라우저 환경을 위해 현재 창(Redirect) 로그인 보조 경로와 탭 세션 지속성(`browserSessionPersistence`)을 함께 제공한다. 특정 학급 담당 권한은 별도로 검사한다.
+3. **교사 승인:** 사용자 결정에 따라 Google로 로그인한 교사(비학생 인증 계정)는 `suspended` 상태가 아니면 `getTeacherStatus` 및 교사 함수 호출 시 `teachers/{uid}.verificationStatus: verified`와 Claims(`role: teacher`, `teacherVerified: true`)가 자동으로 보장되어 별도 운영자 수동 승인 없이 즉시 학급을 생성·관리할 수 있다. 관리자용 도구(`scripts/manage-teacher.mjs`)는 계정 중지(`suspended`)·복구 및 감사 기록용으로 유지한다.
 4. **요청 보호:** App Check는 사용하지 않는다. Callable의 인증·교사 소유권·학생 소속·입력값 검사를 유지하고, 학생 카드 실패 잠금과 멱등 `requestId`로 재시도·오용을 제어한다. 개발 클라우드에서 가상 계정으로 권한 경계를 검증한다.
 5. **학생 인증:** 기존 `loginStudent` → `signInWithCustomToken` 흐름을 연결한다. 클라우드 서비스 계정의 토큰 서명 권한과 관련 API를 확인하고 가상 학생으로 실제 로그인한다. Emulator 성공이 이 IAM 검증을 대신하지 않는다. [Custom Token 서명 요건](https://firebase.google.com/docs/auth/admin/create-custom-tokens)
 6. **학생 첫 화면 조회:** 기존 로그인 응답에는 토큰과 `classId`만 있고 학생은 `classes`를 직접 읽을 수 없다. 본인 Claims로 학급·참가 회차·본인 경로만 반환하는 `getStudentHome` 조회 함수(계획)를 추가한다. 학생 전체 명부를 내려받거나 전체 회차 쿼리가 Rules에서 자동 필터링될 것으로 가정하지 않는다.

@@ -543,3 +543,15 @@
 - 미확인: 인증된 학생 내부 화면의 실제 키보드·초점, VoiceOver, 브라우저 실제 200% 확대, 학생·교사 과업 관찰, 수치형 학급 집계의 안전한 서버 공개 계약. GitHub/Vercel 배포 결과는 별도로 기록한다.
 - 코드·문서 커밋 `4ea09e1`을 GitHub `main`에 푸시했고 이 커밋의 Vercel 상태는 `success`였다. Firebase 함수·Rules는 변경하지 않아 배포하지 않았다. 승인된 학생 카드로 배포 웹의 내부 화면을 직접 검증하지 못했으므로 로컬 가상 화면 결과와 구분한다.
 - 계획서 §3.2·§5를 다시 대조해 홈 미션의 ‘이 미션 쉬기’를 보조 행동으로 추가하고, 홈·미션·우편함·도움의 성공/오류 문구를 실행 영역 근처로 옮겼다. 동일 가상 역할 사전 검토에 SDI-06·07을 추가했다. 후속 빌드가 통과했다. 가상 화면의 320/360/390/768/1280px과 320px·200% 글자 모사에서 가로 넘침·검사한 텍스트 잘림 0을 확인했다. 후속 커밋 `269b5da`를 GitHub `main`에 푸시했고 Vercel 상태가 `success`였다.
+
+## 2026-09-29 — 교사·학생 로그인 오류 진단·수정 및 교사 자동 승인 전환
+
+- 배포 웹(`manito-one-blond.vercel.app`)에서 교사 Google 로그인이 실패하던 4가지 원인을 확인하고 수정했다. [6개 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-29-teacher-login-fix.md)를 기록했다. 실제 외부 전문가나 교사 과업 관찰은 아니다.
+  1. **데스크톱 팝업 차단(`auth/popup-blocked`)**: `@firebase/auth`의 `BrowserPopupRedirectResolver`가 데스크톱에서 페이지 로드 시점이 아니라 클릭 시점에 `gapi.iframes` 스크립트와 `/__/auth/iframe`을 비동기 초기화한 뒤 `window.open()`을 호출해 브라우저 사용자 제스처 활성 시간이 만료되던 문제를 해결하기 위해 `initializeAuth` 전에 `_shouldInitProactively = true`를 설정해 페이지 로드 시점에 미리 준비하도록 했다.
+  2. **현재 창 리다이렉트 대체 수단 및 교사 세션 유지**: 팝업이 차단되거나 열리지 않는 환경을 위해 교사 로그인 시 `browserSessionPersistence`를 적용하고 `"팝업이 안 열리면 현재 창에서 로그인"`(`signInWithRedirect`) 보조 버튼과 `getRedirectResult` 오류 복구를 추가했다. 학생 로그인(`studentLogin`)과 로그아웃(`logout`)은 공용기기 보호를 위해 기존대로 `inMemoryPersistence`로 즉시 전환한다.
+  3. **교사 계정 자동 승인(`verified`) 전환**: 운영자 수동 CLI 승인 없이는 신규 Google 계정이 `pending`에 머물러 학급을 만들 수 없던 구조를 사용자 요청에 맞춰 변경했다. `ensureVerifiedTeacherAccount`와 `requireVerifiedTeacher`에서 정지(`suspended`)되지 않은 교사 계정을 첫 로그인/호출 시 자동으로 `verified` 저장 및 Custom Claims(`role: "teacher", teacherVerified: true`) 부여하도록 수정했고, 클라이언트 `loadTeacher`는 클레임 미반영 시 `getIdToken(true)`로 토큰을 즉시 갱신해 Firestore Security Rules(`isTeacher()`)가 바로 통과되도록 했다.
+  4. **인증 콜백 오류 메시지 증발 수정**: `onAuthStateChanged` 내 오류 발생 시 `exit()`(`signOut`) 호출이 재귀적으로 `onAuthStateChanged(null)`을 발생시켜 `setError("")`로 오류 배너를 지우던 경쟁 상태를 `preserveErrorOnSignOut` 플래그로 수정하고 팝업 차단·취소·네트워크 오류의 한국어 안내를 보강했다.
+- 학생 로그인(`loginStudent`)은 개발 클라우드(`manito-938cc`) 함수 로그와 Custom Token 서명 경로를 점검해 정상 동작 상태임을 확인했다.
+- `npm run build`(Functions·Web TypeScript 및 Vite 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 통과했다. 로컬 환경에 Java Runtime이 설치되어 있지 않아 Firestore Emulator 통합·Rules 테스트는 이번 세션에서 실행하지 못했다(코드에는 자동 승인 통합 테스트 반영 완료).
+- Firebase 개발 프로젝트 `manito-938cc`(`asia-northeast3`)에 변경된 백엔드 함수(`getTeacherStatus`, `listClasses`, `createClass`)를 배포 완료했다. GitHub `main` 푸시 및 Vercel 프런트엔드 배포와 구분해 기록한다.
+- 남은 확인: 배포된 Vercel 웹에서 실제 교사 Google 계정 클릭 시 팝업/현재 창 로그인과 첫 학급 생성 전체 흐름, 로컬 JDK 설치 환경에서의 Emulator 통합 테스트 재실행.

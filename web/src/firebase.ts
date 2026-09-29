@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import {
-  browserPopupRedirectResolver, connectAuthEmulator, inMemoryPersistence,
-  initializeAuth, GoogleAuthProvider, signInWithPopup,
+  browserPopupRedirectResolver, browserSessionPersistence, connectAuthEmulator,
+  getRedirectResult, inMemoryPersistence, initializeAuth, GoogleAuthProvider,
+  setPersistence, signInWithPopup, signInWithRedirect,
   signInWithCustomToken, signOut,
 } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
@@ -26,8 +27,20 @@ const app = initializeApp({
   appId,
 });
 
+try {
+  const resolverProto = (browserPopupRedirectResolver as unknown as { prototype?: object }).prototype;
+  if (resolverProto) {
+    Object.defineProperty(resolverProto, "_shouldInitProactively", {
+      get: () => true,
+      configurable: true,
+    });
+  }
+} catch {
+  // Ignore if the SDK property descriptor changes in a future version.
+}
+
 export const auth = initializeAuth(app, {
-  persistence: inMemoryPersistence,
+  persistence: [browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const db = getFirestore(app);
@@ -43,11 +56,36 @@ export function call<I, O>(name: string, data: I): Promise<O> {
   return httpsCallable<I, O>(functions, name)(data).then((response) => response.data);
 }
 
+function createGoogleProvider(): GoogleAuthProvider {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
+export function prepareTeacherAuth(): void {
+  void setPersistence(auth, browserSessionPersistence).catch(() => undefined);
+}
+
 export async function teacherLogin(): Promise<void> {
-  await signInWithPopup(auth, new GoogleAuthProvider());
+  await signInWithPopup(auth, createGoogleProvider(), browserPopupRedirectResolver);
+}
+
+export async function teacherLoginRedirect(): Promise<void> {
+  await setPersistence(auth, browserSessionPersistence);
+  await signInWithRedirect(auth, createGoogleProvider(), browserPopupRedirectResolver);
+}
+
+export async function consumeAuthRedirectError(): Promise<unknown> {
+  try {
+    await getRedirectResult(auth, browserPopupRedirectResolver);
+    return null;
+  } catch (caught) {
+    return caught;
+  }
 }
 
 export async function studentLogin(classCode: string, cardCode: string): Promise<void> {
+  await setPersistence(auth, inMemoryPersistence);
   const result = await call<{ classCode: string; cardCode: string }, { customToken: string }>(
     "loginStudent", { classCode, cardCode });
   await signInWithCustomToken(auth, result.customToken);
@@ -55,4 +93,5 @@ export async function studentLogin(classCode: string, cardCode: string): Promise
 
 export async function logout(): Promise<void> {
   await signOut(auth);
+  await setPersistence(auth, inMemoryPersistence).catch(() => undefined);
 }
