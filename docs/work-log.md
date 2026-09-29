@@ -579,3 +579,11 @@
   3. **시즌 목록(`rounds`) Firestore 직접 조회 우선 및 로딩 상태 분리**: `TeacherRounds`가 매번 `listRounds` Cloud Function 콜드 스타트를 기다리던 대신 교사 읽기 권한이 허용된 `classes/{classId}/rounds`를 Firestore 클라이언트에서 직접 조회(실패 시 `listRounds` 폴백)하도록 고속화했다. 또한 `roundsLoading` 상태를 추가해 로딩 중 `"현재 진행 중인 시즌이 없어요"`가 잘못 표시되던 문제를 해결했다.
   4. **미션 카탈로그(`getMissionCatalog`) 지연 로딩**: 학급 첫 진입(`overview`) 시 무조건 호출하던 `getMissionCatalog`를 시즌 설정(`view === "rounds" && creating`) 시점에만 지연 호출하도록 변경했다.
 - `npm run build`, 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 통과했다. Firebase 개발 프로젝트 `manito-938cc`의 `listClasses` 함수 배포와 GitHub `main` 푸시(Vercel 프런트엔드 배포)를 구분해 반영한다.
+
+## 2026-09-30 — 마니또 시즌 즉시 중지·완전 삭제(`deleteRound`) 및 시즌 설정 자동 선택 UX 개선
+
+- 교사가 시작한 마니또 시즌을 중지·삭제하는 버튼이 보이지 않던 원인을 진단해 백엔드 삭제 함수와 프론트엔드 자동 선택 흐름을 함께 구현했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-round-stop-and-delete.md)를 기록했다.
+  1. **시즌 설정(`view === "rounds"`) 진입 시 현재 시즌 자동 열기**: 기존에는 `운영 요약`에서 `"진행 시즌 자세히 보기"`를 클릭하거나 좌측 메뉴에서 `"시즌 설정"`으로 이동해도 `chosen` 상태가 비어 있어 시즌 제목만 있는 목록 화면이 먼저 표시되었고, 시즌 제목을 한 번 더 눌러야만 제어 버튼이 나타났다. 이제 `시즌 설정` 진입 시 진행 중(`active`/`paused`/`reveal_pending`/`revealed`)이거나 준비 중(`ready`/`draft`)인 시즌을 자동 선택해 즉시 `시즌 진행 관리` 제어판(`일시정지`, `활동 종료`, `시즌 취소`, `시즌 중지 및 삭제`)이 표시되도록 개선했다. 상단 `"시즌 목록"` 버튼을 누르면 전체 목록을 볼 수 있다.
+  2. **마니또 시즌 즉시 중지 및 완전 삭제(`deleteRound`) 구현**: `functions/src/rounds/flow.ts`에 `deleteRound` Callable Function을 추가했다. 담당 교사가 진행 중이거나 준비·취소·보관된 시즌을 삭제하면 학급의 `activeRoundId`/`lastRoundId` 잠금을 해제하고, 해당 시즌에서 추가된 `pairHistory`를 복원하며, `roundSettings/{roundId}`와 `rounds/{roundId}` 하위 컬렉션 전체(`participants`, `assignmentSecrets`, `studentData`, `messages`, `helpRequests`, `community` 등)를 `recursiveDelete`로 완전히 제거하고 감사 로그(`round.deleted`)를 남긴다.
+  3. **프론트엔드 삭제 확인 모달 및 지난 활동 삭제 연동**: `TeacherRounds.tsx`의 `시즌 진행 관리`와 `지난 활동` 카드에 `"시즌 중지 및 삭제"` / `"시즌 삭제"` 버튼과 `ConfirmDialog` 확인 절차를 추가했다.
+- `npm run build`(Functions·Web TypeScript 및 Vite 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 통과했다. Firebase 개발 프로젝트 `manito-938cc`에 `deleteRound` 함수를 배포하고 GitHub `main`에 푸시해 Vercel 배포에 반영한다.

@@ -161,7 +161,8 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       participantCount: result.participantCount, activityDates: result.activityDates });
     setOverviewError(false);
   }, [classId]);
-  useEffect(() => { summaryRequest.current++; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); void load().catch(() => {setRoundsError(true); setError("시즌 목록을 불러오지 못했어요.");}); }, [load]);
+  const manualListMode = useRef(false);
+  useEffect(() => { summaryRequest.current++; manualListMode.current = false; chosenRef.current = ""; setChosen(""); setOverview(null); setSummary(null); void load().catch(() => {setRoundsError(true); setError("시즌 목록을 불러오지 못했어요.");}); }, [load]);
   const loadCatalog = useCallback(async () => {
     const key = `${classId}:${gradeBand}`;
     try {
@@ -233,6 +234,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     : ["ready","draft"].includes(status) ? 1 : 2;
   const orderedRounds = [...rounds].sort((a,b) => roundOrder(a.status) - roundOrder(b.status)
     || b.startsAt.localeCompare(a.startsAt));
+  const bannerRound = activeRound ?? orderedRounds.find((item) => ["ready", "draft"].includes(item.status));
   const chosenRound = rounds.find((item) => item.roundId === chosen);
   const current = view === "status" ? activeRound : chosenRound;
   useEffect(() => {
@@ -240,16 +242,23 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       if (activeRound) void loadSummary(activeRound.roundId).catch(() => setOverviewError(true));
       else setSummary(null);
     }
+    if (view === "rounds" && !creating && !chosenRef.current && !manualListMode.current && orderedRounds.length > 0) {
+      const target = activeRound ?? orderedRounds[0];
+      if (target) void selectRound(target.roundId);
+    }
     if (view === "status" && activeRound) {
       if (chosenRef.current !== activeRound.roundId) void selectRound(activeRound.roundId);
       else {void loadOverview(activeRound.roundId).catch(() => setOverviewError(true));
         void loadMonitoredMessages(activeRound.roundId);}
     }
-  }, [view, activeRound?.roundId]);
+  }, [view, activeRound?.roundId, creating, orderedRounds.length]);
   useEffect(() => {
     if (view !== "status") { safetyRequest.current++; setSafetyMessages({}); setOpenHelpId(null); setOpenReviewMessageId(null);
       setMonitoredMessages([]); setMessageCursor(null); }
-    if (view !== "rounds" && creating) { setCreating(false); setDirty(false); }
+    if (view !== "rounds") {
+      manualListMode.current = false;
+      if (creating) { setCreating(false); setDirty(false); }
+    }
   }, [view]);
   useEffect(() => {
     if (view !== "status") return;
@@ -294,6 +303,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
         ? await call<object, {roundId: string}>("updateRound", {...payload, roundId: current.roundId, requestId: pendingSave.current.requestId})
         : await call<object, {roundId: string}>("createRound", {...payload, requestId: pendingSave.current.requestId});
       pendingSave.current = null;
+      manualListMode.current = false;
       chosenRef.current = result.roundId; setChosen(result.roundId); setDirty(false); setCreating(false);
       setNotice("준비 내용을 저장했어요. 조건을 확인한 뒤 시작할 수 있어요.");
     });
@@ -304,6 +314,18 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       const key = JSON.stringify([name, current.roundId, current.rosterVersion]);
       if (pendingStatusAction.current?.key !== key) pendingStatusAction.current = {key, requestId: crypto.randomUUID()};
       const requestId = pendingStatusAction.current.requestId;
+      if (name === "delete") {
+        const wasRunning = ["active", "paused", "reveal_pending"].includes(current.status);
+        await call<object, object>("deleteRound", {classId, roundId: current.roundId, requestId});
+        pendingStatusAction.current = null;
+        manualListMode.current = true;
+        chosenRef.current = "";
+        setChosen("");
+        setOverview(null);
+        setSummary(null);
+        setNotice(wasRunning ? "시즌을 중지하고 완전히 삭제했어요." : "시즌을 완전히 삭제했어요.");
+        return;
+      }
       if (name === "prepare") {
         await call<object, object>("prepareRound", {classId, roundId: current.roundId});
       } else if (name === "start") {
@@ -381,8 +403,9 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
 
   const selectedDates = dates.split(/[\s,]+/).filter(Boolean);
   function markChanged() { setDirty(true); setNotice(""); setStepError(""); }
-  function chooseRound(roundId: string, edit = false) {
+  function chooseRound(roundId: string, edit = false, listMode = false) {
     if (dirty && !window.confirm("저장하지 않은 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
+    manualListMode.current = listMode;
     setCreating(edit); void selectRound(roundId);
   }
   function nextStep() {
@@ -408,11 +431,17 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     if (pending.name === "stop" && pending.studentUid) void stop(pending.studentUid);
     else void action(pending.name);
   }
+  const isRunningRound = ["active", "paused", "reveal_pending"].includes(current?.status ?? "");
   const confirmLabels: Record<string,{title:string; detail:string; button:string}> = {
     start: {title:"매칭하고 시작할까요?",detail:`${current?.title ?? "이 활동"}의 배정을 확정합니다. 시작 뒤에는 같은 활동을 다시 추첨할 수 없어요.`,button:"매칭하고 시작"},
     end: {title:"활동을 종료할까요?",detail:`${current?.title ?? "이 활동"}의 새 제출을 닫고 공개 대기로 옮깁니다. 친구 정체는 아직 공개되지 않아요.`,button:"활동 종료"},
     reveal: {title:"친구 정체를 공개할까요?",detail:`${current?.title ?? "이 활동"}에서 처리할 도움·쪽지가 없는지 서버가 다시 확인합니다. 승인하면 학생별 본인 관계가 공개됩니다.`,button:"정체 공개 승인"},
     cancel: {title:"시즌을 취소할까요?",detail:`${current?.title ?? "이 활동"}을 취소합니다. 참가자는 이 시즌에서 더 활동할 수 없어요.`,button:"시즌 취소"},
+    delete: {
+      title: isRunningRound ? "시즌을 즉시 중지하고 삭제할까요?" : "이 시즌을 완전히 삭제할까요?",
+      detail: `${current?.title ?? "이 활동"}의 배정·미션·쪽지 기록을 모두 삭제하고 진행 상태를 해제합니다. 삭제한 시즌은 복구할 수 없어요.`,
+      button: isRunningRound ? "시즌 중지 및 삭제" : "시즌 삭제",
+    },
     stop: {title:"학생 참여를 중단할까요?",detail:`${overview?.participation.find((p) => p.studentUid === confirmAction?.studentUid)?.displayName ?? "선택한 학생"}의 이 시즌 제출과 정체 공개를 차단합니다.`,button:"참여 중단"},
   };
   const confirmation = confirmAction ? confirmLabels[confirmAction.name] : null;
@@ -420,19 +449,19 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
   return <section className="panel round-panel">
     <div className="page-header"><div><h2>{view === "overview" ? "운영 요약" : view === "rounds" ? "시즌 설정" : view === "status" ? "상태 확인" : "지난 활동"}</h2>
       <p>{view === "overview" ? "도움 요청과 쪽지 대화를 먼저 확인하세요." : view === "rounds" ? "준비부터 공개까지 시즌별로 운영해요." : view === "status" ? "학생별 미션·쪽지와 도움 요청을 비공개로 확인해요." : "지난 기록과 다음 활동 준비를 살펴봐요."}</p></div>
-      {view === "rounds" && <div className="page-actions"><button type="button" className="outline" onClick={() => chooseRound("")}>시즌 목록</button>
-        <button type="button" onClick={() => chooseRound("", true)}>새 시즌 준비</button></div>}
+      {view === "rounds" && <div className="page-actions"><button type="button" className="outline" onClick={() => chooseRound("", false, true)}>시즌 목록</button>
+        <button type="button" onClick={() => chooseRound("", true, false)}>새 시즌 준비</button></div>}
     </div>
     {error && <p className="message error" role="alert">{error}</p>}
     {notice && <p className="message success" role="status">{notice}</p>}
     {view === "overview" && <div className="stack">
-      <div className={`season-status-banner${activeRound ? " is-active" : " is-empty"}`}>
+      <div className={`season-status-banner${bannerRound ? " is-active" : " is-empty"}`}>
         <div>
-          <span className="eyebrow">{activeRound ? roundStatusLabels[activeRound.status] : roundsLoading ? "시즌 확인 중" : "시즌 준비 필요"}</span>
-          <h3>{activeRound ? activeRound.title : roundsLoading ? "시즌 정보를 확인하고 있어요…" : "현재 진행 중인 시즌이 없어요"}</h3>
-          <p>{activeRound ? `참가 학생 ${activeRound.participantCount}명 · 수업일 ${activeRound.activityDates.length}일 운영` : roundsLoading ? "학급의 최근 활동 상태를 불러오고 있어요." : "학생을 등록하고 새 시즌을 준비해 보세요."}</p>
+          <span className="eyebrow">{bannerRound ? roundStatusLabels[bannerRound.status] : roundsLoading ? "시즌 확인 중" : "시즌 준비 필요"}</span>
+          <h3>{bannerRound ? bannerRound.title : roundsLoading ? "시즌 정보를 확인하고 있어요…" : "현재 진행 중인 시즌이 없어요"}</h3>
+          <p>{bannerRound ? `참가 학생 ${bannerRound.participantCount}명 · 수업일 ${bannerRound.activityDates.length}일 운영` : roundsLoading ? "학급의 최근 활동 상태를 불러오고 있어요." : "학생을 등록하고 새 시즌을 준비해 보세요."}</p>
         </div>
-        {!roundsLoading && <button className={activeRound ? "outline" : "primary-cta"} onClick={() => onNavigate("rounds")}>{activeRound ? "진행 시즌 자세히 보기" : "새 시즌 준비하기"}</button>}
+        {!roundsLoading && <button className={bannerRound ? "outline" : "primary-cta"} onClick={() => { if (bannerRound) chooseRound(bannerRound.roundId, false, false); onNavigate("rounds"); }}>{activeRound ? "진행 시즌 자세히 보기" : bannerRound ? "준비 중인 시즌 열기" : "새 시즌 준비하기"}</button>}
       </div>
       {overviewError ? <p className="message error" role="alert">현황을 불러오지 못했어요. <button className="small outline" onClick={() => activeRound && void loadSummary(activeRound.roundId).catch(() => setOverviewError(true))}>다시 시도</button></p>
         : activeRound && !summary ? <p role="status">현황을 불러오는 중이에요…</p> : null}
@@ -466,7 +495,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
 
     {view === "rounds" && !creating && !current && <div className="round-list">
       {roundsError ? <p className="message error" role="alert">시즌 목록을 불러오지 못했어요. <button className="small outline" onClick={() => void load().catch(() => setRoundsError(true))}>다시 시도</button></p> : roundsLoading && rounds.length === 0 ? <p role="status">시즌 목록을 불러오는 중이에요…</p> : rounds.length === 0 ? <p className="muted">아직 시즌이 없어요. 새 시즌을 준비해 보세요.</p> : orderedRounds.map((round) =>
-        <button key={round.roundId} type="button" onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong>
+        <button key={round.roundId} type="button" onClick={() => chooseRound(round.roundId, false, false)}><strong>{round.title}</strong>
           <small>{roundStatusLabels[round.status] ?? round.status} · {round.participantCount}명 · {round.activityDates.length}수업일</small></button>)}
     </div>}
 
@@ -521,6 +550,9 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
           {current.status === "reveal_pending" && <button className="primary-cta" disabled={busy} onClick={() => askAction("reveal")}>정체 공개 승인</button>}
           {["revealed", "cancelled"].includes(current.status) && <button className="primary-cta" disabled={busy} onClick={() => void action("archive")}>보관하고 다음 시즌 준비</button>}
           {["draft", "ready", "active", "paused"].includes(current.status) && <button className="danger" disabled={busy} onClick={() => askAction("cancel")}>시즌 취소</button>}
+          <button className="danger outline" type="button" disabled={busy} onClick={() => askAction("delete")}>
+            {isRunningRound ? "시즌 중지 및 삭제" : "시즌 삭제"}
+          </button>
         </div>
       </div>
       {current.status === "paused" && <div className="review-card stack"><h3>일시정지 중 기간 연장</h3><label>새 종료일<input type="date" min={koreaDay(new Date(current.endsAt))} value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>변경한 수업일 3~20일<textarea rows={2} value={dates} onChange={(e) => setDates(e.target.value)} /></label><button disabled={busy} onClick={() => void run(async () => { await call<object, object>("extendRound", {classId,roundId:current.roundId, endsAt:endOfKoreaDay(end), activityDates:dates.split(/[\s,]+/).filter(Boolean),requestId:crypto.randomUUID()}); setNotice("기간을 연장했어요."); })}>기간 연장</button></div>}
@@ -563,8 +595,8 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       </>}
     </div>}
 
-    {view === "history" && <div className="round-list">{roundsLoading && rounds.length === 0 ? <p role="status">지난 활동을 불러오는 중이에요…</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).length === 0 ? <p className="muted">지난 활동이 없어요.</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).map((round) => <button key={round.roundId} onClick={() => chooseRound(round.roundId)}><strong>{round.title}</strong><small>{roundStatusLabels[round.status]} · {koreaDay(new Date(round.startsAt))} ~ {koreaDay(new Date(round.endsAt))}</small></button>)}
-      {current && ["revealed","archived","cancelled"].includes(current.status) && <div className="review-card"><h3>{current.title} · {roundStatusLabels[current.status]}</h3><p>주제·참가자·미션·쪽지 설정만 다음 시즌에 복사합니다. 이전 배정과 활동 기록은 복사하지 않아요.</p><label>다음 시즌 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정 복사해 새 시즌 준비</button></div>}</div>}
+    {view === "history" && <div className="round-list">{roundsLoading && rounds.length === 0 ? <p role="status">지난 활동을 불러오는 중이에요…</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).length === 0 ? <p className="muted">지난 활동이 없어요.</p> : rounds.filter((r) => ["revealed","archived","cancelled"].includes(r.status)).map((round) => <button key={round.roundId} onClick={() => chooseRound(round.roundId, false, false)}><strong>{round.title}</strong><small>{roundStatusLabels[round.status]} · {koreaDay(new Date(round.startsAt))} ~ {koreaDay(new Date(round.endsAt))}</small></button>)}
+      {current && ["revealed","archived","cancelled"].includes(current.status) && <div className="review-card"><h3>{current.title} · {roundStatusLabels[current.status]}</h3><p>주제·참가자·미션·쪽지 설정만 다음 시즌에 복사합니다. 이전 배정과 활동 기록은 복사하지 않아요.</p><label>다음 시즌 주제<input value={nextTitle} onChange={(e) => setNextTitle(e.target.value)} maxLength={60} /></label><div className="action-row"><button disabled={busy || !nextTitle.trim()} onClick={() => void copySettings()}>설정 복사해 새 시즌 준비</button><button type="button" className="danger outline" disabled={busy} onClick={() => askAction("delete")}>시즌 삭제</button></div></div>}</div>}
     {confirmation && <ConfirmDialog title={confirmation.title} detail={confirmation.detail} confirmLabel={confirmation.button} busy={busy} onCancel={() => setConfirmAction(null)} onConfirm={confirmedAction} />}
     {moderationTarget && <ConfirmDialog title="이 쪽지를 학생 화면에서 숨길까요?" detail="받은 학생의 화면에서 숨기고 답장을 막습니다. 교사는 안전 기록을 계속 확인할 수 있어요." confirmLabel="쪽지 숨기기" busy={busy} onCancel={() => setModerationTarget(null)} onConfirm={() => {const id=moderationTarget; setModerationTarget(null); void hideForClass(id);}} />}
   </section>;

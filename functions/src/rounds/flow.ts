@@ -388,3 +388,50 @@ export const getAssignmentsForTeacher = onCall(async (request) => {
       giverName: names.get(doc.id), receiverUid: receiverIds[index],
       receiverName: names.get(receiverIds[index] as string) })) };
 });
+
+export const deleteRound = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "회차");
+  const requestId = requireRequestId(input.requestId);
+  const { classRef, roundRef, settingsRef } = roundRefs(classId, roundId);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  const fingerprint = inputFingerprint({ classId, roundId, action: "delete" });
+  const result = await db.runTransaction(async (tx) => {
+    const [classDoc, roundDoc, command, historyDocs] = await Promise.all([
+      tx.get(classRef), tx.get(roundRef), tx.get(commandRef), tx.get(classRef.collection("pairHistory")),
+    ]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "deleteRound", teacherUid, fingerprint);
+      return command.get("result") as { roundId: string; status: string };
+    }
+    if (!roundDoc.exists) {
+      throw new HttpsError("not-found", "회차를 찾을 수 없어요.");
+    }
+    const previousStatus = String(roundDoc.get("status") ?? "draft");
+    const updates: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
+    if (classDoc.get("activeRoundId") === roundId) updates.activeRoundId = null;
+    if (classDoc.get("lastRoundId") === roundId) updates.lastRoundId = null;
+    if (Object.keys(updates).length > 1) {
+      tx.update(classRef, updates);
+    }
+    for (const doc of historyDocs.docs) {
+      if (doc.get("lastRoundId") === roundId) {
+        const currentCount = Number(doc.get("count") ?? 1);
+        if (currentCount <= 1) tx.delete(doc.ref);
+        else tx.update(doc.ref, { count: currentCount - 1, lastRoundId: null, updatedAt: FieldValue.serverTimestamp() });
+      }
+    }
+    tx.delete(settingsRef);
+    const out = { roundId, status: "deleted" };
+    tx.create(commandRef, { type: "deleteRound", requestedBy: teacherUid,
+      inputFingerprint: fingerprint, result: out, createdAt: FieldValue.serverTimestamp() });
+    tx.create(classRef.collection("auditLogs").doc(), { action: "round.deleted", actorUid: teacherUid,
+      roundId, previousStatus, requestId, createdAt: FieldValue.serverTimestamp() });
+    return out;
+  });
+  await db.recursiveDelete(roundRef);
+  return result;
+});

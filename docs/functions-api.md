@@ -122,6 +122,7 @@ Google 로그인한 교사(비학생 인증 계정)는 `getTeacherStatus` 또는
 | `prepareRound` | `{classId,roundId}` | 배정 가능성·참가 상태·미션 검증 뒤 `{status:"ready",rosterVersion}` |
 | `startRound` | `{classId,roundId,rosterVersion,requestId}` | 학급 잠금과 배정 전체를 단일 트랜잭션으로 확정. 활성 회차 중복 시작 거절 |
 | `changeRoundStatus` | `{classId,roundId,action,requestId}` | `pause`, `resume`, `end`, `cancel`, `archive` 전이. `resume`은 종료 전만 |
+| `deleteRound` | `{classId,roundId,requestId}` | 담당 교사가 회차(진행 중 포함)를 즉시 중지하고 회차 문서·하위 컬렉션·설정(`roundSettings`)을 완전 삭제. 활성 회차일 경우 `activeRoundId` 해제 및 해당 회차로 추가된 `pairHistory` 차감/정리, 감사 기록 및 멱등 처리 |
 | `extendRound` | `{classId,roundId,endsAt,activityDates,requestId}` | 종료 시각 전 일시정지 회차만 기간 연장. 기존 수업일 유지, 전체 기간 30일 이내 |
 | `stopRoundParticipation` | `{classId,roundId,studentUid,requestId}` | 학생 제출·공개 차단, 감사 기록 |
 | `getAssignmentsForTeacher` | `{classId,roundId}` | `{participantCount,assignments:[{giverUid,giverName,receiverUid,receiverName}]}`. 담당 교사 열람마다 감사. 확정 참가자 모두가 서로 다른 한 명을 맡고 서로 다른 한 명에게 맡겨지는지 검증하며 누락·중복·자기 배정·명단 불일치면 `failed-precondition` |
