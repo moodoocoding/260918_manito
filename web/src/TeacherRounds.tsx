@@ -4,6 +4,7 @@ import { call, db } from "./firebase";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import { TeacherCommunity } from "./TeacherCommunity";
 import { TeacherStudentStatus } from "./TeacherStudentStatus";
+import { StudentRosterImporter } from "./StudentRosterImporter";
 
 type Member = { studentUid: string; displayName: string; accessStatus: string };
 type Round = { roundId: string; title: string; status: string; startsAt: string; endsAt: string;
@@ -64,12 +65,14 @@ function endOfKoreaDay(day: string): string { return new Date(`${day}T23:59:59.9
 
 export type TeacherRoundView = "overview" | "rounds" | "status" | "history";
 export type TeacherStatusSection = "students" | "help" | "messages" | "access";
-export function TeacherRounds({ classId, gradeBand, members, view, statusTarget, onNavigate, onDirtyChange }: {
+export function TeacherRounds({ classId, gradeBand, members, view, statusTarget, onNavigate, onDirtyChange, onRegisterStudents }: {
   classId: string; gradeBand: string; members: Member[]; view: TeacherRoundView;
   statusTarget?: TeacherStatusSection | null;
   onNavigate: (view: TeacherRoundView | "assignments", section?: TeacherStatusSection) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onRegisterStudents?: (names: string[]) => Promise<void>;
 }) {
+  const [showImporter, setShowImporter] = useState(false);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [roundsLoading, setRoundsLoading] = useState(true);
   const [roundsError, setRoundsError] = useState(false);
@@ -696,6 +699,26 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
         <div className="season-presets" role="group" aria-label="시즌 기간 빠른 선택"><span>시작일 포함</span>{[5,10,15,20].map((days) => <button key={days} type="button" className={end === addDays(start, days - 1) ? "" : "outline"} aria-pressed={end === addDays(start, days - 1)} disabled={!start} onClick={() => { const next = addDays(start, days - 1); setEnd(next); setDates(schoolDays(start, next).join(", ")); markChanged(); }}>{days}일</button>)}</div>
         <p className="field-help">선택한 기간의 평일 {selectedDates.length}일을 활동일로 사용해요.</p></>}
       {step === 2 && <><h3>2. 참가자와 필수 제외 관계</h3><p>{participants.length}명 선택 · {members.length - participants.length}명 미선택</p>
+        <div className="roster-import-trigger-box" style={{ background: "#f8fafc", padding: "14px 18px", borderRadius: "14px", border: "1px solid #cbd5e1", margin: "12px 0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <strong style={{ fontSize: "1rem", color: "#1e293b" }}>{members.length === 0 ? "⚠️ 등록된 학생이 아직 없어요!" : "새 학생 명단을 가져오거나 추가 등록하고 싶으신가요?"}</strong>
+            <p className="field-help" style={{ margin: "2px 0 0" }}>엑셀, PDF, 한글 파일 또는 명단을 복사해 붙여넣으면 이름을 자동으로 찾아 즉시 등록하고 참가자로 배정해요.</p>
+          </div>
+          <button type="button" className={members.length === 0 ? "primary-cta" : "outline"} onClick={() => setShowImporter((v) => !v)}>
+            {showImporter ? "명단 등록 닫기" : "📋 파일·복사로 학생 명단 가져오기"}
+          </button>
+        </div>
+        {showImporter && onRegisterStudents && (
+          <StudentRosterImporter
+            busy={busy}
+            onCancel={() => setShowImporter(false)}
+            onRegister={async (names) => {
+              await onRegisterStudents(names);
+              setShowImporter(false);
+              markChanged();
+            }}
+          />
+        )}
         <label>학생 찾기<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="표시 이름 검색" /></label>
         <div className="action-row"><button type="button" className="small outline" onClick={() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); markChanged(); }}>입장 가능한 학생 전체 선택</button><button type="button" className="small outline" onClick={() => { setParticipants([]); setExcludedPairs([]); markChanged(); }}>선택 해제</button></div>
         <fieldset aria-describedby={stepError ? "round-step-error" : undefined}><legend>참가 학생 ({participants.length}명)</legend><div className="participant-grid">{members.filter((m) => m.displayName.includes(memberSearch)).map((m) => <CheckboxRow key={m.studentUid} checked={participants.includes(m.studentUid)} disabled={m.accessStatus !== "active"} onChange={(checked) => { setParticipants((old) => checked ? [...old,m.studentUid] : old.filter((id) => id !== m.studentUid)); setExcludedPairs((old) => old.filter((p) => checked || (p.a !== m.studentUid && p.b !== m.studentUid))); markChanged(); }}>{m.displayName}{m.accessStatus !== "active" ? " · 입장 제한" : ""}</CheckboxRow>)}</div></fieldset>

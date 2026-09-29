@@ -11,6 +11,7 @@ import { emptyStudentMailDraft, type StudentMailDraft } from "./StudentMail";
 import { StudentCommunity } from "./StudentCommunity";
 import { StudentRights, TeacherRights } from "./RightsRequests";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
+import { StudentRosterImporter } from "./StudentRosterImporter";
 import "./style.css";
 
 type TeacherPage = "classes" | "overview" | "students" | "rounds" | "assignments" | "status" | "history" | "settings";
@@ -102,6 +103,10 @@ function App() {
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block" | "remove"} | null>(null);
   const [confirmBatchReissue, setConfirmBatchReissue] = useState<{ studentUids: string[]; label: string } | null>(null);
+  const [classToDelete, setClassToDelete] = useState<ClassItem | null>(null);
+  const [isEditingClassCode, setIsEditingClassCode] = useState(false);
+  const [editingClassCodeInput, setEditingClassCodeInput] = useState("");
+  const [showCardImporter, setShowCardImporter] = useState(false);
   const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
   const [editingMemberName, setEditingMemberName] = useState("");
   const [editClassName, setEditClassName] = useState("");
@@ -611,6 +616,58 @@ function App() {
     });
   }
 
+  async function saveQuickClassCode() {
+    if (!selected) return;
+    const trimmed = editingClassCodeInput.trim().toUpperCase();
+    if (trimmed.length < 4 || trimmed.length > 12) {
+      setError("학급 코드는 4~12자리 영문 대소문자나 숫자여야 해요.");
+      return;
+    }
+    await task(async () => {
+      const result = await call<
+        object,
+        { classId: string; name: string; schoolYear: number; gradeBand: string; classCode: string }
+      >("updateClassInfo", {
+        classId: selected.classId,
+        name: selected.name,
+        schoolYear: selected.schoolYear,
+        gradeBand: selected.gradeBand,
+        classCode: trimmed,
+        requestId: crypto.randomUUID(),
+      });
+      const updatedSelected = { ...selected, classCode: result.classCode || trimmed };
+      setSelected(updatedSelected);
+      const updatedClasses = classesRef.current.map((item) =>
+        item.classId === selected.classId ? { ...item, classCode: result.classCode || trimmed } : item,
+      );
+      classesRef.current = updatedClasses;
+      setClasses(updatedClasses);
+      setIsEditingClassCode(false);
+      setNotice(`학급 코드를 ${result.classCode || trimmed}(으)로 변경했어요.`);
+    });
+  }
+
+  async function registerBatchStudents(names: string[]) {
+    if (!selected || !names.length) return;
+    await task(async () => {
+      const result = await call<object, { members: Member[] }>("registerStudents", {
+        classId: selected.classId,
+        names,
+        requestId: crypto.randomUUID(),
+      });
+      setMembers(result.members);
+      const nextCount = result.members.length;
+      setSelected((old) => (old ? { ...old, memberCount: nextCount } : old));
+      const updatedClasses = classesRef.current.map((item) =>
+        item.classId === selected.classId ? { ...item, memberCount: nextCount } : item,
+      );
+      classesRef.current = updatedClasses;
+      setClasses(updatedClasses);
+      await loadCardCodes();
+      setNotice(`${names.length}명의 학생을 등록하고 4자리 카드를 만들었어요.`);
+    });
+  }
+
   async function print(cardsToPrint: Card[]) {
     if (!cardsToPrint.length) return;
     const printGeneration = generation.current;
@@ -831,7 +888,10 @@ function App() {
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
         </section> : role === "teacher" ? <section className="teacher-layout">
           {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
-            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId}><button disabled={busy} onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명</small></button></li>)}</ul>}
+            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId} className="class-list-item">
+              <button className="class-item-select" disabled={busy} onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명 · 코드 {item.classCode}</small></button>
+              <button type="button" className="small danger outline class-delete-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); setClassToDelete(item); }}>삭제</button>
+            </li>)}</ul>}
             {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
               <label>학급 코드 (선택)<input value={newClassCode} maxLength={12} onChange={(event) => setNewClassCode(event.target.value.toUpperCase())} placeholder="미입력 시 6자리 영문·숫자 자동 생성 (예: SUN2026)" /><small className="field-help">선생님이 기억하기 쉬운 4~12자 영문 대소문자·숫자를 직접 지정할 수 있어요.</small></label>
               <label>학년도<input type="number" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))} required /></label>
@@ -842,9 +902,71 @@ function App() {
               <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
               <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
               {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
-                <div className="class-code"><span>학급 코드</span><strong>{selected.classCode || "확인 중…"}</strong><small>입장 카드와 함께 학생에게 안내해 주세요.</small></div>
-                {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
-                  : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
+                <div className="class-code">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: "6px" }}>
+                    <span>학급 코드</span>
+                    {!isEditingClassCode && (
+                      <button
+                        type="button"
+                        className="small outline"
+                        disabled={busy}
+                        onClick={() => {
+                          setIsEditingClassCode(true);
+                          setEditingClassCodeInput(selected.classCode || "");
+                        }}
+                      >
+                        코드 수정
+                      </button>
+                    )}
+                  </div>
+                  {isEditingClassCode ? (
+                    <form
+                      style={{ display: "flex", gap: "6px", alignItems: "center", width: "100%", margin: "6px 0" }}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveQuickClassCode();
+                      }}
+                    >
+                      <input
+                        style={{ fontSize: "1.1rem", fontWeight: "700", textTransform: "uppercase", padding: "6px 10px" }}
+                        maxLength={12}
+                        value={editingClassCodeInput}
+                        onChange={(e) => setEditingClassCodeInput(e.target.value.toUpperCase())}
+                        placeholder="4~12자리 영문/숫자"
+                        required
+                        autoFocus
+                      />
+                      <button type="submit" className="small primary-cta" disabled={busy || !editingClassCodeInput.trim()}>
+                        저장
+                      </button>
+                      <button type="button" className="small outline" disabled={busy} onClick={() => setIsEditingClassCode(false)}>
+                        취소
+                      </button>
+                    </form>
+                  ) : (
+                    <strong>{selected.classCode || "확인 중…"}</strong>
+                  )}
+                  <small>학생이 로그인할 때 사용하는 코드예요. (4~12자 영문/숫자)</small>
+                </div>
+
+                <div style={{ margin: "14px 0" }}>
+                  <button type="button" className={members.length === 0 ? "primary-cta" : "outline"} onClick={() => setShowCardImporter((v) => !v)}>
+                    {showCardImporter ? "명단 등록 닫기" : "📋 엑셀·PDF·한글·복사로 학생 명단 등록하기"}
+                  </button>
+                </div>
+                {showCardImporter && (
+                  <StudentRosterImporter
+                    busy={busy}
+                    onCancel={() => setShowCardImporter(false)}
+                    onRegister={async (names) => {
+                      await registerBatchStudents(names);
+                      setShowCardImporter(false);
+                    }}
+                  />
+                )}
+
+                {members.length > 0 ? <details className="student-registration"><summary>직접 이름 적어 등록하기</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
+                  : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>직접 이름 적어 등록하기</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
                 <div className="card-list-heading"><div><h3>학생 명단 · {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
                   <div className="action-row">
                     <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button>
@@ -882,10 +1004,11 @@ function App() {
                       </li>;
                     })}</ol>}
               </section>}
-              {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} />}
+              {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} onRegisterStudents={registerBatchStudents} />}
               {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
               {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학급 코드·학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학급 코드<input value={editClassCode} maxLength={12} onChange={(event) => setEditClassCode(event.target.value.toUpperCase())} placeholder="예: SUN2026" required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><p className="field-help">학급 코드를 바꾸면 기존에 인쇄한 카드의 학급 코드도 변경되므로 학생들에게 바뀐 코드를 안내해 주세요.</p><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
+          {classToDelete && <ConfirmDialog title={`${classToDelete.name} 학급을 삭제할까요?`} detail={`${classToDelete.name} 학급의 학생 명단, 입장 카드, 시즌과 쪽지 활동 기록이 완전히 삭제되며 복구할 수 없습니다.`} confirmLabel="학급 영구 삭제" busy={busy} onCancel={() => setClassToDelete(null)} onConfirm={async () => { const target = classToDelete; setClassToDelete(null); await task(async () => { await call<object, object>("deleteClassData", { classId: target.classId, requestId: crypto.randomUUID() }); if (selected?.classId === target.classId) { setSelected(null); setMembers([]); } await loadTeacher(); setNotice(`${target.name} 학급 데이터를 삭제했어요.`); }); }} />}
           {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : confirmMember.action === "remove" ? "이 학생을 명단에서 삭제할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : confirmMember.action === "remove" ? `${confirmMember.member.displayName} 학생의 입장 카드와 명단 정보를 삭제합니다. 진행 중인 시즌에 참여하고 있는 학생은 먼저 시즌을 중지하거나 학생 참여를 중단해야 삭제할 수 있어요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : confirmMember.action === "remove" ? "학생 삭제" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else if (target.action === "remove") void removeMember(target.member); else void changeAccess(target.member); }} />}
           {confirmBatchReissue && <ConfirmDialog title={`${confirmBatchReissue.label}의 카드를 4자리 새 코드로 재발급할까요?`} detail="새로운 4자리 코드(예: 7K9X)가 즉시 발급됩니다. 대상 학생의 이전 카드와 로그인 세션은 즉시 무효화되므로 새 카드를 인쇄하여 배부해 주세요." confirmLabel="4자리 새 코드로 재발급" busy={busy} onCancel={() => setConfirmBatchReissue(null)} onConfirm={() => void batchReissue(confirmBatchReissue.studentUids)} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}
