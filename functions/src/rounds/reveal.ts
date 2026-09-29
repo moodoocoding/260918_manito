@@ -200,3 +200,66 @@ export const copyRoundSettings = onCall(async (request) => {
     return result;
   });
 });
+
+export const getRoundReflectionsForTeacher = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const roundId = requireDocumentId(input.roundId, "회차");
+  const { classRef, roundRef, roundDoc } = await requireTeacherRound(teacherUid, classId, roundId);
+  const status = String(roundDoc.get("status") ?? "");
+  if (!["revealed", "archived"].includes(status)) {
+    throw new HttpsError("failed-precondition", "정체가 공개된 시즌에서만 감사 인사와 활동 소감을 모아볼 수 있어요.");
+  }
+  const [membersSnap, participantsSnap, assignmentsSnap, thanksSnap] = await Promise.all([
+    classRef.collection("members").get(),
+    roundRef.collection("participants").get(),
+    roundRef.collection("assignmentSecrets").get(),
+    roundRef.collection("thankYouSecrets").get(),
+  ]);
+  const participantUids = participantsSnap.docs.map((doc) => doc.id);
+  const reflectionDocs = await Promise.all(
+    participantUids.map((uid) => roundRef.collection("studentData").doc(uid).collection("reflection").doc("mine").get()),
+  );
+  await classRef.collection("auditLogs").add({
+    action: "round.reflections_read",
+    actorUid: teacherUid,
+    roundId,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  const names = new Map(membersSnap.docs.map((doc) => [doc.id, String(doc.get("displayName") ?? "학생")]));
+  const receiverByGiver = new Map(assignmentsSnap.docs.map((doc) => [doc.id, String(doc.get("receiverUid") ?? "")]));
+  const giverByReceiver = new Map(assignmentsSnap.docs.map((doc) => [String(doc.get("receiverUid") ?? ""), doc.id]));
+  const sentThankBySender = new Map(thanksSnap.docs.map((doc) => [doc.id, String(doc.get("text") ?? "")]));
+  const receivedThankByReceiver = new Map(
+    thanksSnap.docs.map((doc) => [String(doc.get("receiverUid") ?? ""), String(doc.get("text") ?? "")]),
+  );
+  const reflectionByStudent = new Map(
+    participantUids.map((uid, index) => [
+      uid,
+      reflectionDocs[index].exists ? String(reflectionDocs[index].get("text") ?? "") : null,
+    ]),
+  );
+  const items = participantsSnap.docs.map((doc) => {
+    const studentUid = doc.id;
+    const participationStatus = String(doc.get("participationStatus") ?? "active");
+    const receiverUid = receiverByGiver.get(studentUid);
+    const giverUid = giverByReceiver.get(studentUid);
+    return {
+      studentUid,
+      studentName: names.get(studentUid) ?? "학생",
+      participationStatus,
+      caredForName: receiverUid ? (names.get(receiverUid) ?? null) : null,
+      carerName: giverUid ? (names.get(giverUid) ?? null) : null,
+      thankYouText: sentThankBySender.get(studentUid) ?? null,
+      receivedThankYouText: receivedThankByReceiver.get(studentUid) ?? null,
+      reflectionText: reflectionByStudent.get(studentUid) ?? null,
+    };
+  }).sort((a, b) => a.studentName.localeCompare(b.studentName, "ko-KR"));
+
+  return {
+    roundId,
+    title: String(roundDoc.get("title") ?? ""),
+    items,
+  };
+});

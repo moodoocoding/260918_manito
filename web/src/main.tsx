@@ -98,7 +98,12 @@ function App() {
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState("all");
   const [showCreateClass, setShowCreateClass] = useState(false);
-  const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block"} | null>(null);
+  const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block" | "remove"} | null>(null);
+  const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
+  const [editingMemberName, setEditingMemberName] = useState("");
+  const [editClassName, setEditClassName] = useState("");
+  const [editClassYear, setEditClassYear] = useState(new Date().getFullYear());
+  const [editClassGrade, setEditClassGrade] = useState("middle");
   const generation = useRef(0);
   const classesRef = useRef<ClassItem[]>([]);
   const classSelectVersion = useRef(0);
@@ -115,6 +120,14 @@ function App() {
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
   const focusStudentTitleAfterNavigation = useRef(false);
   const preserveErrorOnSignOut = useRef(false);
+
+  useEffect(() => {
+    if (selected) {
+      setEditClassName(selected.name);
+      setEditClassYear(selected.schoolYear);
+      setEditClassGrade(selected.gradeBand);
+    }
+  }, [selected?.classId, selected?.name, selected?.schoolYear, selected?.gradeBand]);
 
   useEffect(() => {
     if (!focusStudentTitleAfterNavigation.current) return;
@@ -139,6 +152,7 @@ function App() {
     studentMailDraft.current = emptyStudentMailDraft();
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
+    setEditingMemberUid(null); setEditingMemberName("");
     roundDirty.current = false;
   }, []);
 
@@ -499,6 +513,80 @@ function App() {
     });
   }
 
+  async function saveMemberName(member: Member) {
+    if (!selected) return;
+    const trimmed = editingMemberName.trim();
+    if (!trimmed) { setError("학생 이름을 입력해 주세요."); return; }
+    if (trimmed === member.displayName) { setEditingMemberUid(null); return; }
+    await task(async () => {
+      const result = await call<object, { studentUid: string; displayName: string }>("updateStudentName", {
+        classId: selected.classId,
+        studentUid: member.studentUid,
+        displayName: trimmed,
+        requestId: crypto.randomUUID(),
+      });
+      setMembers((old) =>
+        old.map((item) => item.studentUid === member.studentUid ? { ...item, displayName: result.displayName } : item)
+          .sort((a, b) => a.displayName.localeCompare(b.displayName, "ko-KR")),
+      );
+      setEditingMemberUid(null);
+      setNotice(`${member.displayName} 학생의 이름을 ${result.displayName}(으)로 수정했어요.`);
+    });
+  }
+
+  async function removeMember(member: Member) {
+    if (!selected) return;
+    await task(async () => {
+      await call<object, object>("removeStudentMember", {
+        classId: selected.classId,
+        studentUid: member.studentUid,
+        requestId: crypto.randomUUID(),
+      });
+      setMembers((old) => old.filter((item) => item.studentUid !== member.studentUid));
+      setSelectedCardUids((old) => old.filter((uid) => uid !== member.studentUid));
+      setCardCodes((old) => { const next = { ...old }; delete next[member.studentUid]; return next; });
+      const nextCount = Math.max(0, (selected.memberCount ?? members.length) - 1);
+      setSelected((old) => old ? { ...old, memberCount: nextCount } : old);
+      const updatedClasses = classesRef.current.map((item) =>
+        item.classId === selected.classId ? { ...item, memberCount: nextCount } : item,
+      );
+      classesRef.current = updatedClasses;
+      setClasses(updatedClasses);
+      setNotice(`${member.displayName} 학생을 명단에서 삭제했어요.`);
+    });
+  }
+
+  async function updateClassBasicInfo(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    const trimmed = editClassName.trim();
+    if (!trimmed) { setError("학급 이름을 입력해 주세요."); return; }
+    await task(async () => {
+      const result = await call<object, { classId: string; name: string; schoolYear: number; gradeBand: string }>("updateClassInfo", {
+        classId: selected.classId,
+        name: trimmed,
+        schoolYear: editClassYear,
+        gradeBand: editClassGrade,
+        requestId: crypto.randomUUID(),
+      });
+      const updatedSelected: ClassInfo = {
+        ...selected,
+        name: result.name,
+        schoolYear: result.schoolYear,
+        gradeBand: result.gradeBand,
+      };
+      setSelected(updatedSelected);
+      const updatedClasses = classesRef.current.map((item) =>
+        item.classId === selected.classId
+          ? { ...item, name: result.name, schoolYear: result.schoolYear, gradeBand: result.gradeBand }
+          : item,
+      );
+      classesRef.current = updatedClasses;
+      setClasses(updatedClasses);
+      setNotice("학급 기본 정보를 수정했어요.");
+    });
+  }
+
   async function deleteClass() {
     if (!selected || deleteName !== selected.name) return;
     if (!window.confirm(`${selected.name} 학급의 시즌·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
@@ -721,20 +809,24 @@ function App() {
                   filteredMembers.length === 0 ? <p className="muted">조건에 맞는 학생이 없어요.</p> :
                     <ol className="student-card-list">{filteredMembers.map((member) => {
                       const checked = selectedCardUids.includes(member.studentUid);
+                      const isEditing = editingMemberUid === member.studentUid;
                       return <li key={member.studentUid} className={`student-card-row${checked ? " is-selected" : ""}`}>
                         <label className="student-card-choice"><input type="checkbox" checked={checked} disabled={member.accessStatus !== "active"} onChange={(event) => setSelectedCardUids((old) => event.target.checked ? [...old, member.studentUid] : old.filter((uid) => uid !== member.studentUid))} /><span className="student-card-number">{members.indexOf(member) + 1}</span><strong>{member.displayName}</strong></label>
-                        <div className="student-card-code">개인 코드 <code>{member.accessStatus !== "active" ? "입장 불가" : cardCodes[member.studentUid] ?? (cardCodesLoading ? "확인 중…" : cardCodesHidden ? "가려짐" : member.printableCardAvailable ? "코드 확인 필요" : "이전 카드 · 재발급 필요")}</code></div>
+                        {isEditing ? <div className="action-row"><input aria-label="새 학생 이름" value={editingMemberName} maxLength={20} onChange={(event) => setEditingMemberName(event.target.value)} /><button type="button" className="small primary-cta" disabled={busy || !editingMemberName.trim()} onClick={() => void saveMemberName(member)}>저장</button><button type="button" className="small outline" disabled={busy} onClick={() => { setEditingMemberUid(null); setEditingMemberName(""); }}>취소</button></div>
+                          : <div className="student-card-code">개인 코드 <code>{member.accessStatus !== "active" ? "입장 불가" : cardCodes[member.studentUid] ?? (cardCodesLoading ? "확인 중…" : cardCodesHidden ? "가려짐" : member.printableCardAvailable ? "코드 확인 필요" : "이전 카드 · 재발급 필요")}</code></div>}
                         <div className="student-card-actions"><span className="student-card-status">{member.accessStatus !== "active" ? "입장 불가" : member.printableCardAvailable ? "입장 가능 · 출력 가능" : "입장 가능 · 첫 출력 때 재발급"}</span>
+                          {!isEditing && <button type="button" className="small outline" disabled={busy} onClick={() => { setEditingMemberUid(member.studentUid); setEditingMemberName(member.displayName); }}>이름 수정</button>}
                           <button type="button" className="small outline" disabled={busy || member.accessStatus !== "active"} onClick={() => setConfirmMember({member,action:"rotate"})}>재발급</button>
-                          <button type="button" className="small outline" disabled={busy} onClick={() => member.accessStatus === "active" ? setConfirmMember({member,action:"block"}) : void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button></div>
+                          <button type="button" className="small outline" disabled={busy} onClick={() => member.accessStatus === "active" ? setConfirmMember({member,action:"block"}) : void changeAccess(member)}>{member.accessStatus === "active" ? "입장 차단" : "차단 해제"}</button>
+                          <button type="button" className="small danger outline" disabled={busy} onClick={() => setConfirmMember({member,action:"remove"})}>삭제</button></div>
                       </li>;
                     })}</ol>}
               </section>}
               {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} />}
               {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
-              {teacherPage === "settings" && <><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요.</p></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
+              {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
-          {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else void changeAccess(target.member); }} />}
+          {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : confirmMember.action === "remove" ? "이 학생을 명단에서 삭제할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : confirmMember.action === "remove" ? `${confirmMember.member.displayName} 학생의 입장 카드와 명단 정보를 삭제합니다. 진행 중인 시즌에 참여하고 있는 학생은 먼저 시즌을 중지하거나 학생 참여를 중단해야 삭제할 수 있어요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : confirmMember.action === "remove" ? "학생 삭제" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else if (target.action === "remove") void removeMember(target.member); else void changeAccess(target.member); }} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}
         </section> : null}
     </main>

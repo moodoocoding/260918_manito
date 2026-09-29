@@ -130,6 +130,93 @@ export const createCustomMission = onCall(async (request) => {
   });
 });
 
+function requireCustomMissionId(value: unknown): { missionId: string; docId: string } {
+  if (typeof value !== "string" || !/^custom_[A-Za-z0-9]{20}$/.test(value)) {
+    throw new HttpsError("invalid-argument", "우리 반 미션만 수정하거나 삭제할 수 있어요.");
+  }
+  return { missionId: value, docId: value.slice(7) };
+}
+
+export const updateCustomMission = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const { missionId, docId } = requireCustomMissionId(input.missionId);
+  const text = requireText(input.text, "미션", 100);
+  const requestId = requireRequestId(input.requestId);
+  const classRef = db.doc(`classes/${classId}`);
+  const missionRef = classRef.collection("customMissions").doc(docId);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  const fingerprint = inputFingerprint({ classId, missionId, text });
+  return db.runTransaction(async (tx) => {
+    const [classDoc, missionDoc, command] = await Promise.all([
+      tx.get(classRef), tx.get(missionRef), tx.get(commandRef),
+    ]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "updateCustomMission", teacherUid, fingerprint);
+      return command.get("result") as { missionId: string; text: string; category: string };
+    }
+    if (!missionDoc.exists) {
+      throw new HttpsError("not-found", "우리 반 미션을 찾지 못했어요.");
+    }
+    const result = { missionId, text, category: "우리 반 미션" };
+    tx.update(missionRef, { text, updatedAt: FieldValue.serverTimestamp() });
+    tx.create(commandRef, { type: "updateCustomMission", requestedBy: teacherUid,
+      inputFingerprint: fingerprint, result, createdAt: FieldValue.serverTimestamp() });
+    tx.create(classRef.collection("auditLogs").doc(), { action: "custom_mission.updated",
+      actorUid: teacherUid, missionId, requestId, createdAt: FieldValue.serverTimestamp() });
+    return result;
+  });
+});
+
+export const deleteCustomMission = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const { missionId, docId } = requireCustomMissionId(input.missionId);
+  const requestId = requireRequestId(input.requestId);
+  const classRef = db.doc(`classes/${classId}`);
+  const missionRef = classRef.collection("customMissions").doc(docId);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  const fingerprint = inputFingerprint({ classId, missionId, action: "delete" });
+  return db.runTransaction(async (tx) => {
+    const [classDoc, missionDoc, command, roundsSnap, settingsSnap] = await Promise.all([
+      tx.get(classRef), tx.get(missionRef), tx.get(commandRef),
+      tx.get(classRef.collection("rounds")), tx.get(classRef.collection("roundSettings")),
+    ]);
+    assertClassTeacher(classDoc.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "deleteCustomMission", teacherUid, fingerprint);
+      return command.get("result") as { missionId: string; status: string };
+    }
+    if (!missionDoc.exists) {
+      throw new HttpsError("not-found", "우리 반 미션을 찾지 못했어요.");
+    }
+    const roundsMap = new Map(roundsSnap.docs.map((doc) => [doc.id, doc]));
+    for (const settingsDoc of settingsSnap.docs) {
+      const roundDoc = roundsMap.get(settingsDoc.id);
+      if (!roundDoc || !["draft", "ready"].includes(String(roundDoc.get("status") ?? ""))) continue;
+      const missionIds = (settingsDoc.get("missionIds") as string[] | undefined) ?? [];
+      if (missionIds.includes(missionId)) {
+        const nextMissions = missionIds.filter((id) => id !== missionId);
+        const nextVersion = Number(settingsDoc.get("rosterVersion") ?? 1) + 1;
+        tx.update(settingsDoc.ref, { missionIds: nextMissions, rosterVersion: nextVersion });
+        tx.update(roundDoc.ref, { status: "draft", rosterVersion: nextVersion, updatedAt: FieldValue.serverTimestamp() });
+      }
+    }
+    const count = Math.max(0, Number(classDoc.get("customMissionCount") ?? 1) - 1);
+    tx.delete(missionRef);
+    tx.update(classRef, { customMissionCount: count, updatedAt: FieldValue.serverTimestamp() });
+    const result = { missionId, status: "deleted" };
+    tx.create(commandRef, { type: "deleteCustomMission", requestedBy: teacherUid,
+      inputFingerprint: fingerprint, result, createdAt: FieldValue.serverTimestamp() });
+    tx.create(classRef.collection("auditLogs").doc(), { action: "custom_mission.deleted",
+      actorUid: teacherUid, missionId, requestId, createdAt: FieldValue.serverTimestamp() });
+    return result;
+  });
+});
+
 export const setMissionStatus = onCall(async (request) => {
   const input = requireRecord(request.data);
   const missionId = requireMissionId(input.missionId);

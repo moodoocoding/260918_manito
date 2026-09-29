@@ -1,10 +1,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { generateClassCode } from "../auth/codes.js";
-import { requireVerifiedTeacher } from "../shared/authorization.js";
+import { assertClassTeacher, requireVerifiedTeacher } from "../shared/authorization.js";
 import { db } from "../shared/firebase.js";
 import { assertSameCommand, inputFingerprint } from "../shared/idempotency.js";
 import {
+  requireDocumentId,
   requireGradeBand,
   requireRecord,
   requireRequestId,
@@ -95,3 +96,49 @@ export const createClass = onCall(
     return committedResult;
   },
 );
+
+export const updateClassInfo = onCall(async (request) => {
+  const teacherUid = await requireVerifiedTeacher(request);
+  const input = requireRecord(request.data);
+  const classId = requireDocumentId(input.classId, "학급");
+  const name = requireText(input.name, "학급 이름", 40);
+  const schoolYear = requireSchoolYear(input.schoolYear);
+  const gradeBand = requireGradeBand(input.gradeBand);
+  const requestId = requireRequestId(input.requestId);
+  const fingerprint = inputFingerprint({ classId, name, schoolYear, gradeBand });
+  const classRef = db.doc(`classes/${classId}`);
+  const commandRef = classRef.collection("commands").doc(requestId);
+  return db.runTransaction(async (transaction) => {
+    const [classSnapshot, command] = await Promise.all([
+      transaction.get(classRef),
+      transaction.get(commandRef),
+    ]);
+    assertClassTeacher(classSnapshot.data(), teacherUid);
+    if (command.exists) {
+      assertSameCommand(command.data(), "updateClassInfo", teacherUid, fingerprint);
+      return command.get("result") as { classId: string; name: string; schoolYear: number; gradeBand: string };
+    }
+    transaction.update(classRef, {
+      name,
+      schoolYear,
+      gradeBand,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    const result = { classId, name, schoolYear, gradeBand };
+    transaction.create(commandRef, {
+      type: "updateClassInfo",
+      status: "succeeded",
+      requestedBy: teacherUid,
+      inputFingerprint: fingerprint,
+      result,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    transaction.create(classRef.collection("auditLogs").doc(), {
+      action: "class.updated",
+      actorUid: teacherUid,
+      requestId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return result;
+  });
+});

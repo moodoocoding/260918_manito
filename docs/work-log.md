@@ -587,3 +587,20 @@
   2. **마니또 시즌 즉시 중지 및 완전 삭제(`deleteRound`) 구현**: `functions/src/rounds/flow.ts`에 `deleteRound` Callable Function을 추가했다. 담당 교사가 진행 중이거나 준비·취소·보관된 시즌을 삭제하면 학급의 `activeRoundId`/`lastRoundId` 잠금을 해제하고, 해당 시즌에서 추가된 `pairHistory`를 복원하며, `roundSettings/{roundId}`와 `rounds/{roundId}` 하위 컬렉션 전체(`participants`, `assignmentSecrets`, `studentData`, `messages`, `helpRequests`, `community` 등)를 `recursiveDelete`로 완전히 제거하고 감사 로그(`round.deleted`)를 남긴다.
   3. **프론트엔드 삭제 확인 모달 및 지난 활동 삭제 연동**: `TeacherRounds.tsx`의 `시즌 진행 관리`와 `지난 활동` 카드에 `"시즌 중지 및 삭제"` / `"시즌 삭제"` 버튼과 `ConfirmDialog` 확인 절차를 추가했다.
 - `npm run build`(Functions·Web TypeScript 및 Vite 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 통과했다. Firebase 개발 프로젝트 `manito-938cc`에 `deleteRound` 함수를 배포하고 GitHub `main`에 푸시해 Vercel 배포에 반영한다.
+
+## 2026-09-30 — 교사 학급·시즌 운영 5대 필수 관리 기능 일괄 고도화
+
+- 교실 현장 운영에 필요하지만 빠져 있던 5가지 핵심 관리 기능을 백엔드(신규 Callable Function 6개)와 프론트엔드에 일괄 구현했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-teacher-management-5-features.md)를 기록했다.
+  1. **학생 표시 이름 수정(`updateStudentName`) 및 개별 학생 삭제(`removeStudentMember`)**:
+     - `학생·카드` 명단에서 학생 이름을 인라인으로 즉시 수정할 수 있으며, 준비·진행 중인 회차의 `participants` 표시 이름도 함께 동기화된다.
+     - 전학·오등록 학생을 개별 삭제할 수 있다. 진행 중인 시즌(`active`/`paused`/`reveal_pending`)에 활성 참가 중인 학생은 매칭 무결성을 위해 먼저 참여 중단 또는 시즌 중지를 안내하며, 그렇지 않은 학생은 명부·카드 자격(`studentCredentials`)·조회 키(`studentCredentialLookups`)·준비 중 회차 설정(`roundSettings`)·Auth 계정에서 안전하게 제거하고 `memberCount`를 차감한다.
+  2. **학급 기본 정보 수정(`updateClassInfo`)**:
+     - `정보 요청·삭제` 탭 상단에 `학급 기본 정보 수정` 카드를 추가해 학급 이름(1~40자), 학년도, 학년군(`1~2학년`/`3~4학년`/`5~6학년`)을 언제든 수정할 수 있도록 했다.
+  3. **교사 추가 ‘우리 반 미션’ 문구 수정(`updateCustomMission`) 및 삭제(`deleteCustomMission`)**:
+     - `시즌 설정 > 3. 미션`의 `우리 반 미션` 항목마다 `문구 수정`과 `삭제` 버튼을 추가했다. 삭제 시 학급 전용 미션 문서를 지우고 `customMissionCount`를 차감하며, 준비 중인 시즌(`draft`/`ready`)의 선택 목록(`missionIds`)에서도 자동으로 정리한다.
+  4. **시즌 종료일 경과 및 정체 공개 대기 원클릭 안내 배너**:
+     - `운영 요약` 화면에서 진행·일시정지 시즌의 종료일이 지났을 때 `"⏰ 예정된 활동 종료일이 지났어요"` 배너와 `"지금 활동 종료하기 (공개 대기 전환)"` 원클릭 버튼을 표시하고, `공개 대기` 상태일 때 `"지금 정체 공개 승인하기"`(미처리 안전 건이 있으면 상태 확인 이동) 배너를 표시한다.
+  5. **정체 공개 후 ‘우리 반 감사 인사 · 활동 소감 모아보기’(`getRoundReflectionsForTeacher`) 및 인쇄**:
+     - `공개 완료`(`revealed`) 및 `보관`(`archived`) 시즌의 `시즌 설정`과 `지난 활동` 화면에서 참가 학생 전원의 챙긴 친구·나를 챙긴 마니또·마니또에게 보낸 감사 인사·이번 시즌 활동 소감을 카드 그리드로 한눈에 모아보고 `window.print()`로 인쇄할 수 있게 했다.
+- `npm run build`(Functions·Web TypeScript 및 Vite 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 모두 통과했다.
+- Firebase 개발 프로젝트 `manito-938cc`(`asia-northeast3`)에 신규 함수 6개(`updateClassInfo`, `updateStudentName`, `removeStudentMember`, `updateCustomMission`, `deleteCustomMission`, `getRoundReflectionsForTeacher`)를 배포하고, GitHub `main`에 푸시해 Vercel 프론트엔드 배포에 반영한다.

@@ -128,6 +128,12 @@ Google 로그인한 교사(비학생 인증 계정)는 `getTeacherStatus` 또는
 | `getAssignmentsForTeacher` | `{classId,roundId}` | `{participantCount,assignments:[{giverUid,giverName,receiverUid,receiverName}]}`. 담당 교사 열람마다 감사. 확정 참가자 모두가 서로 다른 한 명을 맡고 서로 다른 한 명에게 맡겨지는지 검증하며 누락·중복·자기 배정·명단 불일치면 `failed-precondition` |
 | `getMissionCatalog` | `{classId,gradeBand}` | 담당 학급의 학년군별 4개 카테고리×10개 기본 미션과 학급 전용 미션 |
 | `createCustomMission` | `{classId,text,requestId}` | 담당 교사가 학급 미션을 100자 이내로 추가. 학급당 최대 40개, 멱등 처리 |
+| `updateCustomMission` | `{classId,missionId,text,requestId}` | 담당 교사가 학급 전용 미션(`custom_*`) 문구를 1~100자로 수정. 감사 기록 및 멱등 처리 |
+| `deleteCustomMission` | `{classId,missionId,requestId}` | 담당 교사가 학급 전용 미션(`custom_*`)을 삭제하고 `draft`·`ready` 회차 설정의 `missionIds`에서 제거하며 `customMissionCount`를 차감 |
+| `updateClassInfo` | `{classId,name,schoolYear,gradeBand,requestId}` | 담당 교사가 학급 기본 정보(이름·학년도·학년군)를 수정. 감사 기록 및 멱등 처리 |
+| `updateStudentName` | `{classId,studentUid,displayName,requestId}` | 담당 교사가 학생 표시 이름을 수정하고 진행·준비 회차의 `participants` 표시 이름도 함께 동기화 |
+| `removeStudentMember` | `{classId,studentUid,requestId}` | 진행 중 회차에 참여 중이지 않은 학생을 명부에서 제거하고 카드 자격·조회 키·준비 회차 설정 및 Auth 계정을 정리하며 `memberCount`를 차감 |
+| `getRoundReflectionsForTeacher` | `{classId,roundId}` | `revealed`·`archived` 회차에서 참가 학생별 챙긴 친구·마니또·보낸 감사 인사·받은 감사 인사·활동 소감을 일괄 조회. 열람 감사 기록 |
 | `getStudentActivity` | `null` 또는 `{roundId}` | 현재 또는 본인의 지난 회차 미션·받은 쪽지·보낸 쪽지 상태·도움 요청 상태. 관계 이름은 `revealed`·`archived`에서만 반환하며 그 전에는 `targetDisplayName`·`incomingDisplayName` 모두 `null`. 한국 날짜 `koreaDate`, 시즌 날짜 `startsOn`·`endsOn`, 당일 발송 가능 여부 `canSendMessage`, 다음 수업일 `nextActivityDate`, 저장된 `reflectionText`, 감사 전송 여부 `thankYouSent` 포함. `missions[]`에 공개 범주 `category`를, `missionSummary`에 본인 현재 유효 미션의 `done`·`todo`·`skipped`·`total` 수를 반환한다. `replaced` 원본은 요약에서 제외한다. 유효한 개인 선택 `focusMissionId`는 본인에게만 반환한다. 구 시즌의 불명 범주는 `기타 미션`이다. `inbox[]`·`sent[]`에는 본인 사본의 답장 체인을 따라 정한 `conversation:"caredFor"|"carer"|"unknown"`과 정확한 시각을 노출하지 않는 합산 정렬 번호 `sequence`를 추가한다. 발신자·수신자 UID와 공개 전 이름은 반환하지 않는다. |
 | `listStudentRounds` | `null` | 본인이 참가한 공개 완료·보관 회차의 ID·제목·상태만 조회 |
 | `setMissionStatus` | `{missionId,status:"done"\|"skipped"}` | 진행 중 회차에서 본인 미션 변경 |
