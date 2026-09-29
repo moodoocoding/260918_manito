@@ -89,6 +89,7 @@ function App() {
   const [openHistoryRoundId, setOpenHistoryRoundId] = useState<string | null>(null);
   const [classCodeInput, setClassCodeInput] = useState("");
   const [cardCodeInput, setCardCodeInput] = useState("");
+  const [rememberStudent, setRememberStudent] = useState(false);
   const [showCardInput, setShowCardInput] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [newClassCode, setNewClassCode] = useState("");
@@ -752,7 +753,7 @@ function App() {
             </ul>
           </div>
           <form className="panel entry-form" onSubmit={(event) => { event.preventDefault(); void task(async () => {
-            await studentLogin(classCodeInput, cardCodeInput);
+            await studentLogin(classCodeInput, cardCodeInput, rememberStudent);
             setCardCodeInput("");
           }); }}>
             <div className="entry-form-head">
@@ -769,7 +770,13 @@ function App() {
               </div>
               <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 4자리 코드 (예: 7K9X)" required />
             </div>
-            <p className="field-help">영어 대소문자와 코드 사이의 공백·하이픈은 구분하지 않아요.</p>
+            <div className="checkbox-row remember-row">
+              <label htmlFor="student-remember-me" className="checkbox-label">
+                <input id="student-remember-me" type="checkbox" checked={rememberStudent} onChange={(e) => setRememberStudent(e.target.checked)} />
+                <span>이 기기에서 로그인 기억하기 (자동 로그인)</span>
+              </label>
+            </div>
+            <p className="field-help">공용 컴퓨터에서는 체크를 해제해 주세요. 창을 닫으면 자동으로 로그아웃돼요.</p>
             <button className="wide primary-cta" disabled={busy}>{busy ? "확인 중…" : "입장하기"}</button>
             <p className="help">카드를 잃어버렸거나 입장이 안 되면 선생님께 말씀해 주세요. 이름만으로는 입장할 수 없어요.</p>
           </form>

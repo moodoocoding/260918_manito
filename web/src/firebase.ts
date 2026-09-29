@@ -1,8 +1,8 @@
 import { initializeApp } from "firebase/app";
 import {
-  browserPopupRedirectResolver, browserSessionPersistence, connectAuthEmulator,
-  getRedirectResult, inMemoryPersistence, initializeAuth, GoogleAuthProvider,
-  setPersistence, signInWithPopup, signInWithRedirect,
+  browserLocalPersistence, browserPopupRedirectResolver, browserSessionPersistence,
+  connectAuthEmulator, getRedirectResult, inMemoryPersistence, indexedDBLocalPersistence,
+  initializeAuth, GoogleAuthProvider, setPersistence, signInWithPopup, signInWithRedirect,
   signInWithCustomToken, signOut,
 } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
@@ -40,7 +40,7 @@ try {
 }
 
 export const auth = initializeAuth(app, {
-  persistence: [browserSessionPersistence, inMemoryPersistence],
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const db = getFirestore(app);
@@ -63,15 +63,16 @@ function createGoogleProvider(): GoogleAuthProvider {
 }
 
 export function prepareTeacherAuth(): void {
-  void setPersistence(auth, browserSessionPersistence).catch(() => undefined);
+  void setPersistence(auth, browserLocalPersistence).catch(() => undefined);
 }
 
 export async function teacherLogin(): Promise<void> {
+  await setPersistence(auth, browserLocalPersistence);
   await signInWithPopup(auth, createGoogleProvider(), browserPopupRedirectResolver);
 }
 
 export async function teacherLoginRedirect(): Promise<void> {
-  await setPersistence(auth, browserSessionPersistence);
+  await setPersistence(auth, browserLocalPersistence);
   await signInWithRedirect(auth, createGoogleProvider(), browserPopupRedirectResolver);
 }
 
@@ -84,8 +85,9 @@ export async function consumeAuthRedirectError(): Promise<unknown> {
   }
 }
 
-export async function studentLogin(classCode: string, cardCode: string): Promise<void> {
-  await setPersistence(auth, inMemoryPersistence);
+export async function studentLogin(classCode: string, cardCode: string, rememberMe = false): Promise<void> {
+  const persistenceMode = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+  await setPersistence(auth, persistenceMode);
   const result = await call<{ classCode: string; cardCode: string }, { customToken: string }>(
     "loginStudent", { classCode, cardCode });
   await signInWithCustomToken(auth, result.customToken);
@@ -93,5 +95,4 @@ export async function studentLogin(classCode: string, cardCode: string): Promise
 
 export async function logout(): Promise<void> {
   await signOut(auth);
-  await setPersistence(auth, inMemoryPersistence).catch(() => undefined);
 }

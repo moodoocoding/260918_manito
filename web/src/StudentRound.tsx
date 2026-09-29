@@ -119,19 +119,22 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
           </div>
           <div className="student-next-mission">
             <div className="spotlight-head">
-              <span className="spotlight-badge">핵심 과업 · 이번에 해볼 미션</span>
+              <span className="spotlight-badge">오늘의 미션</span>
               {firstTodo && <span className="category-pill">{firstTodo.category ?? "기타 미션"}</span>}
             </div>
-            <h3>이번에 해볼 미션</h3>
             {firstTodo ? <>
               <p className="student-mission-text">{firstTodo.text}</p>
-              {data.canSubmit && <button className="primary-cta" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button>}
-            </> : <p className="student-mission-empty">{missions.length ? "지금 골라볼 미션이 없어요. 내 기록을 확인해 보세요." : "아직 미션이 없어요."}</p>}
+              <div className="student-mission-actions inline-actions">
+                {data.canSubmit && <button className="primary-cta" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 멋지게 완료했어요! 🎉"); })}>✨ 해냈어요!</button>}
+                <button className="outline" onClick={() => onNavigate?.("missions")}>다른 미션으로 바꾸기 →</button>
+              </div>
+            </> : <>
+              <p className="student-mission-empty">{missions.length ? "지금 진행 중인 미션이 없어요. 새로운 미션을 골라볼까요?" : "아직 준비된 미션이 없어요."}</p>
+              <div className="student-mission-actions inline-actions">
+                <button className="outline" onClick={() => onNavigate?.("missions")}>{missions.length ? "미션 골라보기 →" : "내 기록 보기"}</button>
+              </div>
+            </>}
             {view === "home" && feedback}
-            <div className="student-link-row">
-              <button className="outline" onClick={() => onNavigate?.("missions")}>{firstTodo ? "미션 골라보기" : "내 기록 보기"}</button>
-              {firstTodo && data.canSubmit && <button className="outline" disabled={busy} onClick={() => void run(async () => {await call<object,object>("setMissionStatus", {missionId:firstTodo.missionId,status:"skipped"});setNotice("이 미션은 쉬기로 기록했어요.");})}>이 미션 쉬기</button>}
-            </div>
           </div>
           <p className="field-help">{revealed ? "선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요." : "진행 중에는 친구의 이름을 볼 수 없어요. 쪽지는 서버가 배정된 친구에게 전해요."}</p>
         </section>
