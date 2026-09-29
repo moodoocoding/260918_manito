@@ -619,3 +619,20 @@
      - 학생 로그인 폼의 안내 문구를 `"카드에 적힌 4자리 코드 (예: 7K9X)"`로 정돈했다.
 - `git diff --check`, `npm run build`, `npm run test:functions`(12/12 통과, 4자리 카드 및 12자리 구 카드 파싱 검증), `node --test tests/entry-card-qr.test.mjs`(1/1 통과)가 모두 통과했다.
 - Firebase 개발 프로젝트 `manito-938cc`에 변경된 백엔드 함수(`createClass`, `updateClassInfo`, `loginStudent`, `registerStudents`, `rotateStudentCredential`, `printStudentCards`)를 배포하고, GitHub `main`에 푸시해 Vercel 배포에 반영한다.
+
+## 2026-09-30 — 학생 우편함 메신저형 대화창 전면 개편 및 UI 초점 버그 수정
+
+- 사용자 피드백(제목의 파란색 레터링 사각 박스 버그, 우편함 중간 요약 카드의 불필요성, 메신저처럼 바로 입력할 수 없고 한 단계 더 들어가야 하는 불편함, 완성된 문구를 카카오톡 이모티콘처럼 `+` 버튼으로 넣는 방식 제안)을 반영해 프런트엔드를 전면 개편했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-student-mail-messenger-chat-redesign.md)를 기록했다.
+- **학생 홈 제목의 파란색 사각 박스 버그 수정**:
+  - 탭 이동 시 스크린리더·키보드 접근성을 위해 `.student-page-title`(`안녕, 민지!`)에 프로그램 초점을 둘 때, 브라우저 기본 파란색 포커스 링이 사각 테두리처럼 그려지던 문제를 `:focus-visible`로 한정하고 `:focus:not(:focus-visible) { outline: none; }`을 선언하여 마우스·터치 조작 및 페이지 이동 시 테두리가 나타나지 않도록 교정했다.
+- **우편함 중간 요약 카드([이미지2]) 완전 제거**:
+  - 상단 세그먼트 탭(`내가 맡은 친구` / `나를 맡은 친구`)에서 대화 상대를 이미 선택하고 있으므로, 중간에 시야를 가리던 요약 카드(`.conversation-heading`)와 점프 버튼을 완전히 제거하고 대화 말풍선이 화면 상단에 시원하게 바로 보이도록 정리했다.
+- **카카오톡 스타일 일체형 메신저 대화방 및 `+` 추천 문구 트레이 구현**:
+  - 기존의 복잡했던 `[준비된 문구 / 직접 쓰기]` 모드 선택 탭과 분리된 작성 폼 카드(`.conversation-compose`)를 제거했다.
+  - 대화 내역(`conversation-messages`) 하단에 일체형 메시지 입력 바(`.messenger-input-bar`)를 배치하여, 대화창을 보며 바로 글을 입력하고 `Enter` 키(또는 `보내기` 버튼)로 즉시 전송할 수 있도록 했다(`Shift+Enter` 줄바꿈).
+  - 입력창 좌측에 카카오톡 이모티콘/서랍 버튼과 동일한 **`+` (더하기) 버튼**(`.chat-plus-btn`)을 배치했다. 클릭 시 입력창 바로 위에 귀여운 칩 형태의 추천 문구 서랍(`.chat-preset-tray`)이 펼쳐지며, 칩을 누르면 입력창에 자동으로 문구가 채워져 글쓰기가 서툰 학생도 1초 만에 따뜻한 쪽지를 전송할 수 있다.
+  - 새 메시지 도착이나 탭 전환 시 대화창 최하단으로 부드럽게 자동 스크롤(`scrollTop = scrollHeight`)되도록 보강했다.
+- **개발 검증 및 배포**:
+  - 개발 프로젝트(`manito-938cc`)에 체험용 학급(`DEMO2601`)과 학생 4명(`MNJ1-TEST2601` 등)을 등록하고 등록된 교사 Google 계정에 담임 권한을 연결했다.
+  - `npm run build`(TypeScript 및 Vite 프로덕션 빌드), 함수 단위 테스트 12건, QR 단위 테스트 1건, `git diff --check`가 모두 통과했다.
+  - 코드 및 문서를 Git 커밋(`ae0b72c`) 후 GitHub `main`에 푸시했으며, Vercel 프로덕션 배포 완료를 확인했다.
