@@ -650,10 +650,14 @@ a {
   margin: 0;
 }
 
-.student-page-title:focus {
+.student-page-title:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
   border-radius: 4px;
+}
+
+.student-page-title:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .student-intro {
