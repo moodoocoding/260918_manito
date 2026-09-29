@@ -3360,6 +3360,138 @@ a {
   display: none;
 }
 
+/* Print Sheet Overlay for Screen */
+.print-sheet-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+}
+
+.print-controls-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10001;
+  width: 100%;
+  max-width: 680px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-panel);
+}
+
+.print-controls-info strong {
+  display: block;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.print-controls-info span {
+  display: block;
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.print-sheet-wrapper .print-only {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.print-sheet-wrapper .printed-card {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border: 2px solid #0f172a;
+  border-radius: 16px;
+  padding: 28px 32px;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.printed-card-brand {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.printed-card h1 {
+  font-size: 1.6rem;
+  margin: 10px 0 20px;
+  color: #0f172a;
+}
+
+.printed-card-entry {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.printed-card-entry img {
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
+.printed-card-entry strong {
+  display: block;
+  font-size: 1.15rem;
+}
+
+.printed-card-entry p {
+  font-size: 0.95rem;
+  color: #475569;
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+.printed-card-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  border-block: 2px solid #0f172a;
+  padding: 12px 0;
+  margin-top: 10px;
+}
+
+.printed-card-codes p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.printed-card-codes strong {
+  display: block;
+  font-size: 1.4rem;
+  color: #0f172a;
+  letter-spacing: 1.5px;
+  margin-top: 4px;
+}
+
+.printed-card-secret {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 14px 0 0;
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 1100px) {
   .teacher-status-grid {
@@ -3678,92 +3810,150 @@ a {
 }
 
 @media print {
-  :root,
-  body,
-  .app-shell {
-    background: #ffffff !important;
-    min-height: 0;
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
   }
+
+  :root,
+  body {
+    background: #ffffff !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 카드 인쇄 시 웹 화면 전체(상단바, 교사 대시보드 패널, 다이얼로그 등) 완전 은닉 */
+  body.is-printing-cards,
+  body.is-printing-cards .app-shell {
+    background: #ffffff !important;
+  }
+
+  body.is-printing-cards .topbar,
+  body.is-printing-cards .topbar-surface,
+  body.is-printing-cards .content,
+  body.is-printing-cards .teacher-shell,
+  body.is-printing-cards .teacher-sidebar,
+  body.is-printing-cards .mobile-teacher-menu,
+  body.is-printing-cards .dialog-backdrop,
+  body.is-printing-cards .no-print,
+  body.is-printing-cards .print-controls-bar,
   .topbar-surface,
   .teacher-sidebar,
   .mobile-teacher-menu,
   .no-print {
     display: none !important;
   }
+
+  body.is-printing-cards .print-sheet-wrapper {
+    position: static !important;
+    inset: auto !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  body.is-printing-cards .print-sheet-wrapper .print-only,
   .print-only {
-    display: block;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
+
   .printed-card {
-    width: 100%;
-    max-width: 700px;
-    margin: 24px auto;
-    padding: 30px 34px;
-    color: #17212f;
-    border: 2px solid #17212f;
-    border-radius: 18px;
-    font-size: 18pt;
-    page-break-inside: avoid;
-    break-inside: avoid;
-    page-break-after: always;
-    break-after: page;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 20mm !important;
+    padding: 24px 28px !important;
+    box-sizing: border-box !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    border: 2px solid #000000 !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
   }
+
   .printed-card:last-child {
-    page-break-after: auto;
-    break-after: auto;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
   }
+
   .printed-card h1 {
-    margin: 12px 0 24px;
-    font-size: 25pt;
-    overflow-wrap: anywhere;
+    margin: 8px 0 16px !important;
+    font-size: 22pt !important;
+    color: #000000 !important;
   }
+
   .printed-card-brand {
-    font-size: 14pt;
-    font-weight: 800;
+    font-size: 13pt !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
   }
+
   .printed-card-entry {
-    display: grid;
-    grid-template-columns: 160px minmax(0, 1fr);
-    align-items: center;
-    gap: 22px;
-    margin: 0 0 22px;
+    display: grid !important;
+    grid-template-columns: 140px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 18px !important;
+    margin: 0 0 18px !important;
   }
+
   .printed-card-entry img {
-    display: block;
-    width: 160px;
-    height: 160px;
+    display: block !important;
+    width: 140px !important;
+    height: 140px !important;
+    border: 1px solid #000000 !important;
     image-rendering: pixelated;
   }
+
   .printed-card-entry strong {
-    font-size: 16pt;
-    letter-spacing: 0;
+    font-size: 15pt !important;
+    color: #000000 !important;
   }
+
   .printed-card-entry p {
-    font-size: 12pt;
-    line-height: 1.45;
-    margin: 9px 0 0;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    margin: 6px 0 0 !important;
+    color: #000000 !important;
   }
-  .printed-card-url {
-    overflow-wrap: anywhere;
-  }
+
   .printed-card-codes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    border-block: 1px solid #17212f;
-    padding: 12px 0;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    border-block: 1.5px solid #000000 !important;
+    padding: 10px 0 !important;
   }
+
   .printed-card-codes p {
-    font-size: 13pt;
-    margin: 4px 0;
+    font-size: 12pt !important;
+    margin: 2px 0 !important;
+    color: #000000 !important;
   }
+
   .printed-card-codes strong {
-    display: block;
-    font-size: 18pt;
-    margin-top: 5px;
-    overflow-wrap: anywhere;
+    display: block !important;
+    font-size: 20pt !important;
+    letter-spacing: 2px !important;
+    margin-top: 4px !important;
+    color: #000000 !important;
   }
+
   .printed-card-secret {
-    font-size: 11pt;
-    margin: 18px 0 0;
+    font-size: 10.5pt !important;
+    margin: 14px 0 0 !important;
+    color: #000000 !important;
   }
 }

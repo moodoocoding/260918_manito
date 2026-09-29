@@ -142,3 +142,127 @@ export const reissueMissingCards = onCall(
     });
   },
 );
+
+export const reissueStudentCards = onCall(
+  { timeoutSeconds: 120, memory: "512MiB", secrets: [cardPrintKey] },
+  async (request): Promise<{ reissuedCount: number; cards: Array<{ studentUid: string; displayName: string; cardCode: string }> }> => {
+    const teacherUid = await requireVerifiedTeacher(request);
+    const input = requireRecord(request.data);
+    const classId = requireDocumentId(input.classId, "학급");
+    const studentUids = requestedStudents(input.studentUids);
+    const requestId = requireRequestId(input.requestId);
+    const classRef = db.doc(`classes/${classId}`);
+    const commandRef = classRef.collection("commands").doc(requestId);
+    const fingerprint = inputFingerprint({ classId, studentUids });
+    const [classBefore, existing] = await Promise.all([classRef.get(), commandRef.get()]);
+    assertClassTeacher(classBefore.data(), teacherUid);
+    if (existing.exists) {
+      assertSameCommand(existing.data(), "reissueStudentCards", teacherUid, fingerprint);
+      const cached = existing.data()?.result as { reissuedCount: number; cards: Array<{ studentUid: string; displayName: string; cardCode: string }> };
+      if (cached) return cached;
+    }
+
+    const usedLoginIds = new Set<string>();
+    const plans: Array<{
+      studentUid: string;
+      cardCode: string;
+      lookupDigest: string;
+      encryptedCardCode: string;
+      secretHash: string;
+      secretSalt: string;
+    }> = [];
+    for (const studentUid of studentUids) {
+      let card = generateStudentCard();
+      while (usedLoginIds.has(card.loginId)) card = generateStudentCard();
+      usedLoginIds.add(card.loginId);
+      const lookupDigest = credentialLookupDigest(classId, card.loginId);
+      const hashes = await hashSecret(card.secret);
+      plans.push({
+        studentUid,
+        cardCode: card.cardCode,
+        lookupDigest,
+        encryptedCardCode: encryptCardCode(card.cardCode),
+        ...hashes,
+      });
+    }
+
+    return db.runTransaction(async (tx) => {
+      const [classDoc, command, ...rows] = await Promise.all([
+        tx.get(classRef),
+        tx.get(commandRef),
+        ...plans.map(async (plan) => Promise.all([
+          tx.get(classRef.collection("members").doc(plan.studentUid)),
+          tx.get(db.doc(`studentCredentials/${plan.studentUid}`)),
+          tx.get(db.doc(`studentCredentialLookups/${plan.lookupDigest}`)),
+        ])),
+      ]);
+      assertClassTeacher(classDoc.data(), teacherUid);
+      if (command.exists) {
+        assertSameCommand(command.data(), "reissueStudentCards", teacherUid, fingerprint);
+        const cached = command.data()?.result as { reissuedCount: number; cards: Array<{ studentUid: string; displayName: string; cardCode: string }> };
+        if (cached) return cached;
+      }
+      const cards: Array<{ studentUid: string; displayName: string; cardCode: string }> = [];
+      for (const [index, row] of rows.entries()) {
+        const [member, credential, newLookup] = row;
+        if (!member.exists || !credential.exists || credential.get("classId") !== classId
+          || member.get("accessStatus") !== "active") {
+          throw new HttpsError("permission-denied", "입장 가능한 이 학급 학생만 재발급할 수 있어요.");
+        }
+        if (newLookup.exists) {
+          throw new HttpsError("aborted", "새 카드 코드가 겹쳤어요. 다시 시도해 주세요.");
+        }
+        const plan = plans[index];
+        const oldLookupDigest = credential.get("lookupDigest");
+        if (typeof oldLookupDigest === "string" && oldLookupDigest) {
+          tx.delete(db.doc(`studentCredentialLookups/${oldLookupDigest}`));
+        }
+        const nextSessionVersion = Number(member.get("sessionVersion") ?? 0) + 1;
+        tx.create(db.doc(`studentCredentialLookups/${plan.lookupDigest}`), {
+          classId,
+          studentUid: plan.studentUid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        tx.update(credential.ref, {
+          lookupDigest: plan.lookupDigest,
+          secretHash: plan.secretHash,
+          secretSalt: plan.secretSalt,
+          encryptedCardCode: plan.encryptedCardCode,
+          codeVersion: Number(credential.get("codeVersion") ?? 1) + 1,
+          failedAttempts: 0,
+          lockedUntil: null,
+          sessionVersion: nextSessionVersion,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        tx.update(member.ref, {
+          sessionVersion: nextSessionVersion,
+          printableCardAvailable: true,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        cards.push({
+          studentUid: plan.studentUid,
+          displayName: String(member.get("displayName")),
+          cardCode: plan.cardCode,
+        });
+      }
+      const result = { reissuedCount: cards.length, cards };
+      tx.create(commandRef, {
+        type: "reissueStudentCards",
+        status: "succeeded",
+        requestedBy: teacherUid,
+        inputFingerprint: fingerprint,
+        result,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      tx.create(classRef.collection("auditLogs").doc(), {
+        action: "student.cards_batch_reissued",
+        actorUid: teacherUid,
+        studentUids,
+        studentCount: studentUids.length,
+        requestId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return result;
+    });
+  },
+);

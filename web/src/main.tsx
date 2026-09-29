@@ -101,6 +101,7 @@ function App() {
   const [memberFilter, setMemberFilter] = useState("all");
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block" | "remove"} | null>(null);
+  const [confirmBatchReissue, setConfirmBatchReissue] = useState<{ studentUids: string[]; label: string } | null>(null);
   const [editingMemberUid, setEditingMemberUid] = useState<string | null>(null);
   const [editingMemberName, setEditingMemberName] = useState("");
   const [editClassName, setEditClassName] = useState("");
@@ -625,17 +626,42 @@ function App() {
       throw new Error("입장 QR을 만들지 못했어요. 다시 출력해 주세요.");
     }
     if (printGeneration !== generation.current) return;
-    if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
-    const clear = () => {
-      setPrintSheet(null);
-      if (window.onafterprint === clear) window.onafterprint = null;
-      if (printTimeout.current !== null) window.clearTimeout(printTimeout.current);
-      printTimeout.current = null;
-    };
-    window.onafterprint = clear;
-    printTimeout.current = window.setTimeout(clear, 2 * 60_000);
+    document.body.classList.add("is-printing-cards");
     flushSync(() => setPrintSheet({cards:cardsToPrint, qrDataUrl, entryUrl}));
-    window.setTimeout(() => window.print(), 50);
+    window.setTimeout(() => {
+      window.print();
+    }, 150);
+  }
+
+  function closePrintSheet() {
+    document.body.classList.remove("is-printing-cards");
+    setPrintSheet(null);
+  }
+
+  async function batchReissue(studentUids: string[]) {
+    if (!selected || !studentUids.length) return;
+    setConfirmBatchReissue(null);
+    await task(async () => {
+      const result = await call<
+        object,
+        { reissuedCount: number; cards: Array<{ studentUid: string; displayName: string; cardCode: string }> }
+      >("reissueStudentCards", {
+        classId: selected.classId,
+        studentUids,
+        requestId: crypto.randomUUID(),
+      });
+      setMembers((old) =>
+        old.map((m) => (studentUids.includes(m.studentUid) ? { ...m, printableCardAvailable: true } : m)),
+      );
+      setCardCodes((old) => {
+        const next = { ...old };
+        for (const card of result.cards) {
+          next[card.studentUid] = card.cardCode;
+        }
+        return next;
+      });
+      setNotice(`${result.reissuedCount}명 학생의 카드를 4자리 새 코드로 재발급했어요.`);
+    });
   }
 
   async function preparePrint(studentUids: string[]) {
@@ -820,11 +846,25 @@ function App() {
                 {members.length > 0 ? <details className="student-registration"><summary>새 학생 등록</summary><form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form></details>
                   : <form onSubmit={(event) => void register(event)} className="stack teacher-page-form"><h3>학생 등록</h3><label>이름을 한 줄에 한 명씩<textarea rows={4} value={namesInput} onChange={(event) => setNamesInput(event.target.value)} placeholder={"가람\n나래"} /></label><button disabled={busy}>학생 등록하고 카드 만들기</button></form>}
                 <div className="card-list-heading"><div><h3>학생 명단 · {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</h3><p className="field-help">출력할 학생을 선택하거나 학급 전체 카드를 바로 출력하세요.</p></div>
-                  <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button></div>
+                  <div className="action-row">
+                    <button type="button" disabled={busy || activeMemberUids.length === 0} onClick={() => void preparePrint(activeMemberUids)}>전체 카드 {activeMemberUids.length}장 출력</button>
+                    <button type="button" className="outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setConfirmBatchReissue({ studentUids: activeMemberUids, label: `전체 학생 ${activeMemberUids.length}명` })}>4자리 코드로 전체 재발급</button>
+                  </div>
+                </div>
                 <div className="card-code-notice"><span>개인 코드는 선생님에게만 표시돼요. 다른 화면으로 이동하거나 5분이 지나면 가려집니다.</span><button type="button" className="small outline" disabled={cardCodesLoading || activeMemberUids.length === 0} onClick={() => void loadCardCodes()}>{cardCodesLoading ? "코드 확인 중…" : cardCodesHidden ? "코드 다시 보기" : "코드 새로고침"}</button></div>
                 {cardCodesError && <p className="message error" role="alert">개인 코드를 불러오지 못했어요. 코드 새로고침을 눌러 다시 시도해 주세요.</p>}
+                {Object.values(cardCodes).some((code) => code && code.length > 4) && (
+                  <div className="card-code-notice legacy-code-alert" style={{ background: "#fef3c7", borderColor: "#f59e0b", color: "#92400e", margin: "8px 0" }}>
+                    <span>⚠️ 이전에 발급된 긴 12자리 구 코드를 사용하는 학생이 있어요. <strong>'4자리 코드로 전체 재발급'</strong>을 누르면 4자리 새 코드로 즉시 교체됩니다.</span>
+                  </div>
+                )}
                 <div className="page-actions card-filters"><label>이름 검색<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><label>입장 상태<select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)}><option value="all">전체</option><option value="active">입장 가능</option><option value="blocked">입장 불가</option></select></label></div>
-                <div className="card-selection-toolbar"><button type="button" className="small outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setSelectedCardUids(activeMemberUids)}>전체 선택</button><button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setSelectedCardUids([])}>선택 해제</button><button type="button" disabled={busy || selectedCardUids.length === 0} onClick={() => void preparePrint(selectedCardUids)}>선택한 카드 {selectedCardUids.length}장 출력</button></div>
+                <div className="card-selection-toolbar">
+                  <button type="button" className="small outline" disabled={busy || activeMemberUids.length === 0} onClick={() => setSelectedCardUids(activeMemberUids)}>전체 선택</button>
+                  <button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setSelectedCardUids([])}>선택 해제</button>
+                  <button type="button" disabled={busy || selectedCardUids.length === 0} onClick={() => void preparePrint(selectedCardUids)}>선택한 카드 {selectedCardUids.length}장 출력</button>
+                  <button type="button" className="small outline" disabled={busy || selectedCardUids.length === 0} onClick={() => setConfirmBatchReissue({ studentUids: selectedCardUids, label: `선택한 학생 ${selectedCardUids.length}명` })}>선택한 카드 4자리로 재발급</button>
+                </div>
                 {membersLoading && members.length === 0 ? <p role="status">학생 명단을 불러오는 중이에요…</p> : members.length === 0 ? <p className="muted">아직 등록한 학생이 없어요. 학생을 등록하면 입장 카드를 출력할 수 있어요.</p> :
                   filteredMembers.length === 0 ? <p className="muted">조건에 맞는 학생이 없어요.</p> :
                     <ol className="student-card-list">{filteredMembers.map((member) => {
@@ -847,18 +887,31 @@ function App() {
               {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학급 코드·학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학급 코드<input value={editClassCode} maxLength={12} onChange={(event) => setEditClassCode(event.target.value.toUpperCase())} placeholder="예: SUN2026" required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><p className="field-help">학급 코드를 바꾸면 기존에 인쇄한 카드의 학급 코드도 변경되므로 학생들에게 바뀐 코드를 안내해 주세요.</p><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
           {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : confirmMember.action === "remove" ? "이 학생을 명단에서 삭제할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : confirmMember.action === "remove" ? `${confirmMember.member.displayName} 학생의 입장 카드와 명단 정보를 삭제합니다. 진행 중인 시즌에 참여하고 있는 학생은 먼저 시즌을 중지하거나 학생 참여를 중단해야 삭제할 수 있어요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : confirmMember.action === "remove" ? "학생 삭제" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else if (target.action === "remove") void removeMember(target.member); else void changeAccess(target.member); }} />}
+          {confirmBatchReissue && <ConfirmDialog title={`${confirmBatchReissue.label}의 카드를 4자리 새 코드로 재발급할까요?`} detail="새로운 4자리 코드(예: 7K9X)가 즉시 발급됩니다. 대상 학생의 이전 카드와 로그인 세션은 즉시 무효화되므로 새 카드를 인쇄하여 배부해 주세요." confirmLabel="4자리 새 코드로 재발급" busy={busy} onCancel={() => setConfirmBatchReissue(null)} onConfirm={() => void batchReissue(confirmBatchReissue.studentUids)} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}
         </section> : null}
     </main>
 
-    {printSheet && selected && <div className="print-only">{printSheet.cards.map((card) => <div className="printed-card" key={card.studentUid}>
-      <span className="printed-card-brand">💌 우리 반 비밀친구</span>
-      <h1>{card.displayName} 입장 카드</h1>
-      <div className="printed-card-entry"><img src={printSheet.qrDataUrl} alt="학생 입장 페이지 QR 코드" width="160" height="160" />
-        <div><strong>QR로 입장 페이지 열기</strong><p>스캔한 뒤 아래 학급 코드와 내 카드 코드를 입력하세요.</p><p className="printed-card-url">QR을 쓸 수 없다면: {printSheet.entryUrl}</p></div></div>
-      <div className="printed-card-codes"><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p></div>
-      <p className="printed-card-secret">내 카드 코드는 나만 써요. 친구에게 보여주지 마세요.</p>
-    </div>)}</div>}
+    {printSheet && selected && <div className="print-sheet-wrapper">
+      <div className="print-controls-bar no-print">
+        <div className="print-controls-info">
+          <strong>🖨️ 입장 카드 인쇄 미리보기 ({printSheet.cards.length}장)</strong>
+          <span>인쇄 창이 자동으로 열리지 않으면 [다시 인쇄하기]를 눌러주세요. 인쇄 후 [인쇄 완료 / 닫기]를 누르면 돌아갑니다.</span>
+        </div>
+        <div className="action-row">
+          <button type="button" className="primary-cta" onClick={() => window.print()}>다시 인쇄하기</button>
+          <button type="button" className="outline" onClick={closePrintSheet}>인쇄 완료 / 닫기</button>
+        </div>
+      </div>
+      <div className="print-only">{printSheet.cards.map((card) => <div className="printed-card" key={card.studentUid}>
+        <span className="printed-card-brand">💌 우리 반 비밀친구</span>
+        <h1>{card.displayName} 입장 카드</h1>
+        <div className="printed-card-entry"><img src={printSheet.qrDataUrl} alt="학생 입장 페이지 QR 코드" width="160" height="160" />
+          <div><strong>QR로 입장 페이지 열기</strong><p>스캔한 뒤 아래 학급 코드와 내 카드 코드를 입력하세요.</p><p className="printed-card-url">QR을 쓸 수 없다면: {printSheet.entryUrl}</p></div></div>
+        <div className="printed-card-codes"><p>학급 코드 <strong>{selected.classCode}</strong></p><p>내 카드 코드 <strong>{card.cardCode}</strong></p></div>
+        <p className="printed-card-secret">내 카드 코드는 나만 써요. 친구에게 보여주지 마세요.</p>
+      </div>)}</div>
+    </div>}
   </div>;
 }
 

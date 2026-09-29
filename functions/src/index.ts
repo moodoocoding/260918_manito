@@ -10,7 +10,7 @@ setGlobalOptions({
 
 export { createClass, updateClassInfo } from "./classes/createClass.js";
 export { registerStudents } from "./classes/registerStudents.js";
-export { getPrintableCards, reissueMissingCards } from "./classes/printStudentCards.js";
+export { getPrintableCards, reissueMissingCards, reissueStudentCards } from "./classes/printStudentCards.js";
 export { loginStudent } from "./students/loginStudent.js";
 export { rotateStudentCredential } from "./students/rotateStudentCredential.js";
 export { getTeacherStatus } from "./teachers/getTeacherStatus.js";
