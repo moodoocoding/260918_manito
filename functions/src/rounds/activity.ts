@@ -94,12 +94,15 @@ export const getStudentActivity = onCall(async (request) => {
     inbox: inbox.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), hidden: doc.get("hidden") === true,
       reported: doc.get("reported") === true, type: doc.get("type"), reacted: doc.get("reacted") === true,
+      reactionEmoji: (doc.get("reactionEmoji") as string | undefined) ?? (doc.get("reacted") === true ? "❤️" : null),
+      date: (doc.get("date") as string | undefined) ?? null,
       replyToMessageId: doc.get("replyToMessageId") ?? null,
       conversation: mailTimeline.get(doc.id)?.conversation ?? "unknown",
       sequence: mailTimeline.get(doc.id)?.sequence ?? -1 })),
     sent: sent.docs.sort((a,b) => Number(b.get("createdAt")?.toMillis() ?? 0)
       - Number(a.get("createdAt")?.toMillis() ?? 0)).map((doc) => ({ messageId: doc.id, text: doc.get("text"), status: doc.get("status"),
       date: doc.get("date"), reacted: doc.get("reacted") === true,
+      reactionEmoji: (doc.get("reactionEmoji") as string | undefined) ?? (doc.get("reacted") === true ? "❤️" : null),
       replyToMessageId: doc.get("replyToMessageId") ?? null,
       conversation: mailTimeline.get(doc.id)?.conversation ?? "unknown",
       sequence: mailTimeline.get(doc.id)?.sequence ?? -1 })),
@@ -249,12 +252,14 @@ export const reactToMessage = onCall(async (request) => {
   const input = requireRecord(request.data);
   const messageId = requireDocumentId(input.messageId, "쪽지");
   const requestId = requireRequestId(input.requestId);
+  const emoji = typeof input.emoji === "string" && ["❤️", "👍", "🥰", "🙏", "🎉"].includes(input.emoji)
+    ? input.emoji : "❤️";
   const student = await requireStudentRound(request, typeof input.roundId === "string"
     ? requireDocumentId(input.roundId, "회차") : undefined);
   const messageRef = student.roundRef.collection("messageSecrets").doc(messageId);
   const inboxRef = student.roundRef.collection("studentData").doc(student.uid).collection("inboxItems").doc(messageId);
   const commandRef = student.roundRef.collection("studentCommands").doc(`${student.uid}_${requestId}`);
-  const fingerprint = inputFingerprint({ messageId });
+  const fingerprint = inputFingerprint({ messageId, emoji });
   return db.runTransaction(async (tx) => {
     await assertStudentTransaction(tx, student.classId, student.uid, request.auth?.token.sessionVersion,
       student.roundId, !["revealed", "archived"].includes(student.roundDoc.get("status")));
@@ -264,7 +269,7 @@ export const reactToMessage = onCall(async (request) => {
     ]);
     if (command.exists) {
       assertSameCommand(command.data(), "reactToMessage", student.uid, fingerprint);
-      return { messageId, reacted: true };
+      return { messageId, reacted: true, reactionEmoji: emoji };
     }
     if (!["active", "paused", "reveal_pending", "revealed"].includes(round.get("status"))
       || participant.get("participationStatus") !== "active" || !message.exists
@@ -273,13 +278,14 @@ export const reactToMessage = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "이 쪽지에는 반응할 수 없어요.");
     }
     const senderUid = message.get("senderUid") as string;
-    tx.update(inboxRef, { reacted: true, reactedAt: FieldValue.serverTimestamp() });
+    tx.update(inboxRef, { reacted: true, reactionEmoji: emoji, reactedAt: FieldValue.serverTimestamp() });
     tx.update(student.roundRef.collection("studentData").doc(senderUid).collection("sentMessages").doc(messageId), {
       reacted: true,
+      reactionEmoji: emoji,
     });
     tx.create(commandRef, { type:"reactToMessage", requestedBy:student.uid,
-      inputFingerprint:fingerprint, result:{messageId,reacted:true}, createdAt:FieldValue.serverTimestamp() });
-    return { messageId, reacted: true };
+      inputFingerprint:fingerprint, result:{messageId,reacted:true,reactionEmoji:emoji}, createdAt:FieldValue.serverTimestamp() });
+    return { messageId, reacted: true, reactionEmoji: emoji };
   });
 });
 

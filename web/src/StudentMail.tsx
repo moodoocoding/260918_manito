@@ -3,14 +3,22 @@ import {call} from "./firebase";
 
 type Side = "caredFor" | "carer";
 type Draft = {mode:"preset" | "free"; selectedMessage:string; freeText:string};
-type InboxMessage = {messageId:string; text:string; hidden:boolean; reported:boolean; type:string;
-  reacted:boolean; replyToMessageId:string|null; conversation:Side|"unknown"; sequence:number};
-type SentMessage = {messageId:string; text:string; status:string; date:string; reacted:boolean;
-  replyToMessageId:string|null; conversation:Side|"unknown"; sequence:number};
-export type StudentMailData = {status:string; activityDates:string[]; koreaDate?:string;
+type InboxMessage = {
+  messageId:string; text:string; hidden:boolean; reported:boolean; type:string;
+  reacted:boolean; reactionEmoji?:string|null; replyToMessageId:string|null;
+  conversation:Side|"unknown"; sequence:number; date?:string|null;
+};
+type SentMessage = {
+  messageId:string; text:string; status:string; date:string; reacted:boolean;
+  reactionEmoji?:string|null; replyToMessageId:string|null; conversation:Side|"unknown";
+  sequence:number;
+};
+export type StudentMailData = {
+  status:string; activityDates:string[]; koreaDate?:string;
   canSendMessage?:boolean; messagesSentToday?:number; dailyMessageLimit?:number;
   nextActivityDate?:string|null; presetMessages:string[]; inbox:InboxMessage[]; sent:SentMessage[];
-  allowFreeTextMessages?:boolean};
+  allowFreeTextMessages?:boolean;
+};
 export type StudentMailDraft = {section:Side; drafts:Record<Side,Draft>};
 export function emptyStudentMailDraft(): StudentMailDraft {
   return {section:"caredFor", drafts:{
@@ -21,6 +29,7 @@ export function emptyStudentMailDraft(): StudentMailDraft {
 
 const labels: Record<Side,string> = {caredFor:"내가 맡은 친구", carer:"나를 맡은 친구"};
 const dateLabel = (day?: string | null) => day ? `${Number(day.slice(5,7))}월 ${Number(day.slice(8,10))}일` : "";
+const EMOJI_REACTIONS = ["❤️", "👍", "🥰", "🙏", "🎉"] as const;
 
 export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feedback}: {
   roundId:string; data:StudentMailData; busy:boolean;
@@ -30,8 +39,10 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
   const [section,setSection] = useState<Side>(() => draftRef.current.section);
   const [drafts,setDrafts] = useState(() => draftRef.current.drafts);
   const [showPresetTray, setShowPresetTray] = useState(false);
+  const [activeReactionMessageId, setActiveReactionMessageId] = useState<string | null>(null);
+  const [activeMenuMessageId, setActiveMenuMessageId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const messageListRef = useRef<HTMLOListElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { draftRef.current = {section,drafts}; }, [draftRef,section,drafts]);
 
@@ -65,10 +76,20 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
 
   // Auto-scroll chat to bottom on new messages or tab change
   useEffect(() => {
-    if (messageListRef.current) {
-      messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [section, messages.length]);
+
+  // Close reaction pickers when clicking outside
+  useEffect(() => {
+    function handleClickOutside() {
+      setActiveReactionMessageId(null);
+      setActiveMenuMessageId(null);
+    }
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   async function send(textToSend?: string) {
     const raw = (textToSend !== undefined ? textToSend : currentText).trim();
@@ -92,89 +113,244 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
     });
   }
 
+  async function handleReaction(messageId: string, emoji: string) {
+    if (busy) return;
+    await run(async () => {
+      await call<object,object>("reactToMessage", {
+        roundId,
+        messageId,
+        emoji,
+        requestId: crypto.randomUUID(),
+      });
+      setActiveReactionMessageId(null);
+      setNotice(`${emoji} 반응을 남겼어요!`);
+    });
+  }
+
   function handleFormSubmit(e: FormEvent) {
     e.preventDefault();
     void send();
   }
 
-  return <section className="panel student-conversations messenger-room">
+  return <section className="panel student-conversations kakao-messenger-container">
     <div className="panel-section-head">
       <h2>비밀친구 우편함</h2>
-      <p className="field-help">쪽지는 선택한 친구 한 명에게만 전해져요. 활동 중에는 친구 이름이 비밀로 지켜져요.</p>
+      <p className="field-help">쪽지는 선택한 친구 한 명에게만 전해져요. 활동 중에는 서로의 이름이 비밀로 지켜져요.</p>
     </div>
 
     {/* 상단 관계 전환 세그먼트 탭 */}
     <div className="student-mail-tabs segmented-track" role="group" aria-label="대화 선택">
       {(["caredFor","carer"] as const).map((side) => <button key={side} type="button"
         className={section === side ? "is-active" : "outline"} aria-pressed={section === side} disabled={busy}
-        onClick={() => { setSection(side); setShowPresetTray(false); }}>{labels[side]}</button>)}
-    </div>
-
-    {/* 메신저 헤더: 현재 대화 상대 및 발송 쿼터 안내 */}
-    <div className="messenger-chat-header">
-      <div className="chat-partner-info">
-        <span className="chat-partner-pill">{labels[section]}</span>
-        <span className="chat-partner-desc">
-          {section === "caredFor" ? "내가 챙기는 친구와의 1:1 대화" : "나를 챙겨주는 친구와의 1:1 대화"}
-        </span>
-      </div>
-      {canWrite && <span className="chat-quota-pill">오늘 {data.messagesSentToday ?? 0}/{data.dailyMessageLimit ?? 10}건</span>}
+        onClick={() => {
+          setSection(side);
+          setShowPresetTray(false);
+          setActiveReactionMessageId(null);
+          setActiveMenuMessageId(null);
+        }}>{labels[side]}</button>)}
     </div>
 
     {feedback}
 
-    {/* 메신저 대화 캔버스 */}
-    <div className="messenger-chat-area">
-      <ol className="conversation-messages" ref={messageListRef} aria-label={`${labels[section]}와 주고받은 쪽지`}>
-        {messages.length === 0 && <li className="conversation-empty">{section === "caredFor"
-          ? "아직 주고받은 쪽지가 없어요. 아래에서 첫 응원 쪽지를 보내 보세요!"
-          : "아직 이 친구에게 받은 쪽지가 없어요. 쪽지가 오면 바로 답장할 수 있어요."}</li>}
-        {messages.map((message) => <li key={message.messageId} className={`conversation-message ${message.direction}`}>
-          <span className="conversation-direction">{message.direction === "sent" ? "내가 보냄" : "받음"}</span>
-          <p>{message.text}</p>
-          {message.direction === "sent" ? <small>{message.date} · {message.status === "pending" ? "이전 방식 검토 중"
-            : message.status === "rejected" ? "전달되지 않음" : message.status === "moderated" ? "선생님이 숨김" : "전달됨"}
-            {message.reacted ? " · 친구가 고마워했어요" : ""}</small>
-            : <div className="conversation-actions">
-              {message.reacted && <small>고마워요를 전했어요.</small>}
-              {message.type === "encouragement" && !message.reacted && data.status !== "archived" &&
-                <button type="button" className="small outline" disabled={busy} onClick={() => void run(async () => {
-                  await call<object,object>("reactToMessage", {roundId,messageId:message.messageId,requestId:crypto.randomUUID()});
-                  setNotice("고마워요를 전했어요."); })}>고마워요</button>}
-              <button type="button" className="small outline" disabled={busy} onClick={() => void run(async () => {
-                await call<object,object>("hideMessage", {roundId,messageId:message.messageId});
-                setNotice("쪽지를 숨겼어요."); })}>숨기기</button>
-              {!message.reported && <button type="button" className="small outline" disabled={busy}
-                onClick={() => void run(async () => { await call<object,object>("createHelpRequest",
-                  {roundId,category:"message",messageId:message.messageId,requestId:crypto.randomUUID()});
-                  setNotice("선생님께 알렸어요."); })}>선생님께 알리기</button>}
-            </div>}
-        </li>)}
-      </ol>
+    {/* 메신저 룸 전체 카드 */}
+    <div className="kakao-chat-room">
+      {/* 룸 헤더: 카카오톡 스타일 상대방 이름 및 쿼터 */}
+      <div className="kakao-chat-header">
+        <div className="kakao-partner-profile">
+          <div className="kakao-avatar">{section === "caredFor" ? "🎁" : "💌"}</div>
+          <div className="kakao-partner-meta">
+            <span className="kakao-partner-name">{labels[section]}</span>
+            <span className="kakao-partner-sub">
+              {section === "caredFor" ? "내가 배정받아 챙겨주는 마니또 친구" : "나를 몰래 챙겨주는 비밀친구"}
+            </span>
+          </div>
+        </div>
+        {canWrite && <span className="kakao-quota-badge">오늘 {data.messagesSentToday ?? 0}/{data.dailyMessageLimit ?? 10}건</span>}
+      </div>
 
-      {/* 카카오톡 스타일 일체형 메시지 입력 영역 */}
+      {/* 대화 스크롤 영역 (리스트 번호 없이 카카오톡 말풍선 정렬) */}
+      <div className="kakao-chat-scroll" ref={chatScrollRef}>
+        {messages.length === 0 ? (
+          <div className="kakao-chat-empty">
+            <span className="empty-icon">💬</span>
+            <p>
+              {section === "caredFor"
+                ? "아직 주고받은 쪽지가 없어요.\n아래에서 첫 응원 쪽지를 보내 보세요!"
+                : "아직 이 친구에게 받은 쪽지가 없어요.\n쪽지가 도착하면 이곳에서 바로 답장할 수 있어요."}
+            </p>
+          </div>
+        ) : (
+          <div className="kakao-message-list" role="log" aria-label={`${labels[section]}와 주고받은 쪽지`}>
+            {messages.map((message) => {
+              const isSent = message.direction === "sent";
+              const isReactionOpen = activeReactionMessageId === message.messageId;
+              const isMenuOpen = activeMenuMessageId === message.messageId;
+
+              return (
+                <div key={message.messageId} className={`kakao-message-row ${isSent ? "is-sent" : "is-received"}`}>
+                  {!isSent && <div className="kakao-row-avatar">💌</div>}
+
+                  <div className="kakao-bubble-container">
+                    {!isSent && <span className="kakao-sender-tag">비밀친구</span>}
+
+                    <div className="kakao-bubble-with-meta">
+                      {/* 내가 보낸 쪽지일 때: 타임스탬프와 반응 배지가 말풍선 왼쪽에 위치 */}
+                      {isSent && (
+                        <div className="kakao-msg-side-meta is-left">
+                          <span className="kakao-msg-time">{message.date?.slice(5) || "오늘"}</span>
+                          <span className="kakao-msg-status">
+                            {message.status === "pending" ? "검토중" : message.status === "rejected" ? "미전달" : "전송됨"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* 말풍선 본체 */}
+                      <div className={`kakao-bubble ${isSent ? "kakao-sent" : "kakao-received"}`}>
+                        <p className="kakao-msg-text">{message.text}</p>
+
+                        {/* 말풍선에 붙는 이모티콘 반응 배지 (카카오톡 스타일) */}
+                        {message.reacted && (
+                          <div className="kakao-reaction-pill" title="친구가 반응을 남겼어요">
+                            <span className="reaction-emoji">{message.reactionEmoji || "❤️"}</span>
+                            <span className="reaction-count">1</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 받은 쪽지일 때: 타임스탬프, 이모티콘 반응 버튼, 더보기 메뉴가 말풍선 오른쪽에 위치 */}
+                      {!isSent && (
+                        <div className="kakao-msg-side-meta is-right">
+                          <div className="kakao-action-icons">
+                            {/* 이모티콘 반응 트리거 버튼 */}
+                            {!message.reacted && data.status !== "archived" && (
+                              <button
+                                type="button"
+                                className="kakao-mini-btn react-btn"
+                                title="이모티콘 반응 남기기"
+                                aria-label="이모티콘 반응 남기기"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuMessageId(null);
+                                  setActiveReactionMessageId(isReactionOpen ? null : message.messageId);
+                                }}
+                              >
+                                😊
+                              </button>
+                            )}
+
+                            {/* 쪽지 더보기(숨기기/신고) 메뉴 버튼 */}
+                            <button
+                              type="button"
+                              className="kakao-mini-btn menu-btn"
+                              title="더보기"
+                              aria-label="더보기"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveReactionMessageId(null);
+                                setActiveMenuMessageId(isMenuOpen ? null : message.messageId);
+                              }}
+                            >
+                              •••
+                            </button>
+                          </div>
+                          <span className="kakao-msg-time">{message.date?.slice(5) || "오늘"}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 카카오톡 이모티콘 팝오버 바 (말풍선 바로 위에 뜸) */}
+                    {isReactionOpen && (
+                      <div
+                        className="kakao-reaction-picker-popover"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-label="이모티콘 반응 선택"
+                      >
+                        {EMOJI_REACTIONS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            className="emoji-pop-btn"
+                            disabled={busy}
+                            onClick={() => void handleReaction(message.messageId, emoji)}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 쪽지 관리 메뉴 팝오버 (숨기기 / 선생님께 알리기) */}
+                    {isMenuOpen && (
+                      <div
+                        className="kakao-message-menu-popover"
+                        onClick={(e) => e.stopPropagation()}
+                        role="menu"
+                      >
+                        <button
+                          type="button"
+                          className="menu-item"
+                          disabled={busy}
+                          onClick={() => void run(async () => {
+                            await call<object,object>("hideMessage", {roundId, messageId:message.messageId});
+                            setActiveMenuMessageId(null);
+                            setNotice("쪽지를 숨겼어요.");
+                          })}
+                        >
+                          👁️ 쪽지 숨기기
+                        </button>
+                        {"reported" in message && !message.reported && (
+                          <button
+                            type="button"
+                            className="menu-item is-warn"
+                            disabled={busy}
+                            onClick={() => void run(async () => {
+                              await call<object,object>("createHelpRequest", {
+                                roundId,
+                                category:"message",
+                                messageId:message.messageId,
+                                requestId:crypto.randomUUID()
+                              });
+                              setActiveMenuMessageId(null);
+                              setNotice("선생님께 비공개로 알렸어요.");
+                            })}
+                          >
+                            🚨 선생님께 알리기
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 카카오톡 스타일 하단 일체형 입력바 */}
       {canWrite ? (
-        <div className="messenger-input-wrapper">
-          {/* '+' 버튼을 누르면 펼쳐지는 이모티콘/추천 문구 트레이 */}
+        <div className="kakao-input-area">
+          {/* '+' 버튼 누르면 열리는 추천 문구 & 이모티콘 서랍 */}
           {showPresetTray && (
-            <div className="chat-preset-tray" role="region" aria-label="추천 쪽지 문구">
-              <div className="preset-tray-header">
-                <span className="preset-tray-title">따뜻한 추천 문구를 골라보세요</span>
+            <div className="kakao-preset-drawer" role="region" aria-label="추천 쪽지 문구">
+              <div className="drawer-header">
+                <span className="drawer-title">💡 따뜻한 추천 문구를 골라보세요</span>
                 <button
                   type="button"
-                  className="preset-tray-close"
-                  aria-label="추천 문구 닫기"
+                  className="drawer-close-btn"
+                  aria-label="서랍 닫기"
                   onClick={() => setShowPresetTray(false)}
                 >
                   ✕
                 </button>
               </div>
-              <div className="preset-chips-grid">
+              <div className="drawer-chips-wrap">
                 {data.presetMessages.map((text) => (
                   <button
                     key={text}
                     type="button"
-                    className={`preset-chip ${currentText === text ? "is-selected" : ""}`}
+                    className={`drawer-chip ${currentText === text ? "is-selected" : ""}`}
                     onClick={() => {
                       updateText(text, "preset");
                       textareaRef.current?.focus();
@@ -187,23 +363,23 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
             </div>
           )}
 
-          {/* 메신저 인풋 바: '+' 버튼 + 텍스트 인풋 + 전송 버튼 */}
-          <form className="messenger-input-bar" onSubmit={handleFormSubmit}>
+          {/* 메신저 인풋 바: '+' 버튼 + 입력창 + 노란색/코랄 전송 버튼 */}
+          <form className="kakao-input-bar" onSubmit={handleFormSubmit}>
             <button
               type="button"
-              className={`chat-plus-btn ${showPresetTray ? "is-active" : ""}`}
+              className={`kakao-plus-btn ${showPresetTray ? "is-active" : ""}`}
               aria-label={showPresetTray ? "추천 문구 닫기" : "추천 문구 열기"}
               aria-expanded={showPresetTray}
-              title="추천 쪽지 문구 열기"
+              title="추천 문구 모아보기"
               onClick={() => setShowPresetTray((prev) => !prev)}
             >
               <span className="plus-icon">+</span>
             </button>
-            <div className="chat-input-field-wrap">
+            <div className="kakao-input-field">
               <textarea
                 ref={textareaRef}
-                className="chat-text-input"
-                placeholder={section === "caredFor" ? "따뜻한 응원 쪽지를 남겨보세요... (+ 버튼으로 추천 문구 선택 가능)" : "친구에게 보낼 답장을 적어보세요..."}
+                className="kakao-textarea"
+                placeholder={section === "caredFor" ? "따뜻한 쪽지를 보내보세요 (+ 버튼으로 추천 문구 선택)" : "친구에게 보낼 답장을 적어보세요..."}
                 rows={1}
                 maxLength={200}
                 value={currentText}
@@ -216,21 +392,21 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
                 }}
               />
               {currentText.length > 0 && (
-                <span className="chat-char-counter">{currentText.length}/200자</span>
+                <span className="kakao-char-count">{currentText.length}/200자</span>
               )}
             </div>
             <button
               type="submit"
-              className="chat-send-btn primary-cta"
+              className="kakao-send-btn"
               disabled={busy || !currentText.trim()}
               aria-label="쪽지 보내기"
             >
-              <span>보내기</span>
+              보내기
             </button>
           </form>
         </div>
       ) : (
-        <div className="chat-disabled-banner">
+        <div className="kakao-disabled-bar">
           {data.status !== "active" ? (
             <p>지금은 시즌이 진행 중이 아니어서 쪽지를 보낼 수 없어요.</p>
           ) : !data.canSendMessage ? (

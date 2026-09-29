@@ -1150,345 +1150,610 @@ a {
   gap: 16px;
 }
 
-/* Messenger Room Layout */
-.messenger-room {
+/* KakaoTalk Style Messenger Room Layout */
+.kakao-messenger-container {
+  min-width: 0;
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
-.messenger-chat-header {
+.kakao-chat-room {
+  background: #b2c7da;
+  border: 1.5px solid #9eb8cc;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(18, 38, 63, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.kakao-chat-header {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid var(--border-panel);
+  gap: 10px;
 }
 
-.chat-partner-info {
+.kakao-partner-profile {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
-.chat-partner-pill {
-  display: inline-block;
-  font-size: 0.82rem;
+.kakao-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: #fff5e6;
+  border: 1.5px solid #ffe3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.kakao-partner-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kakao-partner-name {
+  font-size: 1.02rem;
   font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  background: #fde8df;
-  color: #9f3430;
+  color: #191919;
+  line-height: 1.25;
 }
 
-.chat-partner-desc {
-  font-size: 0.88rem;
+.kakao-partner-sub {
+  font-size: 0.78rem;
+  color: #64748b;
   font-weight: 600;
-  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.chat-quota-pill {
+.kakao-quota-badge {
   font-size: 0.78rem;
   font-weight: 750;
-  padding: 3px 9px;
-  border-radius: 8px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
 }
 
-.messenger-chat-area {
-  display: grid;
-  gap: 0;
-  background: var(--bg-sub-surface);
-  border: 1.5px solid var(--border-panel);
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 4px 14px rgba(28, 36, 49, 0.04);
-}
-
-.messenger-chat-area .conversation-messages {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  max-height: 480px;
+/* Chat Scroll & Message List (NO BULLETS OR NUMBERS!) */
+.kakao-chat-scroll {
+  height: 460px;
+  max-height: 58vh;
   overflow-y: auto;
-  padding: 20px 18px;
-  display: grid;
-  gap: 12px;
+  padding: 18px 16px;
   scroll-behavior: smooth;
 }
 
-.conversation-message {
-  min-width: 0;
-  max-width: 88%;
-  padding: 14px 16px;
-  border: 1px solid #d8cbb8;
+.kakao-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 18px;
+  padding: 30px 20px;
+}
+
+.kakao-chat-empty .empty-icon {
+  font-size: 2.4rem;
+  margin-bottom: 8px;
+}
+
+.kakao-chat-empty p {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.kakao-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  list-style: none !important;
+  list-style-type: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.kakao-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  list-style: none !important;
+}
+
+.kakao-message-row.is-received {
+  justify-content: flex-start;
+}
+
+.kakao-message-row.is-sent {
+  justify-content: flex-end;
+}
+
+.kakao-row-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.conversation-message.received {
-  justify-self: start;
-  border-top-left-radius: 4px;
+.kakao-bubble-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  position: relative;
 }
 
-.conversation-message.sent {
-  justify-self: end;
-  background: #fdece6;
-  border-color: #eabbb0;
-  border-top-right-radius: 4px;
+.is-received .kakao-bubble-container {
+  align-items: flex-start;
 }
 
-.conversation-direction {
-  display: inline-block;
-  font-size: 0.82rem;
-  font-weight: 800;
+.is-sent .kakao-bubble-container {
+  align-items: flex-end;
+}
+
+.kakao-sender-tag {
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: #334155;
+  margin-bottom: 4px;
+  margin-left: 2px;
+}
+
+.kakao-bubble-with-meta {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.kakao-msg-side-meta {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.7rem;
   color: #475569;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.kakao-msg-side-meta.is-left {
+  align-items: flex-end;
+}
+
+.kakao-msg-side-meta.is-right {
+  align-items: flex-start;
+}
+
+.kakao-msg-time {
+  font-size: 0.7rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.kakao-msg-status {
+  font-size: 0.68rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.kakao-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   margin-bottom: 2px;
 }
 
-.conversation-message.sent .conversation-direction {
-  color: #8c2d27;
-}
-
-.conversation-message p {
-  margin: 6px 0;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  color: var(--text-primary);
-}
-
-.conversation-message small {
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-}
-
-.conversation-actions {
+.kakao-mini-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #475569;
+  padding: 0;
+  transition: all 0.15s;
 }
 
-.conversation-empty {
-  padding: 28px 20px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 16px;
-  background: var(--bg-sub-surface);
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-/* Messenger Input Wrapper & Tray */
-.messenger-input-wrapper {
+.kakao-mini-btn:hover {
   background: #ffffff;
-  border-top: 1.5px solid #dcd0c0;
-  padding: 10px 12px;
-  display: grid;
-  gap: 10px;
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Preset Message Drawer / Tray */
-.chat-preset-tray {
-  background: #faf6ef;
-  border: 1.5px solid #dcd0c0;
-  border-radius: 14px;
+/* KakaoTalk Message Bubbles */
+.kakao-bubble {
+  position: relative;
+  padding: 10px 14px;
+  line-height: 1.55;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.kakao-received {
+  background: #ffffff;
+  color: #191919;
+  border-radius: 4px 18px 18px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.kakao-sent {
+  background: #fee500;
+  color: #191919;
+  border-radius: 18px 4px 18px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 500;
+}
+
+.kakao-msg-text {
+  margin: 0;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+}
+
+/* Emoji Reaction Pill attached directly to bubble */
+.kakao-reaction-pill {
+  position: absolute;
+  bottom: -8px;
+  right: 6px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9999px;
+  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+  cursor: default;
+  animation: popReaction 0.15s ease-out;
+}
+
+@keyframes popReaction {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.reaction-emoji {
+  font-size: 0.85rem;
+}
+
+.reaction-count {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #475569;
+}
+
+/* Floating Reaction Picker Popover (Kakao Style) */
+.kakao-reaction-picker-popover {
+  position: absolute;
+  top: -42px;
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 9999px;
+  padding: 4px 8px;
+  display: flex;
+  gap: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  z-index: 20;
+  animation: popOver 0.15s ease-out;
+}
+
+@keyframes popOver {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.emoji-pop-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  line-height: 1;
+}
+
+.emoji-pop-btn:hover {
+  transform: scale(1.35);
+}
+
+/* Message Menu Popover (Hide / Report) */
+.kakao-message-menu-popover {
+  position: absolute;
+  top: -64px;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  z-index: 20;
+  min-width: 140px;
+  animation: popOver 0.15s ease-out;
+}
+
+.kakao-message-menu-popover .menu-item {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #334155;
+  transition: background 0.12s;
+}
+
+.kakao-message-menu-popover .menu-item:hover {
+  background: #f1f5f9;
+}
+
+.kakao-message-menu-popover .menu-item.is-warn {
+  color: #dc2626;
+}
+
+/* Bottom Input Area */
+.kakao-input-area {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Preset Message Drawer (Opened by '+' button) */
+.kakao-preset-drawer {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
   padding: 12px 14px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  animation: slideDown 0.15s ease-out;
+  animation: slideDrawer 0.15s ease-out;
 }
 
-@keyframes slideDown {
+@keyframes slideDrawer {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.preset-tray-header {
+.drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.preset-tray-title {
-  font-size: 0.82rem;
+.drawer-title {
+  font-size: 0.84rem;
   font-weight: 800;
   color: #475569;
 }
 
-.preset-tray-close {
-  min-height: 28px;
-  width: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.drawer-close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   color: #64748b;
   font-size: 0.9rem;
-  border-radius: 6px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.preset-tray-close:hover {
+.drawer-close-btn:hover {
   background: #e2e8f0;
 }
 
-.preset-chips-grid {
+.drawer-chips-wrap {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.preset-chip {
-  font-size: 0.84rem;
+.drawer-chip {
+  font-size: 0.86rem;
   font-weight: 700;
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 9999px;
-  border: 1.5px solid #d1c4b2;
+  border: 1.5px solid #cbd5e1;
   background: #ffffff;
   color: #1e293b;
   cursor: pointer;
   transition: all 0.15s;
-  text-align: left;
 }
 
-.preset-chip:hover {
-  border-color: #b94440;
-  background: #fff5f2;
-  color: #9f3430;
+.drawer-chip:hover {
+  border-color: #fee500;
+  background: #fffde6;
   transform: translateY(-1px);
 }
 
-.preset-chip.is-selected {
-  background: #243044;
+.drawer-chip.is-selected {
+  background: #1e293b;
   color: #ffffff;
-  border-color: #243044;
+  border-color: #1e293b;
 }
 
-/* Messenger Input Bar */
-.messenger-input-bar {
+/* Input Bar */
+.kakao-input-bar {
   display: flex;
   align-items: flex-end;
   gap: 8px;
   width: 100%;
 }
 
-.chat-plus-btn {
-  flex: none;
-  width: 42px;
-  height: 42px;
-  min-height: 42px;
+.kakao-plus-btn {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   border-radius: 50%;
-  border: 1.5px solid #b8c2cf;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s;
+  flex-shrink: 0;
   padding: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.chat-plus-btn:hover {
+.kakao-plus-btn:hover {
   background: #e2e8f0;
-  border-color: #64748b;
-  color: #0f172a;
+  border-color: #94a3b8;
+  color: #1e293b;
 }
 
-.chat-plus-btn.is-active {
-  background: #243044;
-  border-color: #243044;
-  color: #ffffff;
+.kakao-plus-btn.is-active {
   transform: rotate(45deg);
+  background: #334155;
+  color: #ffffff;
+  border-color: #334155;
 }
 
-.plus-icon {
+.kakao-plus-btn .plus-icon {
   font-size: 1.4rem;
   font-weight: 700;
   line-height: 1;
 }
 
-.chat-input-field-wrap {
+.kakao-input-field {
   flex: 1 1 auto;
   position: relative;
   display: flex;
   align-items: center;
+  background: #f1f5f9;
+  border-radius: 20px;
+  border: 1.5px solid transparent;
   min-width: 0;
+  transition: all 0.15s;
 }
 
-.chat-text-input {
+.kakao-input-field:focus-within {
+  background: #ffffff;
+  border-color: #fee500;
+  box-shadow: 0 0 0 2px rgba(254, 229, 0, 0.4);
+}
+
+.kakao-textarea {
   width: 100%;
-  min-height: 42px;
-  max-height: 120px;
-  padding: 10px 14px;
+  min-height: 40px;
+  max-height: 100px;
+  padding: 9px 14px;
   font-size: 0.95rem;
   line-height: 1.45;
-  border: 1.5px solid #b8ab99;
-  border-radius: 20px;
-  background: #fffdfa;
-  color: var(--text-primary);
+  border: none;
+  background: transparent;
+  color: #191919;
   resize: none;
   font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.chat-text-input:focus {
   outline: none;
-  border-color: #b94440;
-  box-shadow: 0 0 0 3px rgba(185, 68, 64, 0.15);
-  background: #ffffff;
 }
 
-.chat-char-counter {
+.kakao-char-count {
   position: absolute;
   right: 12px;
   bottom: 6px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #94a3b8;
   font-weight: 600;
   pointer-events: none;
 }
 
-.chat-send-btn {
-  flex: none;
-  height: 42px;
-  min-height: 42px;
-  padding: 0 18px;
+.kakao-send-btn {
+  flex-shrink: 0;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
   border-radius: 20px;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 800;
+  border: none;
+  background: #fee500;
+  color: #191919;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.15s;
 }
 
-.student-app .chat-send-btn {
+.student-app .kakao-send-btn {
   width: auto;
   margin: 0;
 }
 
-.chat-disabled-banner {
+.kakao-send-btn:hover:not(:disabled) {
+  background: #fada00;
+  transform: translateY(-1px);
+}
+
+.kakao-send-btn:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.kakao-disabled-bar {
   padding: 16px 20px;
-  border-top: 1px solid var(--border-panel);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   background: #fbf9f5;
   color: var(--text-secondary);
   font-size: 0.9rem;
   text-align: center;
 }
 
-.chat-disabled-banner p {
+.kakao-disabled-bar p {
   margin: 0;
 }
 
