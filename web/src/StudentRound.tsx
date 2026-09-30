@@ -94,7 +94,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
             <p className="student-season-dates">활동 기간 {niceDate(data.startsOn)} ~ {niceDate(data.endsOn)}</p>
           </div>
           <div className="student-home-summary" aria-label="내 미션 요약">
-            <div className="summary-head"><strong>내 미션 현황</strong><span>원하는 순서로 참여해요</span></div>
+            <div className="summary-head"><strong>내 미션 현황</strong></div>
             {summaryElement}
           </div>
           <div className="student-next-mission">
@@ -116,7 +116,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
             </>}
             {view === "home" && feedback}
           </div>
-          <p className="field-help">{revealed ? "선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요." : "진행 중에는 친구의 이름을 볼 수 없어요. 쪽지는 서버가 배정된 친구에게 전해요."}</p>
+          {revealed && <p className="field-help">선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요.</p>}
         </section>
         <StudentCommunity roundId={roundId} preview onMore={() => onNavigate?.("community")} />
         <section className="panel student-archive-bar">
