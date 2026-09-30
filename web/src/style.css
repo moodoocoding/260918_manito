@@ -997,31 +997,43 @@ a {
   gap: 10px;
 }
 
-.student-mission-list li {
+.student-mission-list li,
+.student-mission-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
-  padding: 15px 16px;
-  border: 1px solid var(--border-subtle);
+  padding: 16px 18px;
+  border: 1.5px solid var(--border-subtle, #e2e8f0);
   border-radius: 14px;
   background: #ffffff;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.2s ease;
 }
 
-.student-mission-list li.is-current {
-  border-left: 5px solid var(--accent-spotlight);
-  background: #fffaf4;
+.student-mission-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
-.student-mission-list li.is-focused {
-  border: 2px solid var(--nav-active);
-  background: #f8fafc;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+.student-mission-card.is-focused {
+  border: 2px solid #7c3aed;
+  background: #faf5ff;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08);
 }
 
-.student-mission-list li > div {
+.student-mission-card.is-done {
+  border: 1.5px solid #bbf7d0;
+  background: #f0fdf4;
+  opacity: 0.88;
+}
+
+.student-mission-card.is-done .mission-text {
+  color: #166534;
+}
+
+.mission-card-body {
+  flex: 1 1 auto;
   min-width: 0;
   display: grid;
   gap: 6px;
@@ -1034,15 +1046,51 @@ a {
   gap: 6px;
 }
 
-.student-mission-list strong {
-  display: block;
-  font-size: 1.02rem;
-  line-height: 1.45;
-  color: var(--text-primary);
+.mission-status-badge.status-done {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  border: 1px solid #86efac;
 }
 
-.student-mission-list button {
-  flex: none;
+.student-mission-card .mission-text,
+.student-mission-list strong {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.mission-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.done-badge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #86efac;
+}
+
+.focus-active-label {
+  display: inline-flex;
+  align-items: center;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 0.84rem;
+  padding: 4px 10px;
+  border-radius: 8px;
 }
 
 .student-filter-empty {

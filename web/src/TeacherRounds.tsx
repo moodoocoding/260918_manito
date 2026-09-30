@@ -393,8 +393,23 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       if (name === "prepare") {
         await call<object, object>("prepareRound", {classId, roundId: current.roundId});
       } else if (name === "start") {
-        await call<object, object>("startRound", {classId, roundId: current.roundId,
-          rosterVersion: current.rosterVersion, requestId});
+        let rosterVersion = current.rosterVersion;
+        if (current.status === "draft") {
+          const prepareResult = await call<object, { roundId: string; status: string; rosterVersion: number }>("prepareRound", {
+            classId,
+            roundId: current.roundId,
+          });
+          rosterVersion = prepareResult.rosterVersion;
+        }
+        await call<object, object>("startRound", {
+          classId,
+          roundId: current.roundId,
+          rosterVersion,
+          requestId,
+        });
+        pendingStatusAction.current = null;
+        setNotice("조건을 확인하고 비밀친구 매칭을 시작했어요! 🚀");
+        return;
       } else if (name === "reveal") {
         await call<object, object>("revealRound", {classId, roundId: current.roundId, requestId});
         void loadReflections(current.roundId);
@@ -849,8 +864,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
       <div className="round-lifecycle-box">
         <strong>시즌 진행 관리</strong>
         <div className="action-row">
-          {current.status === "draft" && <button className="primary-cta" disabled={busy} onClick={() => void action("prepare")}>조건 확인</button>}
-          {current.status === "ready" && <button className="primary-cta" disabled={busy} onClick={() => askAction("start")}>매칭하고 시작</button>}
+          {["draft", "ready"].includes(current.status) && <button className="primary-cta" disabled={busy} onClick={() => askAction("start")}>매칭하고 시작</button>}
           {current.status === "active" && <><button className="outline" disabled={busy} onClick={() => void action("pause")}>일시정지</button><button className="danger" disabled={busy} onClick={() => askAction("end")}>활동 종료</button></>}
           {current.status === "paused" && <><button className="primary-cta" disabled={busy} onClick={() => void action("resume")}>재개</button><button className="danger" disabled={busy} onClick={() => askAction("end")}>활동 종료</button></>}
           {current.status === "reveal_pending" && <button className="primary-cta" disabled={busy} onClick={() => askAction("reveal")}>정체 공개 승인</button>}

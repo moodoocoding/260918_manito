@@ -40,18 +40,10 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const [incomingVisible, setIncomingVisible] = useState(false);
   const [targetVisible, setTargetVisible] = useState(false);
   const [thankYouSentLocal, setThankYouSentLocal] = useState(false);
-  const missionFilter = missionUi.filter;
-  const category = missionUi.category;
-  const missionLimit = missionUi.limit;
-  const [openMissionId, setOpenMissionId] = useState<string | null>(null);
-  const [confirmReplace, setConfirmReplace] = useState(false);
-  const missionButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
-  const focusAfterExpand = useRef<string | null>(null);
   const load = useCallback(() => call<{roundId: string}, Activity>("getStudentActivity", {roundId}), [roundId]);
   useEffect(() => {
     let active = true;
-    setData(null); setError(""); setIncomingVisible(false); setTargetVisible(false); setOpenMissionId(null);
+    setData(null); setError(""); setIncomingVisible(false); setTargetVisible(false);
     void load().then((result) => { if (active) { setData(result); setReflection(result.reflectionText ?? ""); } })
       .catch(() => { if (active) setError("활동을 불러오지 못했어요."); });
     return () => { active = false; };
@@ -62,11 +54,6 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
-  useEffect(() => { if (openMissionId) detailHeadingRef.current?.focus(); }, [openMissionId]);
-  useEffect(() => {
-    const id = focusAfterExpand.current;
-    if (id) { missionButtonRefs.current.get(id)?.focus(); focusAfterExpand.current = null; }
-  }, [missionLimit]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
     try {
@@ -75,28 +62,21 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     } catch (caught) { setError(caught instanceof Error ? caught.message : "처리하지 못했어요."); }
     finally { setBusy(false); }
   }
-  function closeMission() {
-    const id = openMissionId;
-    setOpenMissionId(null); setConfirmReplace(false);
-    requestAnimationFrame(() => { if (id) missionButtonRefs.current.get(id)?.focus(); });
-  }
   const today = data?.koreaDate ?? "";
   const canSend = data?.canSendMessage ?? false;
   const missions = data?.missions.filter((mission) => mission.status !== "replaced") ?? [];
-  const summary = data?.missionSummary;
-  const filtered = missions.filter((mission) => (missionFilter === "all" || mission.status === missionFilter)
-    && (category === "전체" || (mission.category ?? "기타 미션") === category));
-  const selectedMission = missions.find((mission) => mission.missionId === openMissionId);
   const firstTodo = missions.find((mission) => mission.missionId === data?.focusMissionId && mission.status === "todo")
     ?? missions.find((mission) => mission.status === "todo");
   const revealed = ["revealed", "archived"].includes(data?.status ?? status);
-  const availableCategories = categoryOrder.filter((item) => missions.some((mission) => (mission.category ?? "기타 미션") === item));
   const nextDay = data?.nextActivityDate ?? data?.activityDates.find((day) => day > today);
-  const summaryElement = summary ? <div className="student-stat-grid" aria-label="내 미션 기록">
-    <div className="student-stat-tile is-done"><span>해봤어요</span><strong>{summary.done}</strong></div>
-    <div className="student-stat-tile is-todo"><span>골라볼 미션</span><strong>{summary.todo}</strong></div>
-    <div className="student-stat-tile is-skipped"><span>쉬었어요</span><strong>{summary.skipped}</strong></div>
-  </div> : <p className="field-help">이전 미션 기록은 아래 목록에서 확인해 주세요.</p>;
+  const doneCount = missions.filter((m) => m.status === "done").length;
+  const remainingCount = missions.length - doneCount;
+  const summaryElement = (
+    <div className="student-stat-grid" aria-label="내 미션 기록">
+      <div className="student-stat-tile is-done"><span>해낸 미션</span><strong>{doneCount}</strong></div>
+      <div className="student-stat-tile is-todo"><span>남은 미션</span><strong>{remainingCount}</strong></div>
+    </div>
+  );
   const feedback = <>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>;
   return <div className="student-activities">
     {!data && feedback}
@@ -126,10 +106,10 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
               <p className="student-mission-text">{firstTodo.text}</p>
               <div className="student-mission-actions inline-actions">
                 {data.canSubmit && <button className="primary-cta" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 멋지게 완료했어요! 🎉"); })}>✨ 해냈어요!</button>}
-                <button className="outline" onClick={() => onNavigate?.("missions")}>다른 미션으로 바꾸기 →</button>
+                <button className="outline" onClick={() => onNavigate?.("missions")}>다른 미션 고르기 →</button>
               </div>
             </> : <>
-              <p className="student-mission-empty">{missions.length ? "지금 진행 중인 미션이 없어요. 새로운 미션을 골라볼까요?" : "아직 준비된 미션이 없어요."}</p>
+              <p className="student-mission-empty">{missions.length ? "모든 미션을 완료했거나 진행 중인 미션이 없어요. 새로운 미션을 골라볼까요?" : "아직 준비된 미션이 없어요."}</p>
               <div className="student-mission-actions inline-actions">
                 <button className="outline" onClick={() => onNavigate?.("missions")}>{missions.length ? "미션 골라보기 →" : "내 기록 보기"}</button>
               </div>
@@ -148,34 +128,88 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
         </section>
       </>}
       {view === "missions" && <>
-        <section className="panel"><div className="panel-section-head"><h2>내 미션 기록</h2><p className="field-help">기록은 나에게만 보여요. 미션을 모두 해야 하는 것은 아니에요.</p></div>{summaryElement}</section>
-        <section className="panel"><div className="panel-section-head"><h2>미션 골라보기</h2><p className="field-help">{filtered.length}개 중 {Math.min(filtered.length, missionLimit)}개를 보여 줘요.</p></div>{!selectedMission && feedback}
-          {selectedMission ? <div className="student-mission-detail">
-            <button className="outline small" onClick={closeMission}>목록으로 돌아가기</button>
-            <div className="mission-item-badges">
-              <span className={`mission-status-badge status-${selectedMission.status}`}>{missionStatus[selectedMission.status] ?? "기록 확인"}</span>
-              <span className="category-pill">{selectedMission.category ?? "기타 미션"}</span>
-              {data.focusMissionId === selectedMission.missionId && selectedMission.status === "todo" && <span className="focus-pill">이번에 해볼 미션</span>}
-            </div>
-            <h3 tabIndex={-1} ref={detailHeadingRef}>{selectedMission.text}</h3>
-            <p className="mission-tip-box">교실에서 돈을 쓰지 않고 편하게 해 볼 수 있어요. 상대가 부담스러워하면 멈춰도 괜찮아요.</p>
-            {feedback}
-            {data.canSubmit && selectedMission.status === "todo" && <>
-              <div className="student-mission-actions">
-                <button className="primary-cta" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:selectedMission.missionId,status:"done"}); setNotice("미션을 기록했어요."); })}>해냈어요</button>
-                <button className="outline" disabled={busy || data.focusMissionId === selectedMission.missionId} onClick={() => void run(async () => {await call<object,object>("setStudentMissionFocus", {roundId,missionId:selectedMission.missionId,requestId:crypto.randomUUID()});setNotice("이번에 해볼 미션으로 골랐어요.");})}>{data.focusMissionId === selectedMission.missionId ? "이번에 해볼 미션으로 선택됨" : "이번에 해볼래요"}</button>
-                <button className="outline" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:selectedMission.missionId,status:"skipped"}); setNotice("이 미션은 쉬기로 기록했어요."); })}>이 미션 쉬기</button>
-              </div>
-              {!confirmReplace ? <button className="outline small" disabled={busy} onClick={() => setConfirmReplace(true)}>이 미션 바꾸기</button>
-                : <div className="student-replace-confirm"><p>이 미션을 다른 미션으로 바꾸면 원래 미션은 목록에서 빠져요. 바꾸기는 최대 두 번 가능해요.</p><div className="action-row"><button disabled={busy} onClick={() => void run(async () => { await call<object,object>("replaceMission", {missionId:selectedMission.missionId,requestId:crypto.randomUUID()}); setConfirmReplace(false); closeMission(); setNotice("다른 미션으로 바꿨어요."); })}>바꾸기 확인</button><button className="outline" onClick={() => setConfirmReplace(false)}>취소</button></div></div>}
-            </>}
-          </div> : <>
-            <div className="student-mission-filters"><label>기록 상태<select value={missionFilter} onChange={(event) => onMissionUiChange({...missionUi,filter:event.target.value as StudentMissionUi["filter"],limit:8})}><option value="all">전체</option><option value="todo">골라볼 미션</option><option value="done">해봤어요</option><option value="skipped">쉬었어요</option></select></label>
-              <label>미션 종류<select value={category} onChange={(event) => onMissionUiChange({...missionUi,category:event.target.value,limit:8})}><option>전체</option>{availableCategories.map((item) => <option key={item}>{item}</option>)}</select></label></div>
-            {filtered.length === 0 ? <div className="student-filter-empty"><p>이 조건에 맞는 미션이 없어요.</p><button className="outline" onClick={() => onMissionUiChange({filter:"all",category:"전체",limit:8})}>전체 미션 보기</button></div>
-              : <ul className="student-mission-list">{filtered.slice(0,missionLimit).map((mission) => <li key={mission.missionId} className={`status-${mission.status}${data.focusMissionId === mission.missionId && mission.status === "todo" ? " is-focused" : ""}`}><div><div className="mission-item-badges"><span className={`mission-status-badge status-${mission.status}`}>{missionStatus[mission.status] ?? "기록 확인"}</span><span className="category-pill">{mission.category ?? "기타 미션"}</span>{data.focusMissionId === mission.missionId && mission.status === "todo" && <span className="focus-pill">이번 미션</span>}</div><strong>{mission.text}</strong></div><button className="outline small" ref={(node) => {if(node) missionButtonRefs.current.set(mission.missionId,node);}} onClick={() => setOpenMissionId(mission.missionId)}>이 미션 보기</button></li>)}</ul>}
-            {missionLimit < filtered.length && <button className="outline wide" onClick={() => {focusAfterExpand.current = filtered[missionLimit]?.missionId ?? null;onMissionUiChange({...missionUi,limit:missionLimit+8});}}>{Math.min(8, filtered.length-missionLimit)}개 더 보기</button>}
-          </>}
+        <section className="panel">
+          <div className="panel-section-head">
+            <h2>내 미션 기록</h2>
+            <p className="field-help">기록은 나에게만 보여요. 미션을 모두 해야 하는 것은 아니에요.</p>
+          </div>
+          {summaryElement}
+        </section>
+        <section className="panel">
+          <div className="panel-section-head">
+            <h2>미션 골라보기</h2>
+            <p className="field-help">우리 반 미션 중 마음에 드는 미션을 골라 자유롭게 실천해 보세요.</p>
+          </div>
+          {feedback}
+          {missions.length === 0 ? (
+            <p className="muted">아직 등록된 미션이 없어요.</p>
+          ) : (
+            <ul className="student-mission-list">
+              {missions.map((mission) => {
+                const isDone = mission.status === "done";
+                const isFocus = data.focusMissionId === mission.missionId && !isDone;
+                return (
+                  <li
+                    key={mission.missionId}
+                    className={`student-mission-card ${isDone ? "is-done" : isFocus ? "is-focused" : ""}`}
+                  >
+                    <div className="mission-card-body">
+                      <div className="mission-item-badges">
+                        {isDone ? (
+                          <span className="mission-status-badge status-done">✓ 완료</span>
+                        ) : isFocus ? (
+                          <span className="focus-pill">🎯 지금 도전 중</span>
+                        ) : null}
+                        <span className="category-pill">{mission.category ?? "기타 미션"}</span>
+                      </div>
+                      <strong className="mission-text">{mission.text}</strong>
+                    </div>
+                    <div className="mission-card-actions">
+                      {isDone ? (
+                        <span className="done-badge-label">✓ 완료됨</span>
+                      ) : (
+                        <>
+                          {!isFocus && (
+                            <button
+                              type="button"
+                              className="small outline"
+                              disabled={busy}
+                              onClick={() => void run(async () => {
+                                await call<object, object>("setStudentMissionFocus", {
+                                  roundId,
+                                  missionId: mission.missionId,
+                                  requestId: crypto.randomUUID(),
+                                });
+                                setNotice("이번에 해볼 미션으로 골랐어요! 홈에서도 확인할 수 있어요.");
+                              })}
+                            >
+                              이번에 해볼래요
+                            </button>
+                          )}
+                          {data.canSubmit && (
+                            <button
+                              type="button"
+                              className="small primary-cta"
+                              disabled={busy}
+                              onClick={() => void run(async () => {
+                                await call<object, object>("setMissionStatus", {
+                                  missionId: mission.missionId,
+                                  status: "done",
+                                });
+                                setNotice("미션을 멋지게 완료했어요! 🎉");
+                              })}
+                            >
+                              ✨ 해냈어요!
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </>}
       {(view === "home" || view === "history") && revealed && <section className="panel reveal-panel"><div className="panel-section-head"><h2>친구 공개 결과</h2><p className="field-help">주변에 다른 사람이 없을 때 버튼을 눌러 확인하세요.</p></div>{view === "history" && feedback}
