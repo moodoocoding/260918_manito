@@ -814,3 +814,18 @@
      - 완료 미션 카드는 부드러운 연녹색 배경(`#f0fdf4`)과 외곽선(`#bbf7d0`), 기본 커서(`cursor: default`) 및 호버 섀도 제거로 완료된 상태임을 명확히 인지할 수 있도록 시각화했다.
 - `git diff --check`, `npm run build`(Web 및 Functions), `npm run test:functions`(12/12 통과), `npm run test:qr`(1/1 통과)를 모두 완료했다.
 
+## 2026-09-30 — 교사 '상태 확인' 쪽지 모니터링 내 2개 대화방(내가 챙기는 친구 / 나를 챙겨주는 친구) 분리
+
+- 사용자 피드백(교사 '상태 확인'에서 쪽지를 볼 때 모든 쪽지가 뒤섞여 알아보기 힘들므로 학생 화면처럼 대화창을 2개로 분리해 보여주도록 요청)을 수용하여 개선을 완료했다. [6인 가상 전문가 사전·사후 검토](design-reviews/2026-09-30-teacher-student-status-two-conversations.md)를 기록했다.
+  1. **백엔드 대화방 분류 및 배정 상대 이름 연동 (`getTeacherStudentDetail`)**:
+     - `roundRef.collection("assignments")`를 조회하여 대상 학생의 `targetDisplayName`(내가 수호천사로서 챙기는 친구)과 `carerDisplayName`(나를 챙겨주는 마니또 친구)을 추출하도록 보강했다.
+     - `classifyMail` 및 배정 관계를 기반으로 각 쪽지 문서에 `conversation: "caredFor" | "carer" | "unknown"` 속성을 태깅하여 반환하도록 개선했다.
+  2. **프런트엔드 2개 대화방 세그먼트 탭 구현 (`TeacherStudentStatus.tsx`)**:
+     - '쪽지' 탭 내부를 단일 평면 리스트에서 학생 화면(`StudentMail`)과 동일한 2개 대화방 탭 구조로 전환했다:
+       - **내가 챙기는 친구 ({상대 이름})** · {N}건
+       - **나를 챙겨주는 친구 ({상대 이름})** · {N}건
+     - 각 대화방 상단에 대화의 성격과 상대 학생 이름을 안내하는 친절한 힌트 배너를 추가했다.
+  3. **대화형 메시지 카드 UI 및 상태 가독성 개선 (`style.css`)**:
+     - 해당 학생이 보낸 쪽지(`내가 보냄 📤`)와 상대 친구가 보낸 쪽지(`{상대이름} 📥`)를 시각적으로 명확히 구분하는 배지, 방향 표시, 전송 일시, 전달/숨김/검토 상태 배지를 적용했다.
+- `git diff --check`, `npm run build`(Web 및 Functions), `npm run test:functions`(12/12 통과), `npm run test:qr`(1/1 통과)를 모두 완료했다.
+

@@ -4,6 +4,7 @@ import {requireVerifiedTeacher} from "../shared/authorization.js";
 import {db} from "../shared/firebase.js";
 import {requireDocumentId, requireRecord} from "../shared/validation.js";
 import {requireTeacherRound} from "./common.js";
+import {classifyMail} from "./mailTimeline.js";
 
 type MissionPlan = {missionId:string; text:string; category?:string};
 type MissionView = {missionId:string; text:string; status:string};
@@ -64,11 +65,35 @@ export const getTeacherStudentDetail = onCall(async (request) => {
   const participant = await roundRef.collection("participants").doc(studentUid).get();
   if (!participant.exists) throw new HttpsError("permission-denied", "이 시즌의 참가자가 아니에요.");
   const dataRef = roundRef.collection("studentData").doc(studentUid);
-  const [members, missions, inbox, sent] = await Promise.all([
+  const [members, missions, inbox, sent, assignments] = await Promise.all([
     classRef.collection("members").get(), dataRef.collection("missions").get(),
     dataRef.collection("inboxItems").get(), dataRef.collection("sentMessages").get(),
+    roundRef.collection("assignments").get(),
   ]);
   const names = new Map(members.docs.map((doc) => [doc.id, String(doc.get("displayName") ?? "등록 해제 학생")]));
+  const receiverByGiver = new Map(assignments.docs.map((doc) => [doc.id, String(doc.get("receiverUid") ?? "")]));
+  const giverByReceiver = new Map(assignments.docs.map((doc) => [String(doc.get("receiverUid") ?? ""), doc.id]));
+  const targetUid = receiverByGiver.get(studentUid);
+  const carerUid = giverByReceiver.get(studentUid);
+  const targetDisplayName = targetUid ? (names.get(targetUid) ?? "등록 해제 학생") : null;
+  const carerDisplayName = carerUid ? (names.get(carerUid) ?? "등록 해제 학생") : null;
+
+  const mailCopies = [
+    ...inbox.docs.map((doc) => ({
+      messageId: doc.id,
+      direction: "inbox" as const,
+      replyToMessageId: (doc.get("replyToMessageId") as string | undefined) ?? null,
+      createdAtMillis: Number(doc.get("createdAt")?.toMillis() ?? 0),
+    })),
+    ...sent.docs.map((doc) => ({
+      messageId: doc.id,
+      direction: "sent" as const,
+      replyToMessageId: (doc.get("replyToMessageId") as string | undefined) ?? null,
+      createdAtMillis: Number(doc.get("createdAt")?.toMillis() ?? 0),
+    })),
+  ];
+  const mailTimeline = classifyMail(mailCopies);
+
   const thankCopies = inbox.docs.filter((doc) => doc.get("type") === "thanks" && doc.id.startsWith("thanks_"));
   const messageIds = [...new Set([...inbox.docs.filter((doc) => doc.get("type") !== "thanks"),
     ...sent.docs].map((doc) => doc.id))];
@@ -84,7 +109,17 @@ export const getTeacherStudentDetail = onCall(async (request) => {
     if (senderUid !== studentUid && receiverUid !== studentUid) {
       throw new HttpsError("failed-precondition", "학생의 쪽지 기록이 올바르지 않아요.");
     }
+    const timeline = mailTimeline.get(doc.id);
+    let conversation: "caredFor" | "carer" | "unknown" = timeline?.conversation ?? "unknown";
+    if (conversation === "unknown") {
+      if ((senderUid === studentUid && receiverUid === targetUid) || (senderUid === targetUid && receiverUid === studentUid)) {
+        conversation = "caredFor";
+      } else if ((senderUid === carerUid && receiverUid === studentUid) || (senderUid === studentUid && receiverUid === carerUid)) {
+        conversation = "carer";
+      }
+    }
     return {messageId:doc.id, direction:senderUid === studentUid ? "sent" : "received",
+      conversation,
       senderName:names.get(senderUid) ?? "등록 해제 학생",
       receiverName:names.get(receiverUid) ?? "등록 해제 학생",
       text:String(doc.get("text") ?? ""), status:String(doc.get("status") ?? "unknown"),
@@ -97,7 +132,8 @@ export const getTeacherStudentDetail = onCall(async (request) => {
     if (!thank.exists || thank.get("receiverUid") !== studentUid || thank.get("senderUid") !== senderUid) {
       throw new HttpsError("failed-precondition", "감사 쪽지 기록을 확인할 수 없어요.");
     }
-    messages.push({messageId:copy.id, direction:"received", senderName:names.get(senderUid) ?? "등록 해제 학생",
+    messages.push({messageId:copy.id, direction:"received", conversation:"caredFor",
+      senderName:names.get(senderUid) ?? "등록 해제 학생",
       receiverName:names.get(studentUid) ?? "등록 해제 학생", text:String(thank.get("text") ?? ""),
       status:"delivered", date:"감사 인사", createdAtMillis:Number(thank.get("createdAt")?.toMillis() ?? 0)});
   }
@@ -108,6 +144,8 @@ export const getTeacherStudentDetail = onCall(async (request) => {
   await classRef.collection("auditLogs").add({action:"round.teacher_student_detail",actorUid:teacherUid,
     roundId, studentUid, messageCount:messages.length,createdAt:FieldValue.serverTimestamp()});
   return {roundId, studentUid, displayName:names.get(studentUid) ?? "등록 해제 학생",
+    targetDisplayName,
+    carerDisplayName,
     missions:missionList,
     messages:messages.map(({createdAtMillis, ...message}) => message)};
 });

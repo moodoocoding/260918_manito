@@ -4,11 +4,20 @@ import {call} from "./firebase";
 export type Student = {studentUid:string; displayName:string; participationStatus:string;
   completedMissions:number; totalMissions:number; sentMessages:number};
 export type Detail = {studentUid:string; displayName:string;
+  targetDisplayName?:string | null;
+  carerDisplayName?:string | null;
   missions:Array<{missionId:string; text:string; status:"done"|"todo"|"skipped"}>;
-  messages:Array<{messageId:string; direction:"sent"|"received"; senderName:string;
-    receiverName:string; text:string; status:string; date:string}>};
+  messages:Array<{messageId:string; direction:"sent"|"received";
+    conversation?:"caredFor"|"carer"|"unknown";
+    senderName:string; receiverName:string; text:string; status:string; date:string}>};
 
 const missionLabels = {done:"완료", todo:"아직 하지 않음", skipped:"쉬기"};
+const messageStatusLabels: Record<string, string> = {
+  moderated: "교사가 숨김",
+  rejected: "전달되지 않음",
+  pending: "검토 대기",
+  delivered: "전달됨",
+};
 const fetchStatus = (classId:string,roundId:string) =>
   call<object,{students:Student[]}>("getTeacherStudentStatus",{classId,roundId});
 const fetchDetail = (classId:string,roundId:string,studentUid:string) =>
@@ -27,6 +36,7 @@ export function TeacherStudentStatus({classId, roundId, loadStatus = fetchStatus
   const [detailLoading,setDetailLoading] = useState(false);
   const [detailError,setDetailError] = useState("");
   const [detailSection,setDetailSection] = useState<"missions"|"messages">("missions");
+  const [mailSide,setMailSide] = useState<"caredFor"|"carer">("caredFor");
   const detailRequest = useRef(0);
   const summaryRequest = useRef(0);
   const detailElement = useRef<HTMLElement|null>(null);
@@ -70,7 +80,7 @@ export function TeacherStudentStatus({classId, roundId, loadStatus = fetchStatus
       return;
     }
     const version = ++detailRequest.current;
-    setSelected(studentUid); setDetail(null); setDetailError(""); setDetailLoading(true); setDetailSection("missions");
+    setSelected(studentUid); setDetail(null); setDetailError(""); setDetailLoading(true); setDetailSection("missions"); setMailSide("caredFor");
     try {
       const result = await loadDetail(classId,roundId,studentUid);
       if (version === detailRequest.current) setDetail(result);
@@ -105,16 +115,80 @@ export function TeacherStudentStatus({classId, roundId, loadStatus = fetchStatus
               .map((item) => <li key={item.missionId}>{item.text}</li>)}</ul>}
           </section>)}
         </div>}</>}
-      {detailSection === "messages" && <>
-        <p className="field-help">이 학생과 직접 주고받은 이번 시즌 쪽지 전체를 최신순으로 보여줘요. 이 열람은 기록됩니다.</p>
-        {detail.messages.length === 0 ? <p className="muted">주고받은 쪽지가 없어요.</p> : <ol className="teacher-status-messages">
-          {detail.messages.map((message) => <li key={message.messageId}>
-            <div><strong>{message.direction === "sent" ? "보냄" : "받음"}</strong>
-              <span>{message.senderName} → {message.receiverName}</span>
-              <small>{message.date} · {message.status === "moderated" ? "교사가 숨김" : message.status === "rejected" ? "전달되지 않음" : message.status === "pending" ? "검토 대기" : "전달됨"}</small></div>
-            <p>{message.text}</p>
-          </li>)}
-        </ol>}</>}</>}
+      {detailSection === "messages" && (() => {
+        const studentName = detail.displayName;
+        const caredForMessages = detail.messages.filter((m) => {
+          if (m.conversation) return m.conversation === "caredFor";
+          if (detail.targetDisplayName) {
+            return m.receiverName === detail.targetDisplayName || m.senderName === detail.targetDisplayName;
+          }
+          return m.direction === "sent";
+        });
+        const carerMessages = detail.messages.filter((m) => {
+          if (m.conversation) return m.conversation === "carer";
+          if (detail.carerDisplayName) {
+            return m.receiverName === detail.carerDisplayName || m.senderName === detail.carerDisplayName;
+          }
+          return m.direction === "received";
+        });
+        const activeMessages = mailSide === "caredFor" ? caredForMessages : carerMessages;
+
+        return <>
+          <p className="field-help">이 학생의 쪽지 대화를 학생 화면과 동일하게 2개의 대화방으로 분리하여 보여줘요. 이 열람은 기록됩니다.</p>
+          <div className="teacher-mail-tabs segmented-track" role="group" aria-label="쪽지 대화방 선택">
+            <button
+              type="button"
+              className={mailSide === "caredFor" ? "small is-active" : "small outline"}
+              aria-pressed={mailSide === "caredFor"}
+              onClick={() => setMailSide("caredFor")}
+            >
+              내가 챙기는 친구 {detail.targetDisplayName ? `(${detail.targetDisplayName})` : ""} · {caredForMessages.length}건
+            </button>
+            <button
+              type="button"
+              className={mailSide === "carer" ? "small is-active" : "small outline"}
+              aria-pressed={mailSide === "carer"}
+              onClick={() => setMailSide("carer")}
+            >
+              나를 챙겨주는 친구 {detail.carerDisplayName ? `(${detail.carerDisplayName})` : ""} · {carerMessages.length}건
+            </button>
+          </div>
+          <div className="teacher-conversation-hint">
+            {mailSide === "caredFor" ? (
+              <p>
+                💌 <strong>{studentName}</strong>이(가) 수호천사로서 챙기는 친구{" "}
+                <strong>{detail.targetDisplayName ? `[${detail.targetDisplayName}]` : ""}</strong>에게 보낸 쪽지와 상대방의 답장 대화예요.
+              </p>
+            ) : (
+              <p>
+                🤫 <strong>{studentName}</strong>을(를) 챙겨주는 마니또{" "}
+                <strong>{detail.carerDisplayName ? `[${detail.carerDisplayName}]` : ""}</strong>이(가) 보낸 쪽지와 <strong>{studentName}</strong>의 답장 대화예요.
+              </p>
+            )}
+          </div>
+          {activeMessages.length === 0 ? (
+            <p className="muted">이 대화방에서 주고받은 쪽지가 아직 없어요.</p>
+          ) : (
+            <ol className="teacher-status-messages">
+              {activeMessages.map((message) => {
+                const isSentByThisStudent = message.senderName === studentName;
+                return (
+                  <li key={message.messageId} className={`teacher-msg-item ${isSentByThisStudent ? "sent-by-student" : "sent-by-partner"}`}>
+                    <div className="teacher-msg-meta">
+                      <span className={`teacher-msg-badge ${isSentByThisStudent ? "is-sender" : "is-partner"}`}>
+                        {isSentByThisStudent ? "내가 보냄 📤" : `${message.senderName} 📥`}
+                      </span>
+                      <span className="teacher-msg-direction">{message.senderName} → {message.receiverName}</span>
+                      <small>{message.date} · {messageStatusLabels[message.status] ?? message.status}</small>
+                    </div>
+                    <p className="teacher-msg-content">{message.text}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </>;
+      })()}</>}
     </section>}
     {!loading && !error && students.length > 0 && <div className="teacher-status-grid">
       {students.map((student) => <button key={student.studentUid} type="button"
