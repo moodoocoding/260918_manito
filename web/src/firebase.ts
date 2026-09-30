@@ -88,8 +88,10 @@ export async function consumeAuthRedirectError(): Promise<unknown> {
 export async function studentLogin(classCode: string, cardCode: string, rememberMe = false): Promise<void> {
   const persistenceMode = rememberMe ? browserLocalPersistence : browserSessionPersistence;
   await setPersistence(auth, persistenceMode);
+  const normalizedClassCode = classCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const normalizedCardCode = cardCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
   const result = await call<{ classCode: string; cardCode: string }, { customToken: string }>(
-    "loginStudent", { classCode, cardCode });
+    "loginStudent", { classCode: normalizedClassCode, cardCode: normalizedCardCode });
   await signInWithCustomToken(auth, result.customToken);
 }
 

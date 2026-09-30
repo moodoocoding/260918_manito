@@ -730,4 +730,16 @@
      - 학생이 0명일 때 다음 버튼을 누르면 딱딱한 "참가 학생 4~40명과…" 대신 `"먼저 학생 명단을 등록해 주세요."`라는 직관적인 안내가 표시되도록 교정했다.
 - `git diff --check`, `npm run build`(Web 및 Functions), `npm run test:functions`(12/12 통과), `npm run test:qr`(1/1 통과)를 모두 완료했다.
 
+## 2026-09-30 — 학급 코드 및 학생 카드 코드 대소문자 무구분(Case-Insensitive) 로그인 지원 및 입력 UI 대문자 자동 변환
+
+- 사용자 요청(학급 코드 대소문자 가리지 않고 접속 지원)을 반영해 프런트엔드와 백엔드 전 과정에서 완벽한 대소문자 무구분 처리를 구현했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-case-insensitive-class-code-login.md)를 기록했다.
+  1. **학생 로그인 입력 UX 대문자 자동 변환**:
+     - 학생 입장 화면의 학급 코드(`student-class-code`) 및 카드 코드(`student-card-code`) 입력란에 `onChange` 핸들러에서 사용자가 소문자로 타이핑하더라도 즉시 대문자로 자동 변환(`toUpperCase()`)하여 state에 반영되도록 교정했다.
+     - CSS에 `text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; font-size: 1.08rem;`를 적용하여 타이핑 순간 화면에 실물 인쇄 카드와 완전히 동일한 형태의 선명한 대문자로 보이도록 개선했다.
+  2. **클라이언트 및 API 전송 이중 정규화**:
+     - 폼 제출 시 및 `firebase.ts`의 `studentLogin` 함수에서 `trim().toUpperCase()` 및 특수문자/공백 제거 정규화를 거쳐 백엔드로 전달하도록 보강했다.
+  3. **단위 테스트 보강 및 검증**:
+     - `functions/test/codes.test.mjs`에 소문자(`happy2026`, `vdwq`) 및 공백/기호가 포함된 학급 코드와 소문자 카드 코드(`abcd-efghjklm`)에 대한 대소문자 무구분 정규화 테스트를 추가하고 전체 통과를 확인했다.
+- `git diff --check`, `npm run build`(Web 및 Functions), `npm run test:functions`(12/12 통과), `npm run test:qr`(1/1 통과)를 모두 완료했다.
+
 

@@ -836,7 +836,7 @@ function App() {
             </ul>
           </div>
           <form className="panel entry-form" onSubmit={(event) => { event.preventDefault(); void task(async () => {
-            await studentLogin(classCodeInput, cardCodeInput, rememberStudent);
+            await studentLogin(classCodeInput.trim().toUpperCase(), cardCodeInput.trim().toUpperCase(), rememberStudent);
             setCardCodeInput("");
           }); }}>
             <div className="entry-form-head">
@@ -844,14 +844,14 @@ function App() {
               <h2>내 카드로 입장하기</h2>
             </div>
             <label htmlFor="student-class-code">학급 코드
-              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value)} placeholder="선생님이 알려준 학급 코드" required />
+              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="선생님이 알려준 학급 코드" required />
             </label>
             <div className="field-group">
               <div className="field-label-row">
                 <label htmlFor="student-card-code">개인 카드 코드</label>
                 <button type="button" className="small outline inline-toggle" onClick={() => setShowCardInput((value) => !value)}>{showCardInput ? "코드 가리기" : "코드 보기"}</button>
               </div>
-              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value)} placeholder="카드에 적힌 4자리 코드 (예: 7K9X)" required />
+              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))} placeholder="카드에 적힌 4자리 코드 (예: 7K9X)" required />
             </div>
             <div className="checkbox-row remember-row">
               <label htmlFor="student-remember-me" className="checkbox-label">
