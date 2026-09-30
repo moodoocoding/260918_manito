@@ -21,8 +21,16 @@ const statusCopy: Record<string,string> = {
   revealed: "친구 공개 완료", archived: "지난 활동",
 };
 const missionStatus: Record<string,string> = {todo:"골라볼 미션", done:"해봤어요", skipped:"쉬었어요"};
-const categoryOrder = ["인사와 칭찬", "경청과 대화", "협력과 배려", "감사와 응원", "우리 반 미션", "기타 미션"];
 const niceDate = (day?: string | null) => day ? `${Number(day.slice(5,7))}월 ${Number(day.slice(8,10))}일` : "";
+function getCategorySlug(category?: string): string {
+  if (!category) return "default";
+  if (category.includes("인사") || category.includes("칭찬")) return "greeting";
+  if (category.includes("경청") || category.includes("대화")) return "conversation";
+  if (category.includes("협력") || category.includes("배려")) return "cooperation";
+  if (category.includes("감사") || category.includes("응원")) return "cheering";
+  if (category.includes("우리 반") || category.includes("우리반") || category.includes("학급")) return "custom";
+  return "default";
+}
 
 export function StudentRound({ roundId, status, refreshVersion, view, gradeBand, onNavigate, missionUi, onMissionUiChange, mailDraftRef }: {
   roundId: string; status: string; refreshVersion: number; view: View; gradeBand?: string;
@@ -100,7 +108,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
           <div className="student-next-mission">
             <div className="spotlight-head">
               <span className="spotlight-badge">오늘의 미션</span>
-              {firstTodo && <span className="category-pill">{firstTodo.category ?? "기타 미션"}</span>}
+              {firstTodo && <span className={`category-pill cat-${getCategorySlug(firstTodo.category)}`}>{firstTodo.category ?? "기타 미션"}</span>}
             </div>
             {firstTodo ? <>
               <p className="student-mission-text">{firstTodo.text}</p>
@@ -160,7 +168,7 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
                         ) : isFocus ? (
                           <span className="focus-pill">🎯 지금 도전 중</span>
                         ) : null}
-                        <span className="category-pill">{mission.category ?? "기타 미션"}</span>
+                        <span className={`category-pill cat-${getCategorySlug(mission.category)}`}>{mission.category ?? "기타 미션"}</span>
                       </div>
                       <strong className="mission-text">{mission.text}</strong>
                     </div>

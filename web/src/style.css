@@ -296,6 +296,42 @@ a {
   white-space: nowrap;
 }
 
+.category-pill.cat-greeting {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.category-pill.cat-conversation {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
+.category-pill.cat-cooperation {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.category-pill.cat-cheering {
+  background: #fdf2f8;
+  color: #be185d;
+  border-color: #fbcfe8;
+}
+
+.category-pill.cat-custom {
+  background: #faf5ff;
+  color: #6d28d9;
+  border-color: #ddd6fe;
+}
+
+.category-pill.cat-default {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
 .focus-pill {
   background: #243044;
   color: #ffffff;
@@ -826,11 +862,11 @@ a {
   color: var(--text-secondary);
 }
 
-/* 3-Column Stat Tiles */
+/* 2-Column Stat Tiles */
 .student-stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .student-stat-tile {
@@ -889,10 +925,10 @@ a {
   display: grid;
   gap: 12px;
   padding: 22px;
-  border: 2px solid var(--accent-spotlight);
+  border: 1.5px solid #fed7aa;
   border-radius: 18px;
-  background: linear-gradient(145deg, #fffdf9 0%, #fff1e4 100%);
-  box-shadow: 0 8px 22px rgba(217, 107, 67, 0.11);
+  background: linear-gradient(145deg, #fffdfa 0%, #fff7ed 100%);
+  box-shadow: 0 4px 18px rgba(249, 115, 22, 0.08);
 }
 
 .spotlight-head {
@@ -921,19 +957,21 @@ a {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .student-next-mission .inline-actions .primary-cta {
-  padding: 11px 22px;
-  font-size: 1.02rem;
+  padding: 10px 20px;
+  font-size: 0.98rem;
   font-weight: 800;
+  border-radius: 12px;
 }
 
 .student-next-mission .inline-actions .outline {
   padding: 10px 18px;
-  font-size: 0.96rem;
+  font-size: 0.94rem;
   font-weight: 600;
+  border-radius: 12px;
 }
 
 .student-next-mission .student-link-row {
@@ -1026,6 +1064,12 @@ a {
   border: 1.5px solid #bbf7d0;
   background: #f0fdf4;
   opacity: 0.88;
+}
+
+.student-mission-card.is-done:hover {
+  border-color: #bbf7d0;
+  box-shadow: none;
+  cursor: default;
 }
 
 .student-mission-card.is-done .mission-text {
@@ -1151,13 +1195,14 @@ a {
 
 .student-mission-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 10px 0 4px;
+  gap: 10px;
+  margin: 12px 0 4px;
 }
 
-.student-app .student-mission-actions button:first-child {
-  flex: 1 1 100%;
+.student-app .student-mission-actions button {
+  flex: 0 1 auto;
 }
 
 .student-replace-confirm {
@@ -3838,8 +3883,8 @@ a {
     grid-template-columns: 1fr;
   }
   .student-stat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
   .student-stat-tile {
     padding: 8px;
