@@ -3005,11 +3005,11 @@ a {
   list-style: none;
 }
 
-.class-list li {
+.member-list li {
   margin: 8px 0;
 }
 
-.class-list button {
+.member-list button {
   display: block;
   width: 100%;
   background: var(--bg-sub-surface);
@@ -3018,7 +3018,6 @@ a {
   text-align: left;
 }
 
-.class-list small,
 .member-list small {
   display: block;
   color: var(--text-secondary);
@@ -3959,33 +3958,127 @@ a {
 }
 
 /* -------------------------------------------------------------
-   Class List & Inline Code Editor
+   Class Cards (내 학급 목록)
    ------------------------------------------------------------- */
-.class-list-item {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  position: relative;
+.class-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  padding: 0 !important;
+  margin: 0 0 20px !important;
+  list-style: none !important;
 }
 
-.class-item-select {
-  flex: 1;
-  text-align: left;
+.class-card-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  background: var(--bg-card, #ffffff) !important;
+  border: 1.5px solid var(--border-panel, #e2e8f0) !important;
+  border-radius: 16px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.2s ease !important;
+  margin: 0 !important;
 }
 
-.class-delete-btn {
-  padding: 12px 14px;
-  align-self: center;
-  border-radius: 12px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0.75;
-  transition: opacity 0.15s ease, background 0.15s ease;
+.class-card-item:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
 }
 
-.class-list-item:hover .class-delete-btn {
-  opacity: 1;
+.class-card-info {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  cursor: pointer !important;
+  text-align: left !important;
+}
+
+.class-card-name {
+  display: block !important;
+  font-size: 1.18rem !important;
+  font-weight: 800 !important;
+  color: #1e293b !important;
+  margin-bottom: 4px !important;
+  word-break: break-word !important;
+}
+
+.class-card-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 0.88rem !important;
+  color: #64748b !important;
+  flex-wrap: wrap !important;
+}
+
+.class-card-meta .dot-sep {
+  color: #cbd5e1 !important;
+}
+
+.class-code-badge {
+  display: inline-block !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  font-weight: 700 !important;
+  font-size: 0.82rem !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  margin-left: 4px !important;
+  letter-spacing: 0.02em !important;
+}
+
+.class-card-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Specific class-list button overrides to prevent 100% width distortion */
+.class-list .class-enter-btn,
+.class-list .class-delete-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+  text-align: center !important;
+}
+
+.class-list .class-enter-btn {
+  background: #ede9fe !important;
+  color: #6d28d9 !important;
+  border: 1.5px solid #ddd6fe !important;
+  padding: 8px 16px !important;
+  font-size: 0.92rem !important;
+}
+
+.class-list .class-enter-btn:hover {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  border-color: #7c3aed !important;
+}
+
+.class-list .class-delete-btn {
+  background: transparent !important;
+  color: #ef4444 !important;
+  border: 1.5px solid #fca5a5 !important;
+  padding: 8px 14px !important;
+  font-size: 0.85rem !important;
+  opacity: 0.85 !important;
+}
+
+.class-list .class-delete-btn:hover {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #ef4444 !important;
+  opacity: 1 !important;
 }
 
 .inline-code-form {

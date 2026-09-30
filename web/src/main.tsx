@@ -888,9 +888,20 @@ function App() {
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
         </section> : role === "teacher" ? <section className="teacher-layout">
           {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
-            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId} className="class-list-item">
-              <button className="class-item-select" disabled={busy} onClick={() => void selectClass(item.classId)}><strong>{item.name}</strong><small>{item.schoolYear}학년도 · {item.memberCount}명 · 코드 {item.classCode}</small></button>
-              <button type="button" className="small danger outline class-delete-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); setClassToDelete(item); }}>삭제</button>
+            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId} className="class-card-item">
+              <div className="class-card-info" role="button" tabIndex={0} onClick={() => void selectClass(item.classId)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") void selectClass(item.classId); }}>
+                <strong className="class-card-name">{item.name}</strong>
+                <div className="class-card-meta">
+                  <span>{item.schoolYear}학년도</span>
+                  <span className="dot-sep">·</span>
+                  <span>{item.memberCount}명</span>
+                  <span className="class-code-badge">코드 {item.classCode}</span>
+                </div>
+              </div>
+              <div className="class-card-actions">
+                <button type="button" className="class-enter-btn" disabled={busy} onClick={() => void selectClass(item.classId)}>입장하기 →</button>
+                <button type="button" className="class-delete-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); setClassToDelete(item); }}>삭제</button>
+              </div>
             </li>)}</ul>}
             {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
               <label>학급 코드 (선택)<input value={newClassCode} maxLength={12} onChange={(event) => setNewClassCode(event.target.value.toUpperCase())} placeholder="미입력 시 6자리 영문·숫자 자동 생성 (예: SUN2026)" /><small className="field-help">선생님이 기억하기 쉬운 4~12자 영문 대소문자·숫자를 직접 지정할 수 있어요.</small></label>
