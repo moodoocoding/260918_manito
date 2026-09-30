@@ -649,22 +649,24 @@ function App() {
 
   async function registerBatchStudents(names: string[]) {
     if (!selected || !names.length) return;
+    if (members.length + names.length > 40) {
+      setError("한 학급에는 최대 40명까지 등록할 수 있어요.");
+      return;
+    }
     await task(async () => {
-      const result = await call<object, { members: Member[] }>("registerStudents", {
+      const result = await call<object, { students: Card[]; requiresCredentialRotation: boolean }>("registerStudents", {
         classId: selected.classId,
-        names,
+        displayNames: names,
         requestId: crypto.randomUUID(),
       });
-      setMembers(result.members);
-      const nextCount = result.members.length;
-      setSelected((old) => (old ? { ...old, memberCount: nextCount } : old));
-      const updatedClasses = classesRef.current.map((item) =>
-        item.classId === selected.classId ? { ...item, memberCount: nextCount } : item,
-      );
-      classesRef.current = updatedClasses;
-      setClasses(updatedClasses);
+      await loadTeacher();
+      await selectClass(selected.classId, teacherPage, false);
       await loadCardCodes();
-      setNotice(`${names.length}명의 학생을 등록하고 4자리 카드를 만들었어요.`);
+      setNotice(
+        result.requiresCredentialRotation
+          ? `${names.length}명의 학생을 등록했어요.`
+          : `${names.length}명의 학생을 등록하고 4자리 카드를 만들었어요.`,
+      );
     });
   }
 

@@ -761,6 +761,14 @@
   4. **교사 시즌 진행 관리 '조건 확인' 단계 원클릭 통합**:
      - 교사 화면에서 초안(`draft`) 저장 후 불필요하게 '조건 확인' 버튼을 누르고 대기해야 했던 2단계 조작을 개선하여, 초안 상태에서도 곧바로 **`[매칭하고 시작]`**을 누를 수 있도록 통합했다.
      - 클릭 시 클라이언트 내부에서 `prepareRound` 검증과 최신 `rosterVersion` 확보를 거쳐 `startRound`를 원클릭 트랜잭션으로 연계 처리하여 워크플로우를 대폭 단축했다. [6인 가상 전문가 사전·사후 검토](design-reviews/2026-09-30-remove-redundant-prepare-step.md)를 기록했다.
+## 2026-09-30 — 학생 명단 일괄 등록 API 파라미터 불일치 결함 수정
+
+- 사용자 피드백(시즌 설정 2단계에서 '텍스트 직접 붙여넣기'로 이름을 추출하고 등록 버튼을 눌러도 학생 이름이 저장되지 않고 다음으로 넘어갈 수 없는 결함)을 접수하고 원인을 분석하여 즉시 해결했다. [6인 가상 전문가 관점의 사전·사후 검토](design-reviews/2026-09-30-fix-student-batch-register-api.md)를 기록했다.
+  1. **API 파라미터 키 매핑 교정**:
+     - 백엔드 Callable 함수 `registerStudents`는 `displayNames` 배열을 요구하나, `registerBatchStudents`에서 `names`로 잘못 전달하여 400 Bad Request(`학생은 한 번에 1명 이상 40명 이하로 등록해 주세요.`) 오류가 발생하던 문제를 `displayNames: names`로 교정했다.
+  2. **최신 학급 명부 및 카드 동기화 파이프라인 복원**:
+     - 등록 완료 후 `await loadTeacher()`, `await selectClass(selected.classId, teacherPage, false)`, `await loadCardCodes()`를 연속 호출하여 Firestore의 최신 학생 명단(`members`)이 즉시 화면 state에 동기화되도록 수정했다.
+     - 이를 통해 시즌 설정 2단계가 등록 완료 즉시 Zero-State(명단 등록기)에서 Active-State(참가자 체크박스 및 필수 제외 매트릭스)로 자연스럽게 전환되어 다음 단계로 지체 없이 진행할 수 있도록 했다.
+  3. **클라이언트 40명 초과 사전 검증 추가**:
+     - 기존 명단과 신규 명단의 합이 40명을 초과할 경우 친절한 에러 메시지를 사전에 안내하도록 보강했다.
 - `git diff --check`, `npm run build`(Web 및 Functions), `npm run test:functions`(12/12 통과), `npm run test:qr`(1/1 통과)를 모두 완료했다.
-
-
