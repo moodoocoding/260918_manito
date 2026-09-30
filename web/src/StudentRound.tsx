@@ -167,42 +167,24 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
                     <div className="mission-card-actions">
                       {isDone ? (
                         <span className="done-badge-label">✓ 완료됨</span>
+                      ) : isFocus ? (
+                        <span className="focus-active-label">도전 중인 미션</span>
                       ) : (
-                        <>
-                          {!isFocus && (
-                            <button
-                              type="button"
-                              className="small outline"
-                              disabled={busy}
-                              onClick={() => void run(async () => {
-                                await call<object, object>("setStudentMissionFocus", {
-                                  roundId,
-                                  missionId: mission.missionId,
-                                  requestId: crypto.randomUUID(),
-                                });
-                                setNotice("이번에 해볼 미션으로 골랐어요! 홈에서도 확인할 수 있어요.");
-                              })}
-                            >
-                              이번에 해볼래요
-                            </button>
-                          )}
-                          {data.canSubmit && (
-                            <button
-                              type="button"
-                              className="small primary-cta"
-                              disabled={busy}
-                              onClick={() => void run(async () => {
-                                await call<object, object>("setMissionStatus", {
-                                  missionId: mission.missionId,
-                                  status: "done",
-                                });
-                                setNotice("미션을 멋지게 완료했어요! 🎉");
-                              })}
-                            >
-                              ✨ 해냈어요!
-                            </button>
-                          )}
-                        </>
+                        <button
+                          type="button"
+                          className="small outline"
+                          disabled={busy}
+                          onClick={() => void run(async () => {
+                            await call<object, object>("setStudentMissionFocus", {
+                              roundId,
+                              missionId: mission.missionId,
+                              requestId: crypto.randomUUID(),
+                            });
+                            setNotice("이번에 해볼 미션으로 골랐어요! 홈에서도 확인할 수 있어요.");
+                          })}
+                        >
+                          이번에 해볼래요
+                        </button>
                       )}
                     </div>
                   </li>
