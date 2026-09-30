@@ -166,14 +166,14 @@ export function StudentRosterImporter({ onRegister, busy = false, onCancel }: St
 
   return (
     <div className="roster-importer-card sub-panel">
-      <div className="importer-header">
-        <div>
+      <div className="roster-importer-header">
+        <div className="header-text-group">
           <h3>📋 학생 명단 자동 등록 / 가져오기</h3>
           <p className="field-help">엑셀, PDF, 한글 파일 또는 복사한 명단을 넣으면 학생 이름을 자동으로 찾아 깔끔하게 정리해요.</p>
         </div>
         {onCancel && (
-          <button type="button" className="small outline" onClick={onCancel} disabled={busy}>
-            닫기
+          <button type="button" className="small outline close-btn" onClick={onCancel} disabled={busy}>
+            ✕ 닫기
           </button>
         )}
       </div>

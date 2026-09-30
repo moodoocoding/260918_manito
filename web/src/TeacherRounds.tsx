@@ -487,7 +487,7 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
     }
     if (step === 2 && (participants.length < 4 || participants.length > 40
       || excludedPairs.some((pair) => !participants.includes(pair.a) || !participants.includes(pair.b)))) {
-      setStepError("참가 학생 4~40명과 참가자 사이의 제외 관계를 확인해 주세요."); return;
+      setStepError(members.length === 0 ? "먼저 학생 명단을 등록해 주세요." : "참가 학생 4~40명과 참가자 사이의 제외 관계를 확인해 주세요."); return;
     }
     if (step === 3 && missionIds.length < 1) { setStepError("미션을 한 개 이상 선택해 주세요."); return; }
     setStep((value) => Math.min(5, value + 1)); window.scrollTo(0,0);
@@ -698,35 +698,66 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
           <label>종료일<input required type="date" min={start} value={end} onChange={(event) => { const next = event.target.value; setEnd(next); setDates(schoolDays(start, next).join(", ")); markChanged(); }} /></label></div>
         <div className="season-presets" role="group" aria-label="시즌 기간 빠른 선택"><span>시작일 포함</span>{[5,10,15,20].map((days) => <button key={days} type="button" className={end === addDays(start, days - 1) ? "" : "outline"} aria-pressed={end === addDays(start, days - 1)} disabled={!start} onClick={() => { const next = addDays(start, days - 1); setEnd(next); setDates(schoolDays(start, next).join(", ")); markChanged(); }}>{days}일</button>)}</div>
         <p className="field-help">선택한 기간의 평일 {selectedDates.length}일을 활동일로 사용해요.</p></>}
-      {step === 2 && <><h3>2. 참가자와 필수 제외 관계</h3><p>{participants.length}명 선택 · {members.length - participants.length}명 미선택</p>
-        <div className="roster-import-trigger-box" style={{ background: "#f8fafc", padding: "14px 18px", borderRadius: "14px", border: "1px solid #cbd5e1", margin: "12px 0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-          <div>
-            <strong style={{ fontSize: "1rem", color: "#1e293b" }}>{members.length === 0 ? "⚠️ 등록된 학생이 아직 없어요!" : "새 학생 명단을 가져오거나 추가 등록하고 싶으신가요?"}</strong>
-            <p className="field-help" style={{ margin: "2px 0 0" }}>엑셀, PDF, 한글 파일 또는 명단을 복사해 붙여넣으면 이름을 자동으로 찾아 즉시 등록하고 참가자로 배정해요.</p>
+      {step === 2 && <>
+        {members.length === 0 ? (
+          <div className="roster-onboarding-section">
+            <h3>2. 학생 명단 등록</h3>
+            <p className="field-help" style={{ margin: "4px 0 16px", fontSize: "0.95rem" }}>
+              새 시즌을 시작하기 위해 우리 반 학생 명단을 등록해 주세요. 엑셀, PDF, 한글 파일 또는 명단 텍스트를 넣으면 이름을 자동으로 찾아 즉시 등록해요.
+            </p>
+            {onRegisterStudents && (
+              <StudentRosterImporter
+                busy={busy}
+                onRegister={async (names) => {
+                  await onRegisterStudents(names);
+                  markChanged();
+                }}
+              />
+            )}
           </div>
-          <button type="button" className={members.length === 0 ? "primary-cta" : "outline"} onClick={() => setShowImporter((v) => !v)}>
-            {showImporter ? "명단 등록 닫기" : "📋 파일·복사로 학생 명단 가져오기"}
-          </button>
-        </div>
-        {showImporter && onRegisterStudents && (
-          <StudentRosterImporter
-            busy={busy}
-            onCancel={() => setShowImporter(false)}
-            onRegister={async (names) => {
-              await onRegisterStudents(names);
-              setShowImporter(false);
-              markChanged();
-            }}
-          />
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+              <div>
+                <h3 style={{ margin: 0 }}>2. 참가자와 필수 제외 관계</h3>
+                <p style={{ margin: "4px 0 0" }}>{participants.length}명 선택 · {members.length - participants.length}명 미선택</p>
+              </div>
+              {onRegisterStudents && (
+                <button
+                  type="button"
+                  className="small outline"
+                  onClick={() => setShowImporter((v) => !v)}
+                >
+                  {showImporter ? "✕ 명단 추가 닫기" : "📋 학생 명단 추가 / 가져오기"}
+                </button>
+              )}
+            </div>
+
+            {showImporter && onRegisterStudents && (
+              <div style={{ margin: "12px 0 20px" }}>
+                <StudentRosterImporter
+                  busy={busy}
+                  onCancel={() => setShowImporter(false)}
+                  onRegister={async (names) => {
+                    await onRegisterStudents(names);
+                    setShowImporter(false);
+                    markChanged();
+                  }}
+                />
+              </div>
+            )}
+
+            <label>학생 찾기<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="표시 이름 검색" /></label>
+            <div className="action-row"><button type="button" className="small outline" onClick={() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); markChanged(); }}>입장 가능한 학생 전체 선택</button><button type="button" className="small outline" onClick={() => { setParticipants([]); setExcludedPairs([]); markChanged(); }}>선택 해제</button></div>
+            <fieldset aria-describedby={stepError ? "round-step-error" : undefined}><legend>참가 학생 ({participants.length}명)</legend><div className="participant-grid">{members.filter((m) => m.displayName.includes(memberSearch)).map((m) => <CheckboxRow key={m.studentUid} checked={participants.includes(m.studentUid)} disabled={m.accessStatus !== "active"} onChange={(checked) => { setParticipants((old) => checked ? [...old,m.studentUid] : old.filter((id) => id !== m.studentUid)); setExcludedPairs((old) => old.filter((p) => checked || (p.a !== m.studentUid && p.b !== m.studentUid))); markChanged(); }}>{m.displayName}{m.accessStatus !== "active" ? " · 입장 제한" : ""}</CheckboxRow>)}</div></fieldset>
+            <fieldset><legend>필수 제외 관계 · {excludedPairs.length}쌍</legend><p className="field-help">서로 배정되지 않아야 할 두 학생을 선택해 주세요. 양방향으로 적용됩니다.</p>
+              <div className="action-row"><select aria-label="첫 번째 참가자" value={pairA} onChange={(e) => setPairA(e.target.value)}><option value="">첫 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
+                <select aria-label="두 번째 참가자" value={pairB} onChange={(e) => setPairB(e.target.value)}><option value="">두 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
+                <button type="button" className="small outline" disabled={!pairA || !pairB || pairA === pairB} onClick={() => { if (!excludedPairs.some((p) => [p.a,p.b].includes(pairA) && [p.a,p.b].includes(pairB))) { setExcludedPairs((old) => [...old,{a:pairA,b:pairB}]); markChanged(); } setPairA(""); setPairB(""); }}>제외 추가</button></div>
+              <ul>{excludedPairs.map((p) => <li key={`${p.a}_${p.b}`}>{members.find((m) => m.studentUid === p.a)?.displayName} ↔ {members.find((m) => m.studentUid === p.b)?.displayName} <button type="button" className="small outline" onClick={() => { setExcludedPairs((old) => old.filter((pair) => pair !== p)); markChanged(); }}>제거</button></li>)}</ul></fieldset>
+          </>
         )}
-        <label>학생 찾기<input type="search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="표시 이름 검색" /></label>
-        <div className="action-row"><button type="button" className="small outline" onClick={() => { setParticipants(members.filter((m) => m.accessStatus === "active").map((m) => m.studentUid)); markChanged(); }}>입장 가능한 학생 전체 선택</button><button type="button" className="small outline" onClick={() => { setParticipants([]); setExcludedPairs([]); markChanged(); }}>선택 해제</button></div>
-        <fieldset aria-describedby={stepError ? "round-step-error" : undefined}><legend>참가 학생 ({participants.length}명)</legend><div className="participant-grid">{members.filter((m) => m.displayName.includes(memberSearch)).map((m) => <CheckboxRow key={m.studentUid} checked={participants.includes(m.studentUid)} disabled={m.accessStatus !== "active"} onChange={(checked) => { setParticipants((old) => checked ? [...old,m.studentUid] : old.filter((id) => id !== m.studentUid)); setExcludedPairs((old) => old.filter((p) => checked || (p.a !== m.studentUid && p.b !== m.studentUid))); markChanged(); }}>{m.displayName}{m.accessStatus !== "active" ? " · 입장 제한" : ""}</CheckboxRow>)}</div></fieldset>
-        <fieldset><legend>필수 제외 관계 · {excludedPairs.length}쌍</legend><p className="field-help">서로 배정되지 않아야 할 두 학생을 선택해 주세요. 양방향으로 적용됩니다.</p>
-          <div className="action-row"><select aria-label="첫 번째 참가자" value={pairA} onChange={(e) => setPairA(e.target.value)}><option value="">첫 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
-            <select aria-label="두 번째 참가자" value={pairB} onChange={(e) => setPairB(e.target.value)}><option value="">두 번째 학생</option>{members.filter((m) => participants.includes(m.studentUid)).map((m) => <option key={m.studentUid} value={m.studentUid}>{m.displayName}</option>)}</select>
-            <button type="button" className="small outline" disabled={!pairA || !pairB || pairA === pairB} onClick={() => { if (!excludedPairs.some((p) => [p.a,p.b].includes(pairA) && [p.a,p.b].includes(pairB))) { setExcludedPairs((old) => [...old,{a:pairA,b:pairB}]); markChanged(); } setPairA(""); setPairB(""); }}>제외 추가</button></div>
-          <ul>{excludedPairs.map((p) => <li key={`${p.a}_${p.b}`}>{members.find((m) => m.studentUid === p.a)?.displayName} ↔ {members.find((m) => m.studentUid === p.b)?.displayName} <button type="button" className="small outline" onClick={() => { setExcludedPairs((old) => old.filter((pair) => pair !== p)); markChanged(); }}>제거</button></li>)}</ul></fieldset></>}
+      </>}
       {step === 3 && <><h3>3. 미션</h3><p>기간 안에 할 미션을 원하는 만큼 골라 주세요. 학생은 원하는 순서로 진행하거나 쉬어 갈 수 있어요. <strong>선택 {missionIds.length}개</strong></p>
         {catalogError && <p className="message error" role="alert">미션 목록을 불러오지 못했어요. <button type="button" className="small outline" onClick={() => void loadCatalog()}>다시 시도</button></p>}
         {missionCategoryNames.filter((category) => catalog.some((mission) => mission.category === category)).map((category) => (

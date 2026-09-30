@@ -4118,14 +4118,23 @@ a {
 }
 
 .roster-importer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
-.roster-importer-header h4 {
+.roster-importer-header .header-text-group h3,
+.roster-importer-header .header-text-group h4 {
   margin: 0 0 6px;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: #1e293b;
+}
+
+.roster-importer-header .close-btn {
+  flex-shrink: 0;
 }
 
 .importer-tabs {
