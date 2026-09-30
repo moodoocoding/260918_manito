@@ -230,6 +230,7 @@ export const startRound = onCall(async (request) => {
     const categories = new Map(builtInMissions(gradeBand).map((mission) => [mission.missionId, mission.category]));
     const missionPlan = missionIds.map((missionId) => ({missionId, text: missionTexts.get(missionId)!,
       category: missionId.startsWith("custom_") ? "우리 반 미션" : categories.get(missionId) ?? "기타 미션"}));
+    const memberNames = new Map(members.map((doc) => [doc.id, doc.get("displayName") as string]));
     for (const [giverUid, receiverUid] of assignments) {
       tx.create(roundRef.collection("assignmentSecrets").doc(giverUid), {
         giverUid, receiverUid, createdAt: FieldValue.serverTimestamp(),
@@ -238,6 +239,7 @@ export const startRound = onCall(async (request) => {
         participationStatus: "active", joinedAt: FieldValue.serverTimestamp(),
       });
       tx.create(roundRef.collection("studentData").doc(giverUid), {
+        targetDisplayName: memberNames.get(receiverUid) ?? null,
         createdAt: FieldValue.serverTimestamp(),
       });
       const historyRef = classRef.collection("pairHistory").doc(Buffer.from(pairKey(giverUid, receiverUid)).toString("base64url"));

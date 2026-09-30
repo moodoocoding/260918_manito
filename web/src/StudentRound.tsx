@@ -47,21 +47,63 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const [reflection, setReflection] = useState("");
   const [incomingVisible, setIncomingVisible] = useState(false);
   const [targetVisible, setTargetVisible] = useState(false);
+  const [targetCountdown, setTargetCountdown] = useState(0);
+  const targetTimerRef = useRef<number | null>(null);
+
+  const hideTarget = useCallback(() => {
+    if (targetTimerRef.current !== null) {
+      window.clearInterval(targetTimerRef.current);
+      targetTimerRef.current = null;
+    }
+    setTargetVisible(false);
+    setTargetCountdown(0);
+  }, []);
+
+  const showTarget = useCallback(() => {
+    if (targetTimerRef.current !== null) {
+      window.clearInterval(targetTimerRef.current);
+      targetTimerRef.current = null;
+    }
+    setTargetVisible(true);
+    setTargetCountdown(3);
+    targetTimerRef.current = window.setInterval(() => {
+      setTargetCountdown((prev) => {
+        if (prev <= 1) {
+          if (targetTimerRef.current !== null) {
+            window.clearInterval(targetTimerRef.current);
+            targetTimerRef.current = null;
+          }
+          setTargetVisible(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
   const [thankYouSentLocal, setThankYouSentLocal] = useState(false);
   const load = useCallback(() => call<{roundId: string}, Activity>("getStudentActivity", {roundId}), [roundId]);
   useEffect(() => {
     let active = true;
-    setData(null); setError(""); setIncomingVisible(false); setTargetVisible(false);
+    setData(null); setError(""); setIncomingVisible(false); hideTarget();
     void load().then((result) => { if (active) { setData(result); setReflection(result.reflectionText ?? ""); } })
       .catch(() => { if (active) setError("활동을 불러오지 못했어요."); });
     return () => { active = false; };
-  }, [load, status, refreshVersion]);
-  useEffect(() => { setIncomingVisible(false); setTargetVisible(false); }, [view]);
+  }, [load, status, refreshVersion, hideTarget]);
+  useEffect(() => { setIncomingVisible(false); hideTarget(); }, [view, hideTarget]);
   useEffect(() => {
-    const hide = () => { if (document.visibilityState !== "visible") { setIncomingVisible(false); setTargetVisible(false); } };
+    const hide = () => { if (document.visibilityState !== "visible") { setIncomingVisible(false); hideTarget(); } };
     document.addEventListener("visibilitychange", hide);
-    return () => document.removeEventListener("visibilitychange", hide);
-  }, []);
+    window.addEventListener("blur", hide);
+    return () => {
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("blur", hide);
+      if (targetTimerRef.current !== null) {
+        window.clearInterval(targetTimerRef.current);
+        targetTimerRef.current = null;
+      }
+    };
+  }, [hideTarget]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
     try {
@@ -101,6 +143,43 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
             <h2>{data.title}</h2>
             <p className="student-season-dates">활동 기간 {niceDate(data.startsOn)} ~ {niceDate(data.endsOn)}</p>
           </div>
+          {data.targetDisplayName && !revealed && (
+            <div className={`student-target-secret-card ${targetVisible ? "is-revealed" : "is-hidden"}`}>
+              <div className="target-secret-header">
+                <span className="target-secret-pill">🔒 비밀친구 미션</span>
+                <span className="target-secret-timer-hint">
+                  {targetVisible ? `⏱️ ${targetCountdown}초 뒤 자동으로 가려져요` : "주변 친구가 보지 못하게 가리고 확인하세요"}
+                </span>
+              </div>
+              <div className="target-secret-body">
+                <div className="target-secret-label">내가 몰래 챙겨줄 마니또 친구</div>
+                <div className="target-secret-name-box">
+                  {targetVisible ? (
+                    <div className="target-revealed-view">
+                      <span className="target-name-tag">🎁 {data.targetDisplayName}</span>
+                      <p className="target-tip-text">친구 모르게 따뜻한 배려와 응원을 선물해 보세요!</p>
+                    </div>
+                  ) : (
+                    <div className="target-hidden-view">
+                      <span className="secret-lock-icon">🔒</span>
+                      <span className="secret-dots">••••••</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="target-secret-actions">
+                {targetVisible ? (
+                  <button type="button" className="small outline target-toggle-btn" onClick={hideTarget}>
+                    🙈 바로 다시 가리기
+                  </button>
+                ) : (
+                  <button type="button" className="small primary-cta target-toggle-btn" onClick={showTarget}>
+                    👁️ 비밀친구 살짝 확인하기 (3초)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="student-home-summary" aria-label="내 미션 요약">
             <div className="summary-head"><strong>내 미션 현황</strong></div>
             {summaryElement}

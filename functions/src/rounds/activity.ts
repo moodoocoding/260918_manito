@@ -60,6 +60,20 @@ export const getStudentActivity = onCall(async (request) => {
     total: currentMissions.length,
   } : null;
   const identityRevealed = ["revealed", "archived"].includes(student.roundDoc.get("status"));
+  let targetDisplayName = view.get("targetDisplayName") as string | null | undefined;
+  if (!targetDisplayName && ["active", "paused", "reveal_pending", "revealed", "archived"].includes(student.roundDoc.get("status"))) {
+    const assignmentDoc = await student.roundRef.collection("assignmentSecrets").doc(student.uid).get();
+    if (assignmentDoc.exists) {
+      const receiverUid = assignmentDoc.get("receiverUid") as string;
+      const receiverMember = await student.classRef.collection("members").doc(receiverUid).get();
+      if (receiverMember.exists) {
+        targetDisplayName = (receiverMember.get("displayName") as string | undefined) ?? null;
+        if (targetDisplayName) {
+          await dataRef.set({ targetDisplayName }, { merge: true });
+        }
+      }
+    }
+  }
   const mailCopies: MailCopy[] = [
     ...inbox.docs.map((doc) => ({messageId: doc.id, direction: "inbox" as const,
       replyToMessageId: doc.get("replyToMessageId") ?? null,
@@ -74,7 +88,7 @@ export const getStudentActivity = onCall(async (request) => {
     title: student.roundDoc.get("title"),
     startsOn: koreaDate(student.roundDoc.get("startsAt").toDate()),
     endsOn: koreaDate(student.roundDoc.get("endsAt").toDate()),
-    targetDisplayName: identityRevealed ? view.get("targetDisplayName") ?? null : null,
+    targetDisplayName: targetDisplayName ?? null,
     incomingDisplayName: identityRevealed ? view.get("incomingDisplayName") ?? null : null,
     activityDates,
     canSubmit: activeForSubmission(student.roundDoc),
