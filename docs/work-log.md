@@ -1111,6 +1111,13 @@
 - `npm run build`와 `git diff --check` 통과. 기존 Vite 500KB 초과 번들 경고가 남는다. 6개 가상 프로파일 사전·사후 판단과 근거는 `docs/design-reviews/2026-10-30-manitto-student-world-refactor.md`에 기록했다. 활성 회차 미션 저장·쪽지 초안 경고·도움 접수·비밀 공개/회고의 실제 상태별 브라우저 검증, 강제 API 오류, 스크린리더/실기기 검증은 미실시다. 외부 전문가나 실제 학생은 검토하지 않았다.
 - Firebase 개발 배포, Vercel 배포, GitHub 푸시는 하지 않았다. 에뮬레이터는 로컬 `demo-manitto`만 사용했으며 로그아웃 후 브라우저에 학생 홈을 남기지 않았다.
 
+## 2026-10-30 — 활성 마니또 UI 흐름 QA fixture 준비
+
+- 사용자/부모의 지시에 따라 제품 소스는 추가 수정하지 않았다. `demo-manitto` Auth/Firestore/Functions 에뮬레이터와 5182 웹 서버를 별도 실행하고, 기존 callable만 사용해 가상 교사·4명 학급·미션 3개가 있는 active 회차를 준비했다. 실학생/개발 Firebase 및 공유 포트는 사용하지 않았다.
+- 합성 계정 접속 자료는 로컬 `/private/tmp/manitto-active-flow-credentials.json`(권한 0600)에만 저장했다. 계정·카드 코드는 대화나 문서에 복사하지 않는다. CUA는 이 실행에서 사용할 수 없어 UI 자체는 클릭/검증하지 않았고, 부모가 `http://127.0.0.1:5182/student`에서 이어 확인할 수 있도록 활성 session을 유지한다.
+- 활성 흐름의 소스 읽기와 6개 가상 관점 재검토를 `docs/design-reviews/2026-10-30-manitto-student-world-refactor.md`에 보완했다. 그 과정에서 API는 `skipped`를 지원하지만 현재 학생 UI에는 미션 쉬기/교체 호출이 없음을 확인해 M1(P1 후보)로 기록했다. 이 결함의 실제 UI 재현 여부는 부모 CUA에서 확인할 예정이다.
+- 이번 seed callable 호출(create/register/create/prepare/start)은 테스트 fixture 설정이며 활성 UI 또는 전체 API 통합 검증으로 계산하지 않는다. `tests/rounds.integration.test.mjs`는 이번에 실행하지 않았다. 화면 검증 계획은 문서 표를 따르고, 6개 관점 활성 흐름 사후 판정·실제 브라우저 결과는 아직 미완료다.
+
 
 ## 2026-10-30 — 5175 테스트 사이트 재실행·현재 채팅에 표시
 
@@ -1212,3 +1219,12 @@
 
 - 부모가추가허용브라우저에서교사우체통준비상태/폼0/초점/서비스복귀와학생Pending390px·입력0·접수불가안내/마을·종료키보드callback을확인했다. 여섯사후판정은노출보류범위통과이며미배포API404노출P1을해소했다. 실제우체통서버배포/Google인증완료로보지않는다.
 - 제품소스동결후명시적Git업로드목록을준비했다. 별도작업인교사용운영매뉴얼md/pptx와실정보포함가능실연동캡처11개는제외하고가상QA/제품자산/필요한시험은포함한다. 선택텍스트의개인키패턴과검증JSON의직접학생이름/카드/토큰필드는없음을확인했다. 실제환경/로그/임시QA자격은Git제외를유지한다. GitHub푸시/VercelReady결과는이후추가한다.
+
+
+## 2026-10-30 — GitHub 업로드와 Vercel 프로덕션 배포 완료
+
+- 제품커밋 `f2be4b80baf8bf6b90b472a8cb005bab3d830866`을기존 `moodoocoding/260918_manito`의main에정상푸시했다. 검증된제품/지원자료197개만선택했고별도매뉴얼2개와실정보가능실연동PNG11개는로컬보관으로제외했다. 환경실값·로그·임시QA자격·서비스계정파일은커밋하지않았다.
+- 기존팀의Vercel프로젝트manito가Git연동으로production배포 `dpl_4xgv9eJR4fKpjXv8DvCDs7PX1Lg6`을생성했고READY와동일소스SHA를확인했다. 빌드64.2초, 공식별칭 `https://manito-one-blond.vercel.app`이새배포에연결됐다. Firebase나Supabase배포/데이터변경은없다.
+- 실제공식주소의교사/학생/학급상태직접경로3개모두HTTP200·no-store,JS/CSS3개와주요이미지8개모두정상content-type/200이다. 새통합허브/우체통준비메시지포함,기존Firebase프로젝트포함/demo·9099없음,미배포우체통5개Callable이름이공개JS에모두없음을확인했다. 실제비공개학급조회나계정입력은하지않았다.
+- 배포대상의최근10분Vercelerror/fatal레벨그룹조회에그룹이없었다. 정적Vercel범위확인이며Firebase/브라우저실Google인증의런타임성공을의미하지않는다. 환경변수목록조회는연결앱403제한으로값을읽거나변경하지않았고공개번들로대상을검증했다.
+- 근거: `docs/design-reviews/assets/teacher-platform-web-release-2026-10-30.json`. 우체통신규서버배포·실Google로그인/세션복원·실AI짝생성및마니또기존미션쉬기누락후속은별도잔여다. 부모는동일제품커밋의5173고정파일을listener/열린입력보존방식으로갱신했다. 후속검증문서와이배포기록만별도문서커밋하며제품소스는변경하지않는다.

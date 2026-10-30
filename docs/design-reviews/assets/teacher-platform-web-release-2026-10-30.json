@@ -1,0 +1,113 @@
+{
+  "checkedAt": "2026-10-30T05:39:06.582Z",
+  "deploymentId": "dpl_4xgv9eJR4fKpjXv8DvCDs7PX1Lg6",
+  "sourceCommit": "f2be4b80baf8bf6b90b472a8cb005bab3d830866",
+  "environment": "production",
+  "baseUrl": "https://manito-one-blond.vercel.app",
+  "framework": "vite",
+  "readyState": "READY",
+  "buildDurationSeconds": 64.2,
+  "checks": {
+    "allRoutesOk": true,
+    "allAssetsOk": true,
+    "allImagesOk": true,
+    "integratedHubIncluded": true,
+    "mailboxPendingIncluded": true,
+    "unavailableMailboxCallsExcluded": true,
+    "existingFirebaseProject": true,
+    "emulatorExcluded": true
+  },
+  "routes": [
+    {
+      "route": "/teacher",
+      "status": 200,
+      "noStore": true
+    },
+    {
+      "route": "/student",
+      "status": 200,
+      "noStore": true
+    },
+    {
+      "route": "/teacher/classes/release-check/today-tasks",
+      "status": 200,
+      "noStore": true
+    }
+  ],
+  "assets": [
+    {
+      "path": "/assets/index-CremjrkC.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8"
+    },
+    {
+      "path": "/assets/index-CSbozYv6.css",
+      "status": 200,
+      "contentType": "text/css; charset=utf-8"
+    },
+    {
+      "path": "/assets/browser-DkdoOY_y.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8"
+    }
+  ],
+  "images": [
+    {
+      "path": "/assets/world-town-v2-QkLo5V2A.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/world-town-east-v1-nqJd5EhI.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/world-avatar-v2-BCxXSlR1.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/student-login-world-Bv791Y9Y.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/world-wood-texture-v1-DQty91Kt.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/world-ui-icons-v1-BLKbq0KL.png",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/world-parchment-texture-v1-rWjLDSEq.webp",
+      "status": 200,
+      "imageContentType": true
+    },
+    {
+      "path": "/assets/today-tasks-classroom-v1-Kr-EV3uN.png",
+      "status": 200,
+      "imageContentType": true
+    }
+  ],
+  "localTests": {
+    "navigation": 6,
+    "functions": 29,
+    "rules": 17,
+    "integration": 28
+  },
+  "limits": [
+    "No real Google sign-in or private class reads were performed.",
+    "Firebase was not deployed; teacher-mail callables remain gated.",
+    "Real AI pair generation remains unverified."
+  ],
+  "observability": {
+    "vercelRuntimeErrorGroups": 0,
+    "window": "10m",
+    "scope": "This Vercel deployment only; Firebase runtime and browser authentication not exercised.",
+    "drains": "not inspected"
+  }
+}
