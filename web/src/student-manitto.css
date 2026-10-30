@@ -5,6 +5,47 @@
 
 .manitto-empty-state p { margin: 0; }
 
+.student-app .world-feature-page .student-activities > .student-home-primary {
+  border-radius: var(--world-radius);
+  border-color: var(--world-gold-border);
+  background: var(--world-card);
+  background-image: var(--world-parchment-texture);
+  box-shadow: 2px 3px 0 #9b835940;
+}
+
+.student-app .world-feature-page .student-activities .student-stat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.student-app .world-feature-page .mission-actions-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--world-space-2);
+}
+
+.student-app .world-feature-page :is(.world-page-back, .student-nav a)[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.student-app .world-feature-page .kakao-input-field {
+  align-items: stretch;
+  flex-direction: column;
+  border-radius: var(--world-radius);
+  border-color: var(--world-wood-border);
+  padding: var(--world-space-2) var(--world-space-3);
+}
+
+.student-app .world-feature-page .kakao-input-label {
+  color: var(--world-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.student-app .world-feature-page .kakao-textarea {
+  padding-inline: 0;
+}
+
 .student-app .world-feature-page .student-activities .student-next-mission {
   padding: var(--world-space-6);
   border: 2px solid var(--world-forest-border);
@@ -30,6 +71,54 @@
   background-image: var(--world-parchment-texture);
 }
 
+.student-app .world-feature-page .student-activities :is(
+  .reveal-card,
+  .reflection-box,
+  .thank-you-box,
+  .reflection-form-box,
+  .review-card,
+  .sent-message
+) {
+  min-width: 0;
+  border: 2px solid var(--world-gold-border);
+  border-radius: var(--world-radius);
+  background-color: var(--world-card);
+  background-image: var(--world-parchment-texture);
+  color: var(--world-ink);
+  overflow-wrap: anywhere;
+}
+
+.student-app .world-feature-page .student-activities .reveal-card {
+  padding: var(--world-space-4);
+  gap: var(--world-space-3);
+}
+
+.student-app .world-feature-page .student-activities .student-secret {
+  min-width: 0;
+  max-width: 100%;
+  border: 2px solid var(--world-gold-border);
+  border-radius: var(--world-radius);
+  background-color: var(--world-paper-shade);
+  background-image: var(--world-parchment-texture);
+  color: var(--world-ink);
+  overflow-wrap: anywhere;
+}
+
+.student-app .world-feature-page .student-activities .reflection-section {
+  display: grid;
+  gap: var(--world-space-4);
+}
+
+.student-app .world-feature-page .student-activities :is(.reflection-box, .thank-you-box, .reflection-form-box) {
+  padding: var(--world-space-4);
+}
+
+.student-app .world-feature-page .student-activities .review-card,
+.student-app .world-feature-page .student-activities .sent-message {
+  margin: var(--world-space-3) 0;
+  padding: var(--world-space-4);
+}
+
 .student-app .world-feature-page .student-conversations .kakao-chat-room {
   border: 2px solid var(--world-wood-border);
   border-radius: var(--world-radius);
@@ -46,4 +135,8 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .student-app .world-feature-page .student-activities .student-next-mission { padding: var(--world-space-4); }
+}
+
+@media (max-width: 480px) {
+  .student-app .world-feature-page .student-activities .student-stat-grid { grid-template-columns: 1fr; }
 }

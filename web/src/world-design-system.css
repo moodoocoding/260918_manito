@@ -127,7 +127,8 @@
 .world-choice-card > .world-pixel-icon { width: 144px; height: 144px; flex-basis: 144px; }
 .world-demo-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
 .world-demo-grid > :last-child:nth-child(odd) { grid-column: 1/-1; }
-.world-feature-page .panel { border-radius: var(--world-radius); border-color: var(--world-gold-border); background: var(--world-card); box-shadow: 2px 3px 0 #9b835940; }
+.world-feature-page .panel,
+.student-app .world-feature-page .world-paper .panel { border-radius: var(--world-radius); border-color: var(--world-gold-border); background: var(--world-card); box-shadow: 2px 3px 0 #9b835940; }
 .student-app .world-feature-page .student-nav { margin: 0; grid-template-columns: repeat(6,minmax(0,1fr)); border-radius: var(--world-radius); }
 .student-app .world-feature-page .student-nav a { border: 1px solid var(--world-gold-border); border-radius: var(--world-radius); background: var(--world-card); color: var(--world-ink); }
 .student-app .world-feature-page .student-nav a[aria-current="page"] { background: var(--world-forest); border-color: var(--world-forest-border); color: var(--world-card); }

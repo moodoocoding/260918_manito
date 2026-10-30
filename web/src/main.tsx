@@ -129,6 +129,7 @@ function App() {
   const [historyError, setHistoryError] = useState("");
   const [historyReload, setHistoryReload] = useState(0);
   const [studentRefreshVersion, setStudentRefreshVersion] = useState(0);
+  const [studentRoundPending, setStudentRoundPending] = useState(false);
   const [openHistoryRoundId, setOpenHistoryRoundId] = useState<string | null>(null);
   const [classCodeInput, setClassCodeInput] = useState("");
   const [cardCodeInput, setCardCodeInput] = useState("");
@@ -160,6 +161,7 @@ function App() {
   const classesRef = useRef<ClassItem[]>([]);
   const classSelectVersion = useRef(0);
   const studentRoundId = useRef<string | null>(null);
+  const studentRoundBusy = useRef(false);
   const studentMailDraft = useRef<StudentMailDraft>(emptyStudentMailDraft());
   const teacherMailboxDraft = useRef<TeacherMailboxDraft>(emptyTeacherMailboxDraft());
   const teacherMailboxBusy = useRef(false);
@@ -173,6 +175,7 @@ function App() {
   const cardReadVersion = useRef(0);
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
+  const activeStudentGeneration = generation.current;
   const teacherClassTitle = useRef<HTMLHeadingElement | null>(null);
   const teacherCreateToggle = useRef<HTMLButtonElement | null>(null);
   const focusStudentTitleAfterNavigation = useRef(false);
@@ -199,6 +202,14 @@ function App() {
   }, [studentPage]);
 
   useEffect(() => {
+    const backButton = document.querySelector<HTMLButtonElement>(".world-page-back");
+    if (!backButton || role !== "student") return;
+    if (studentRoundPending) backButton.setAttribute("aria-disabled", "true");
+    else backButton.removeAttribute("aria-disabled");
+    return () => backButton.removeAttribute("aria-disabled");
+  }, [role, studentPage, studentRoundPending]);
+
+  useEffect(() => {
     if (!isTeacherRoomPreview && route === "teacher" && role === "none") prepareTeacherAuth();
   }, [route, role]);
 
@@ -213,6 +224,8 @@ function App() {
     setHistoryRounds([]); setHistoryLoading(false); setHistoryError(""); setOpenHistoryRoundId(null);
     studentRoundId.current = null; setStudentMissionUi({filter:"all",category:"전체",limit:8});
     studentMailDraft.current = emptyStudentMailDraft();
+    studentRoundBusy.current = false;
+    setStudentRoundPending(false);
     teacherMailboxDraft.current = emptyTeacherMailboxDraft();
     teacherMailboxBusy.current = false;
     studentWorldPosition.current = 8;
@@ -336,6 +349,11 @@ function App() {
     };
     const onPop = () => {
       const path = window.location.pathname;
+      if (studentRoundBusy.current) {
+        history.pushState(null, "", studentPageRef.current === "today" ? "/student" : `/student/${studentPageRef.current}`);
+        setNotice("저장 중이에요. 저장이 끝나면 화면을 이동할 수 있어요.");
+        return;
+      }
       const hasFriendMailDraft = Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim());
       if (studentPageRef.current === "friend-mail" && path !== "/student/friend-mail" && hasFriendMailDraft
         && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) {
@@ -421,7 +439,7 @@ function App() {
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       const hasFriendMailDraft = Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim());
-      if (roundDirty.current || teacherMailboxBusy.current || isTeacherMailboxDraftDirty(teacherMailboxDraft.current) || hasFriendMailDraft) { event.preventDefault(); event.returnValue = ""; }
+      if (roundDirty.current || studentRoundBusy.current || teacherMailboxBusy.current || isTeacherMailboxDraftDirty(teacherMailboxDraft.current) || hasFriendMailDraft) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
@@ -489,6 +507,10 @@ function App() {
 
   function openStudentPage(page: StudentPage) {
     if (studentPage === page) return;
+    if (studentRoundBusy.current) {
+      setNotice("저장 중이에요. 저장이 끝나면 화면을 이동할 수 있어요.");
+      return;
+    }
     if (studentPage === "mail" && page !== "mail") {
       if (teacherMailboxBusy.current) return;
       if (isTeacherMailboxDraftDirty(teacherMailboxDraft.current)
@@ -967,9 +989,10 @@ function App() {
           }}>
           {studentFrame && (manittoServicePages.includes(studentPage)
             ? <nav className="student-nav manitto-student-nav segmented-track" aria-label="마니또 메뉴">{([{id:"manitto",label:"활동 홈"},{id:"missions",label:"미션"},{id:"friend-mail",label:"친구 쪽지"},{id:"help",label:"도움"},{id:"history",label:"지난 활동"}] as const).map((item) =>
-              <a key={item.id} href={`/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
+              <a key={item.id} href={`/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} aria-disabled={studentRoundPending || undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
             : <nav className="student-nav segmented-track" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"비밀 우체통"},{id:"friend-mail",label:"친구 쪽지"},{id:"community",label:"우리 반"},{id:"help",label:"도움"}] as const).map((item) =>
-              <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>)}
+              <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} aria-disabled={studentRoundPending || undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>)}
+          {studentRoundPending && <p className="field-help" role="status">저장 중이에요. 저장이 끝나면 메뉴나 뒤로 이동을 사용할 수 있어요. 활동 마치기는 언제든 할 수 있어요.</p>}
           {studentPage === "today" && <StudentClassroom className={home?.className || "우리 반"} onNavigate={openStudentPage}
             initialPosition={studentWorldPosition.current} onPositionChange={(position) => { studentWorldPosition.current = position; }} onExit={() => { void exit(); }} />}
           {studentPage === "today-tasks" && <StudentTodayTasks client={schooldocMissionsClient} autoConnect authorize={async () => {
@@ -986,9 +1009,9 @@ function App() {
           }} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} onHelp={() => openStudentPage("help")} />}
           {isExpansionSpaceId(studentPage) && <StudentExpansionSpace spaceId={studentPage} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} />}
           {studentPage === "manitto" && <>{home?.round
-            ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onNavigate={(view) => openStudentPage(view === "mail" ? "friend-mail" : view)} />
+            ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onBusyChange={(busy) => { if (generation.current === activeStudentGeneration) { studentRoundBusy.current = busy; setStudentRoundPending(busy); } }} onNavigate={(view) => openStudentPage(view === "mail" ? "friend-mail" : view)} />
             : <section className="world-section manitto-empty-state"><h2>지금 진행 중인 활동이 없어요</h2><p>마니또 회차가 준비되면 이곳에서 미션과 친구 쪽지를 이용할 수 있어요. 다른 학급 서비스는 계속 이용할 수 있어요.</p><WorldButton variant="secondary" onClick={() => openStudentPage("history")}>지난 활동 보기</WorldButton></section>}</>}
-          {studentPage === "missions" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="world-section"><h2>지금 진행 중인 활동이 없어요</h2><p>미션은 마니또 회차가 시작되면 이곳에서 확인할 수 있어요.</p></section>}</>}
+          {studentPage === "missions" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onBusyChange={(busy) => { if (generation.current === activeStudentGeneration) { studentRoundBusy.current = busy; setStudentRoundPending(busy); } }} /> : <section className="world-section"><h2>지금 진행 중인 활동이 없어요</h2><p>미션은 마니또 회차가 시작되면 이곳에서 확인할 수 있어요.</p></section>}</>}
           {studentPage === "mail" && (teacherMailServerReady ? <StudentTeacherMailbox draftRef={teacherMailboxDraft} onSubmit={async (input) => {
             const current = generation.current;
             try { return await call<CreateTeacherMailInput, CreateTeacherMailResult>("createTeacherMail", input); }
@@ -1001,9 +1024,9 @@ function App() {
               throw caught;
             }
           }} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} onBusyChange={(value) => { teacherMailboxBusy.current = value; }} /> : <StudentTeacherMailboxPending onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} />)}
-          {studentPage === "friend-mail" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="world-section"><h2>친구 쪽지가 아직 열리지 않았어요</h2><p>진행 중인 마니또 활동이 시작되면 친구와 쪽지를 주고받을 수 있어요. 지난 쪽지는 지난 활동에서 볼 수 있어요.</p><WorldButton variant="secondary" onClick={() => openStudentPage("history")}>지난 활동 보기</WorldButton></section>}</>}
+          {studentPage === "friend-mail" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onBusyChange={(busy) => { if (generation.current === activeStudentGeneration) { studentRoundBusy.current = busy; setStudentRoundPending(busy); } }} /> : <section className="world-section"><h2>친구 쪽지가 아직 열리지 않았어요</h2><p>진행 중인 마니또 활동이 시작되면 친구와 쪽지를 주고받을 수 있어요. 지난 쪽지는 지난 활동에서 볼 수 있어요.</p><WorldButton variant="secondary" onClick={() => openStudentPage("history")}>지난 활동 보기</WorldButton></section>}</>}
           {studentPage === "community" && <StudentCommunity roundId={home?.round?.roundId} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} classLabel={home?.className} />}
-          {studentPage === "help" && <>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
+          {studentPage === "help" && <>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onBusyChange={(busy) => { if (generation.current === activeStudentGeneration) { studentRoundBusy.current = busy; setStudentRoundPending(busy); } }} />}
             <StudentRights /></>}
           {studentPage === "history" && <><section className="world-section"><div className="panel-section-head"><h2>공개된 활동</h2><p className="field-help">예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p></div>{historyLoading && <p role="status">지난 활동을 불러오는 중이에요…</p>}{historyError && <div className="world-state world-state--error" role="alert">{historyError}<div><WorldButton variant="secondary" onClick={() => setHistoryReload((version) => version + 1)}>다시 불러오기</WorldButton></div></div>}{!historyLoading && !historyError && (historyRounds.length === 0 ? <p className="muted">아직 공개된 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>)}</section>
             {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}</>}

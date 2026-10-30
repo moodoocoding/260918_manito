@@ -376,8 +376,10 @@ export function StudentMail({roundId, data, busy, run, setNotice, draftRef, feed
               <span className="plus-icon">+</span>
             </button>
             <div className="kakao-input-field">
+              <label className="kakao-input-label" htmlFor="student-message-text">쪽지 내용</label>
               <textarea
                 ref={textareaRef}
+                id="student-message-text"
                 className="kakao-textarea"
                 placeholder={section === "caredFor" ? "따뜻한 쪽지를 보내보세요 (+ 버튼으로 추천 문구 선택)" : "친구에게 보낼 답장을 적어보세요..."}
                 rows={1}
