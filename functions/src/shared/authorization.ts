@@ -10,6 +10,9 @@ export async function ensureVerifiedTeacherAccount(
   if (!uid || request.auth?.token.role === "student") {
     throw new HttpsError("unauthenticated", "교사 로그인이 필요해요.");
   }
+  if (request.auth?.token.firebase?.sign_in_provider !== "google.com") {
+    throw new HttpsError("permission-denied", "Google 계정으로 로그인한 교사만 이용할 수 있어요.");
+  }
 
   const teacherRef = db.doc(`teachers/${uid}`);
   const teacher = await teacherRef.get();

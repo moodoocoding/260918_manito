@@ -1,0 +1,390 @@
+{
+  "project": "manito-938cc",
+  "existingFunctionsUnchanged": 59,
+  "addedFunctions": [
+    "getStudentBalanceGame",
+    "retryStudentBalanceMatching",
+    "submitBalanceGameChoices"
+  ],
+  "runtime": "nodejs22",
+  "secretBinding": "GEMINI_API_KEY version 1 (two functions)",
+  "rulesMatchRepository": true,
+  "unauthenticatedRequests": [
+    {
+      "function": "getStudentBalanceGame",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "function": "retryStudentBalanceMatching",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "function": "submitBalanceGameChoices",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    }
+  ],
+  "realStudentOrGeminiCall": false,
+  "previousRuleset": "projects/manito-938cc/rulesets/d8cfc015-487b-4caf-8410-1ea92a821e93",
+  "deployedRuleset": "projects/manito-938cc/rulesets/d89b17d5-5a85-406b-a271-b5b37322a6c7",
+  "existingRuleLinesChangedOrRemoved": 0,
+  "rulesLinesAdded": 30,
+  "existingFunctionEvidence": [
+    {
+      "name": "changeRoundStatus",
+      "updateTime": "2026-09-27T15:47:10.553547363Z",
+      "revision": "changeroundstatus-00003-zuz",
+      "unchanged": true
+    },
+    {
+      "name": "copyRoundSettings",
+      "updateTime": "2026-09-27T15:47:04.415027560Z",
+      "revision": "copyroundsettings-00003-yax",
+      "unchanged": true
+    },
+    {
+      "name": "createClass",
+      "updateTime": "2026-09-29T16:34:12.858859728Z",
+      "revision": "createclass-00008-fih",
+      "unchanged": true
+    },
+    {
+      "name": "createCustomMission",
+      "updateTime": "2026-09-27T15:46:56.065813989Z",
+      "revision": "createcustommission-00001-zok",
+      "unchanged": true
+    },
+    {
+      "name": "createHelpRequest",
+      "updateTime": "2026-09-27T15:47:09.081631722Z",
+      "revision": "createhelprequest-00003-fef",
+      "unchanged": true
+    },
+    {
+      "name": "createRightsRequest",
+      "updateTime": "2026-09-27T15:46:56.377281468Z",
+      "revision": "createrightsrequest-00002-xol",
+      "unchanged": true
+    },
+    {
+      "name": "createRound",
+      "updateTime": "2026-09-27T16:39:29.905413641Z",
+      "revision": "createround-00005-gic",
+      "unchanged": true
+    },
+    {
+      "name": "deleteClassData",
+      "updateTime": "2026-09-27T15:47:59.210111959Z",
+      "revision": "deleteclassdata-00003-kot",
+      "unchanged": true
+    },
+    {
+      "name": "deleteCustomMission",
+      "updateTime": "2026-09-29T16:06:37.975794170Z",
+      "revision": "deletecustommission-00001-puh",
+      "unchanged": true
+    },
+    {
+      "name": "deleteRound",
+      "updateTime": "2026-09-29T15:43:14.275167308Z",
+      "revision": "deleteround-00001-rab",
+      "unchanged": true
+    },
+    {
+      "name": "extendRound",
+      "updateTime": "2026-09-27T15:47:08.281900730Z",
+      "revision": "extendround-00003-jor",
+      "unchanged": true
+    },
+    {
+      "name": "getAssignmentsForTeacher",
+      "updateTime": "2026-09-28T02:04:07.609460652Z",
+      "revision": "getassignmentsforteacher-00004-fom",
+      "unchanged": true
+    },
+    {
+      "name": "getClassAccessInfo",
+      "updateTime": "2026-09-27T15:46:53.142642184Z",
+      "revision": "getclassaccessinfo-00005-jut",
+      "unchanged": true
+    },
+    {
+      "name": "getMessageForReview",
+      "updateTime": "2026-09-27T15:46:59.750006198Z",
+      "revision": "getmessageforreview-00002-doj",
+      "unchanged": true
+    },
+    {
+      "name": "getMissionCatalog",
+      "updateTime": "2026-09-27T15:49:43.215855480Z",
+      "revision": "getmissioncatalog-00004-red",
+      "unchanged": true
+    },
+    {
+      "name": "getPrintableCards",
+      "updateTime": "2026-09-29T16:34:18.198402285Z",
+      "revision": "getprintablecards-00004-tol",
+      "unchanged": true
+    },
+    {
+      "name": "getRightsRequestsForTeacher",
+      "updateTime": "2026-09-27T15:46:59.470994937Z",
+      "revision": "getrightsrequestsforteacher-00002-lug",
+      "unchanged": true
+    },
+    {
+      "name": "getRoundReflectionsForTeacher",
+      "updateTime": "2026-09-29T16:06:41.074375187Z",
+      "revision": "getroundreflectionsforteacher-00001-biw",
+      "unchanged": true
+    },
+    {
+      "name": "getRoundSettingsForTeacher",
+      "updateTime": "2026-09-27T15:47:02.182144432Z",
+      "revision": "getroundsettingsforteacher-00003-xac",
+      "unchanged": true
+    },
+    {
+      "name": "getStudentActivity",
+      "updateTime": "2026-09-30T02:53:26.928982728Z",
+      "revision": "getstudentactivity-00011-yuv",
+      "unchanged": true
+    },
+    {
+      "name": "getStudentCommunity",
+      "updateTime": "2026-09-27T23:16:57.229842880Z",
+      "revision": "getstudentcommunity-00001-voq",
+      "unchanged": true
+    },
+    {
+      "name": "getStudentHome",
+      "updateTime": "2026-09-27T17:03:49.131379873Z",
+      "revision": "getstudenthome-00007-jej",
+      "unchanged": true
+    },
+    {
+      "name": "getTeacherCommunity",
+      "updateTime": "2026-09-27T23:17:06.293597595Z",
+      "revision": "getteachercommunity-00001-kil",
+      "unchanged": true
+    },
+    {
+      "name": "getTeacherRoundOverview",
+      "updateTime": "2026-09-27T15:47:00.810603359Z",
+      "revision": "getteacherroundoverview-00004-pef",
+      "unchanged": true
+    },
+    {
+      "name": "getTeacherStatus",
+      "updateTime": "2026-09-29T01:25:57.486374064Z",
+      "revision": "getteacherstatus-00006-tef",
+      "unchanged": true
+    },
+    {
+      "name": "getTeacherStudentDetail",
+      "updateTime": "2026-09-28T03:05:13.114199237Z",
+      "revision": "getteacherstudentdetail-00001-cag",
+      "unchanged": true
+    },
+    {
+      "name": "getTeacherStudentStatus",
+      "updateTime": "2026-09-28T03:05:13.724140026Z",
+      "revision": "getteacherstudentstatus-00001-jev",
+      "unchanged": true
+    },
+    {
+      "name": "hideMessage",
+      "updateTime": "2026-09-27T15:47:02.183285622Z",
+      "revision": "hidemessage-00003-quv",
+      "unchanged": true
+    },
+    {
+      "name": "listClasses",
+      "updateTime": "2026-09-29T15:19:03.548801257Z",
+      "revision": "listclasses-00007-wix",
+      "unchanged": true
+    },
+    {
+      "name": "listMyRightsRequests",
+      "updateTime": "2026-09-27T15:47:00.926345515Z",
+      "revision": "listmyrightsrequests-00002-tev",
+      "unchanged": true
+    },
+    {
+      "name": "listRounds",
+      "updateTime": "2026-09-27T15:47:02.427470577Z",
+      "revision": "listrounds-00003-kaz",
+      "unchanged": true
+    },
+    {
+      "name": "listStudentRounds",
+      "updateTime": "2026-09-27T15:46:52.167815190Z",
+      "revision": "liststudentrounds-00002-kiv",
+      "unchanged": true
+    },
+    {
+      "name": "listTeacherMessages",
+      "updateTime": "2026-09-27T15:46:52.451214633Z",
+      "revision": "listteachermessages-00001-lah",
+      "unchanged": true
+    },
+    {
+      "name": "loginStudent",
+      "updateTime": "2026-09-29T16:34:19.672051724Z",
+      "revision": "loginstudent-00007-kof",
+      "unchanged": true
+    },
+    {
+      "name": "moderateMessage",
+      "updateTime": "2026-09-27T15:46:52.403687716Z",
+      "revision": "moderatemessage-00001-nod",
+      "unchanged": true
+    },
+    {
+      "name": "prepareRound",
+      "updateTime": "2026-09-27T16:39:36.391720872Z",
+      "revision": "prepareround-00004-poh",
+      "unchanged": true
+    },
+    {
+      "name": "reactToMessage",
+      "updateTime": "2026-09-29T23:37:50.181810241Z",
+      "revision": "reacttomessage-00003-mas",
+      "unchanged": true
+    },
+    {
+      "name": "registerStudents",
+      "updateTime": "2026-09-29T16:34:18.990058200Z",
+      "revision": "registerstudents-00008-kad",
+      "unchanged": true
+    },
+    {
+      "name": "reissueMissingCards",
+      "updateTime": "2026-09-29T16:34:17.832459760Z",
+      "revision": "reissuemissingcards-00004-cad",
+      "unchanged": true
+    },
+    {
+      "name": "reissueStudentCards",
+      "updateTime": "2026-09-29T23:47:07.858214066Z",
+      "revision": "reissuestudentcards-00001-rip",
+      "unchanged": true
+    },
+    {
+      "name": "removeStudentMember",
+      "updateTime": "2026-09-29T16:06:38.488584658Z",
+      "revision": "removestudentmember-00001-jos",
+      "unchanged": true
+    },
+    {
+      "name": "replaceMission",
+      "updateTime": "2026-09-27T22:40:16.073813905Z",
+      "revision": "replacemission-00006-yok",
+      "unchanged": true
+    },
+    {
+      "name": "resolveHelpRequest",
+      "updateTime": "2026-09-27T15:46:54.208739212Z",
+      "revision": "resolvehelprequest-00003-zeq",
+      "unchanged": true
+    },
+    {
+      "name": "revealRound",
+      "updateTime": "2026-09-27T17:06:13.586039236Z",
+      "revision": "revealround-00004-wim",
+      "unchanged": true
+    },
+    {
+      "name": "reviewMessage",
+      "updateTime": "2026-09-27T15:47:10.890724559Z",
+      "revision": "reviewmessage-00003-wok",
+      "unchanged": true
+    },
+    {
+      "name": "rotateStudentCredential",
+      "updateTime": "2026-09-29T16:34:21.246476367Z",
+      "revision": "rotatestudentcredential-00008-ped",
+      "unchanged": true
+    },
+    {
+      "name": "saveReflection",
+      "updateTime": "2026-09-27T15:47:02.727008124Z",
+      "revision": "savereflection-00003-zeq",
+      "unchanged": true
+    },
+    {
+      "name": "sendMessage",
+      "updateTime": "2026-09-27T15:47:01.692671051Z",
+      "revision": "sendmessage-00003-vis",
+      "unchanged": true
+    },
+    {
+      "name": "sendThankYou",
+      "updateTime": "2026-09-27T15:47:04.565906416Z",
+      "revision": "sendthankyou-00004-get",
+      "unchanged": true
+    },
+    {
+      "name": "setMissionStatus",
+      "updateTime": "2026-09-27T22:40:15.486376686Z",
+      "revision": "setmissionstatus-00005-sim",
+      "unchanged": true
+    },
+    {
+      "name": "setStudentAccess",
+      "updateTime": "2026-09-27T15:47:06.226512064Z",
+      "revision": "setstudentaccess-00005-rux",
+      "unchanged": true
+    },
+    {
+      "name": "setStudentMissionFocus",
+      "updateTime": "2026-09-27T22:40:09.465020040Z",
+      "revision": "setstudentmissionfocus-00001-wiy",
+      "unchanged": true
+    },
+    {
+      "name": "startRound",
+      "updateTime": "2026-09-30T02:53:26.930961797Z",
+      "revision": "startround-00008-vun",
+      "unchanged": true
+    },
+    {
+      "name": "stopRoundParticipation",
+      "updateTime": "2026-09-27T15:47:09.492039423Z",
+      "revision": "stoproundparticipation-00003-qog",
+      "unchanged": true
+    },
+    {
+      "name": "updateClassInfo",
+      "updateTime": "2026-09-29T16:34:19.742199195Z",
+      "revision": "updateclassinfo-00002-tap",
+      "unchanged": true
+    },
+    {
+      "name": "updateCustomMission",
+      "updateTime": "2026-09-29T16:06:37.708229562Z",
+      "revision": "updatecustommission-00001-diz",
+      "unchanged": true
+    },
+    {
+      "name": "updateRound",
+      "updateTime": "2026-09-27T16:39:35.795472778Z",
+      "revision": "updateround-00005-noz",
+      "unchanged": true
+    },
+    {
+      "name": "updateRoundCommunity",
+      "updateTime": "2026-09-27T23:17:05.292642660Z",
+      "revision": "updateroundcommunity-00001-jeh",
+      "unchanged": true
+    },
+    {
+      "name": "updateStudentName",
+      "updateTime": "2026-09-29T16:06:38.690736268Z",
+      "revision": "updatestudentname-00001-han",
+      "unchanged": true
+    }
+  ]
+}

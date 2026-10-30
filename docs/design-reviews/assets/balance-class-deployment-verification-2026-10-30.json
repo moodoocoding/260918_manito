@@ -1,0 +1,47 @@
+{
+  "project": "manito-938cc",
+  "functionCount": 62,
+  "existingFunctionsUnchanged": 59,
+  "updatedFunctions": [
+    {
+      "name": "getStudentBalanceGame",
+      "runtime": "nodejs22",
+      "revision": "getstudentbalancegame-00002-col",
+      "state": "ACTIVE"
+    },
+    {
+      "name": "retryStudentBalanceMatching",
+      "runtime": "nodejs22",
+      "revision": "retrystudentbalancematching-00002-kog",
+      "state": "ACTIVE"
+    },
+    {
+      "name": "submitBalanceGameChoices",
+      "runtime": "nodejs22",
+      "revision": "submitbalancegamechoices-00002-hic",
+      "state": "ACTIVE"
+    }
+  ],
+  "stagedRulesMatchDeployed": true,
+  "teacherGooglePolicyNotIncluded": true,
+  "secretBinding": "existing GEMINI_API_KEY version 1, two functions",
+  "unauthenticatedRequests": [
+    {
+      "function": "getStudentBalanceGame",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "function": "retryStudentBalanceMatching",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "function": "submitBalanceGameChoices",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    }
+  ],
+  "realStudentSubmission": false,
+  "realGeminiCall": false
+}

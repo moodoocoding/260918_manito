@@ -33,7 +33,7 @@ export const createClass = onCall(
       throw new HttpsError("invalid-argument", "학급 코드는 4~12자의 영문 대소문자 또는 숫자여야 해요.");
     }
     const classCode = isCustom ? requestedCode : generateClassCode();
-    const fingerprint = inputFingerprint({ name, schoolYear, gradeBand, classCode });
+    const fingerprint = inputFingerprint({ name, schoolYear, gradeBand, classCode: requestedCode });
 
     const commandRef = db.doc(`teacherCommands/${teacherUid}_${requestId}`);
     const existingCommand = await commandRef.get();

@@ -1,0 +1,62 @@
+.raster-world { gap: 14px; }
+.raster-world .classroom-heading { align-items: center; gap: 16px; padding: 0; }
+.raster-world .classroom-heading > div:first-child { gap: 4px; min-width: 0; max-width: 100%; }
+.raster-world .classroom-heading h1 { margin: 0; font-size: 1.65rem; line-height: 1.2; }
+.raster-world .classroom-heading p { margin: 0; font-size: .88rem; }
+.raster-world .classroom-heading .context-badge { max-width: 100%; padding: 4px 9px; font-size: .72rem; white-space: normal; overflow-wrap: anywhere; }
+.raster-world .classroom-map { border: 3px solid #375540; border-radius: 4px; background: #f7f1d7; box-shadow: 0 6px 0 #78946d; }
+.raster-world .classroom-map-topline span:last-child { color: #e1eac7; font-weight: 600; }
+.raster-world .classroom-world-viewport { scroll-behavior: smooth; scrollbar-color: #728c59 #dfdfb6; background: #79cdd8; }
+.raster-world .classroom-scene { width: 200%; min-width: 0; height: auto; min-height: 0; aspect-ratio: 4 / 1; isolation: isolate; background: #80ced9; }
+.raster-world .classroom-scene:focus-visible { outline: 4px solid #193e64; outline-offset: -5px; box-shadow: inset 0 0 0 8px #fff0a3; }
+.raster-world .world-town-image { position: absolute; inset: 0 auto 0 0; z-index: 0; display: block; width: 50%; height: 100%; object-fit: fill; image-rendering: pixelated; pointer-events: none; user-select: none; }
+.raster-world .world-town-image--east { left: 50%; }
+.raster-world .world-landmarks { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.raster-world .world-landmark { position: absolute; display: grid; align-content: center; gap: 2px; width: clamp(145px, 8.3%, 188px); min-height: 58px; margin: 0; padding: 9px 22px 9px 12px; transform: translate(-50%, -100%); border: 2px solid #6a4c2f; border-radius: 3px; background: #fff3ca; color: #382d1e; box-shadow: 3px 4px 0 #493c2b99, inset 0 0 0 2px #e7ca8d; text-align: left; line-height: 1.3; pointer-events: auto; transition: background-color .15s, box-shadow .15s; }
+.raster-world .world-landmark::after { position: absolute; content: ""; left: calc(50% - 6px); bottom: -10px; width: 12px; height: 12px; border-right: 2px solid #6a4c2f; border-bottom: 2px solid #6a4c2f; background: #f9e7b0; transform: rotate(45deg); }
+.raster-world .world-landmark strong { font-size: .88rem; font-weight: 900; }
+.raster-world .world-landmark small { color: #655238; font-size: .66rem; font-weight: 600; line-height: 1.4; }
+.raster-world .world-landmark-arrow { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #73562c; font-size: 1.3rem; }
+.raster-world .world-landmark.is-near { border-color: #6b4b1b; background: #ffe38b; box-shadow: 0 0 0 3px #fff5a866, 3px 4px 0 #493c2b99, inset 0 0 0 2px #e8bb5e; }
+.raster-world .world-landmark:hover { background: #fff8dd; color: #382d1e; box-shadow: 0 0 0 3px #fff8b9, 3px 4px 0 #493c2b99; }
+.raster-world .world-landmark:active { transform: translate(-50%, -100%); }
+.raster-world .world-landmark:focus-visible { outline: 4px solid #1f4f87; outline-offset: 4px; }
+@supports (container-type: size) {
+  .raster-world .classroom-scene { container-type: size; }
+  .raster-world .world-landmark,
+  .raster-world .world-landmark:active { transform: translate(-50%, max(-100%, calc(.25rem - var(--world-sign-y) * 1cqh))); }
+}
+.raster-world .world-avatar { --avatar-height: clamp(98px, 12vw, 136px); --avatar-facing: 1; position: absolute; z-index: 3; bottom: 16%; width: calc(var(--avatar-height) * .57); height: var(--avatar-height); transform: translateX(-50%); pointer-events: none; }
+.raster-world .world-avatar.faces-left { --avatar-facing: -1; }
+.raster-world .world-avatar-image { position: absolute; left: 50%; top: 0; width: auto; height: 100%; max-width: none; transform: translateX(-50%) scaleX(var(--avatar-facing)); image-rendering: pixelated; filter: drop-shadow(1px 2px 0 #2d462e55); }
+.raster-world .world-avatar-shadow { position: absolute; width: 65%; height: 7px; left: 17.5%; bottom: 4%; background: #334b2c55; border-radius: 50%; }
+.raster-world .world-avatar-name { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 1px 7px; border: 1px solid #605031; background: #fff9df; color: #3f452e; font-size: .65rem; font-weight: 850; box-shadow: 1px 2px 0 #30472966; }
+.raster-world .world-avatar.is-walking .world-avatar-image { animation: world-sprite-step .17s steps(2, end) infinite; }
+@keyframes world-sprite-step { 0%,100% { transform: translateX(-50%) translateY(0) scaleX(var(--avatar-facing)); } 50% { transform: translateX(-50%) translateY(-3px) scaleX(var(--avatar-facing)); } }
+.raster-world .world-travel-bar { display: flex; align-items: center; gap: 14px; padding: 12px 15px; border-top: 2px solid #617f4c; background: #f5f0d5; }
+.raster-world .world-arrival { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.raster-world .world-arrival-dot { flex: 0 0 10px; width: 10px; height: 10px; border: 2px solid #51652e; background: #bad47b; box-shadow: 1px 1px 0 #e9f0c2; }
+.raster-world .world-arrival strong { display: block; color: #334c34; font-size: .87rem; }
+.raster-world .world-arrival p { margin: 3px 0 0; color: #59674a; font-size: .7rem; line-height: 1.4; }
+.raster-world .world-enter { display: inline-flex; align-items: center; justify-content: center; gap: 14px; flex: 0 0 auto; min-height: 48px; padding: 9px 16px; border: 2px solid #775322; border-radius: 3px; background: #efbd54; color: #3f321b; box-shadow: 2px 3px 0 #aa8642; font-size: .85rem; font-weight: 850; }
+.raster-world .world-enter:hover { background: #ffdc7d; color: #3f321b; }
+.raster-world .world-enter:disabled { opacity: .5; box-shadow: none; }
+.raster-world .world-objects { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.raster-world .world-object { position: absolute; display: block; min-height: 0; margin: 0; padding: 0; border: 2px solid transparent; border-radius: 8px; background: transparent; box-shadow: none; pointer-events: auto; transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.raster-world .world-object:hover { transform: none; border-color: #fff0a9; background: #fff4a31c; box-shadow: 0 0 12px #ffe78877; }
+.raster-world .world-object.is-interactive { border-color: #fff0a9b3; background: #fff6b412; box-shadow: 0 0 9px #ffe78888; }
+.raster-world .world-object-hint { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 95%; padding: 5px 8px; border: 1px solid #705b30; border-radius: 3px; background: #fff4cc; color: #3e3826; font-size: .66rem; font-weight: 800; opacity: 0; pointer-events: none; }
+.raster-world .world-object:hover .world-object-hint { opacity: 1; }
+.raster-world .classroom-scene { cursor: crosshair; }
+.raster-world .world-landmark, .raster-world .world-object { cursor: pointer; }
+.raster-world .classroom-dpad { display: grid; grid-template-columns: repeat(2, 48px); gap: 6px; flex: 0 0 auto; }
+.raster-world .classroom-dpad button { min-height: 48px; border: 2px solid #7b7955; border-radius: 3px; background: #fff9df; color: #3f543b; box-shadow: 1px 2px 0 #bdc599; }
+.raster-world .classroom-access-note { margin: 0; padding: 0 15px 11px; color: #6c7255; font-size: .68rem; line-height: 1.45; }
+@media (max-width: 900px) { .raster-world .world-landmark { width: 154px; padding-inline: 10px 20px; } .raster-world .world-landmark strong { font-size: .8rem; } .raster-world .world-landmark small { font-size: .61rem; } }
+@media (max-width: 700px) { .raster-world .classroom-heading { align-items: flex-start; flex-direction: row; flex-wrap: wrap; gap: 10px; } .raster-world .classroom-heading h1 { font-size: 1.4rem; } .raster-world .classroom-heading p { font-size: .8rem; } .raster-world .classroom-scene { width: 200%; min-width: 0; height: auto; aspect-ratio: 4 / 1; } .raster-world .world-landmark { width: clamp(72px, 10%, 110px); min-height: 48px; padding: 6px 12px 6px 6px; } .raster-world .world-landmark strong { font-size: .7rem; } .raster-world .world-landmark small { display: none; } .raster-world .world-avatar { --avatar-height: clamp(48px, 14vw, 90px); } .raster-world .world-travel-bar { flex-wrap: wrap; gap: 10px; padding: 12px; } .raster-world .world-arrival { flex-basis: calc(100% - 2px); } .raster-world .world-enter { flex: 1; } .raster-world .classroom-dpad { margin-left: auto; } }
+.raster-world .world-building-status { display: block; margin-top: 2px; color: #75805a; font-size: .58rem; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .raster-world .world-avatar { transition: none; } .raster-world .world-avatar.is-walking .world-avatar-image { animation: none; } .raster-world .classroom-world-viewport { scroll-behavior: auto; } }
+
+
+.raster-world .world-session-actions { display: flex; justify-content: flex-end; padding: 0 15px 12px; }
+.raster-world .world-session-actions button { min-height: 48px; }

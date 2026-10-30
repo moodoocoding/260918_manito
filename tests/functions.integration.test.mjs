@@ -12,6 +12,7 @@ import {
 } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getDoc, getFirestore, setDoc } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
+import { signInEmulatorGoogle } from "../scripts/emulator-google-auth.mjs";
 
 const projectId = "demo-manitto";
 const region = "asia-northeast3";
@@ -76,14 +77,9 @@ before(async () => {
   connectFirestoreEmulator(getFirestore(teacherApp), "127.0.0.1", firestorePort);
   connectFirestoreEmulator(getFirestore(studentApp), "127.0.0.1", firestorePort);
 
-  const teacherToken = await adminAuth.createCustomToken(teacherUid, {
-    role: "teacher",
-    teacherVerified: true,
-  });
-  await signInWithCustomToken(teacherAuth, teacherToken);
-  await signInWithCustomToken(otherTeacherAuth, await adminAuth.createCustomToken(otherTeacherUid, {
-    role: "teacher", teacherVerified: true,
-  }));
+  await signInEmulatorGoogle(teacherAuth, adminAuth, teacherUid);
+  await signInEmulatorGoogle(otherTeacherAuth, adminAuth, otherTeacherUid);
+  assert.equal((await teacherAuth.currentUser.getIdTokenResult()).signInProvider, "google.com");
 });
 
 after(async () => {
@@ -97,18 +93,20 @@ after(async () => {
 
 test("teacher creates a class, registers students, and rotates a student card", async () => {
   const createClass = httpsCallable(teacherFunctions, "createClass");
-  const classResponse = await createClass({
+  const createInput = {
     name: "별빛반",
     schoolYear: new Date().getUTCFullYear(),
     gradeBand: "middle",
     requestId: "class_req_001",
-  });
+  };
+  const [classResponse, concurrentClassResponse] = await Promise.all([createClass(createInput), createClass(createInput)]);
+  assert.deepEqual(concurrentClassResponse.data, classResponse.data);
   const { classId, classCode } = classResponse.data;
   const classInfo = await httpsCallable(teacherFunctions, "getClassAccessInfo")({ classId });
   assert.equal(classInfo.data.classCode, classCode);
   assert.equal((await httpsCallable(teacherFunctions, "listClasses")()).data.classes.length, 1);
   assert.match(classId, /^[A-Za-z0-9_-]{10,}$/);
-  assert.match(classCode, /^[A-Z2-9]{8}$/);
+  assert.match(classCode, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
   const repeatedClassResponse = await createClass({
     name: "별빛반",
     schoolYear: new Date().getUTCFullYear(),
@@ -133,7 +131,7 @@ test("teacher creates a class, registers students, and rotates a student card", 
   }), { code: "functions/permission-denied" });
   assert.equal(registration.data.requiresCredentialRotation, false);
   const firstStudent = registration.data.students[0];
-  assert.match(firstStudent.cardCode, /^[A-Z2-9]{4}-[A-Z2-9]{8}$/);
+  assert.match(firstStudent.cardCode, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/);
   const secondStudent = registration.data.students[1];
   const printCards = httpsCallable(teacherFunctions, "getPrintableCards");
   const printable = await printCards({classId, studentUids: [firstStudent.studentUid, secondStudent.studentUid]});
@@ -249,6 +247,11 @@ test("teacher creates a class, registers students, and rotates a student card", 
   const freshTeacherUid = `teacher-fresh-${crypto.randomUUID().slice(0, 8)}`;
   await adminAuth.createUser({ uid: freshTeacherUid, email: `${freshTeacherUid}@example.test`, displayName: "새 선생님" });
   await signInWithCustomToken(otherTeacherAuth, await adminAuth.createCustomToken(freshTeacherUid));
+  await assert.rejects(httpsCallable(otherTeacherFunctions, "getTeacherStatus")(), {
+    code: "functions/permission-denied",
+  });
+  assert.equal((await adminDb.doc(`teachers/${freshTeacherUid}`).get()).exists, false);
+  await signInEmulatorGoogle(otherTeacherAuth, adminAuth, freshTeacherUid);
   const freshStatus = await httpsCallable(otherTeacherFunctions, "getTeacherStatus")();
   assert.equal(freshStatus.data.status, "verified");
   const freshDoc = await adminDb.doc(`teachers/${freshTeacherUid}`).get();

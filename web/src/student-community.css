@@ -1,0 +1,23 @@
+.community-content { gap: var(--world-space-6); }
+.community-context { text-align: center; }
+.community-page :is(h2,p), .community-teaser :is(h2,p) { margin: 0; }
+.community-page h2, .community-teaser h2 {
+  display: flex; align-items: center; gap: var(--world-space-3); font-size: 1.25rem; line-height: 1.4;
+}
+.community-section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--world-space-4); }
+.community-game-entry { grid-template-columns: auto minmax(0,1fr); align-items: center; }
+.community-game-entry .community-entry-art { grid-column: 1; grid-row: 1/3; }
+.community-entry-copy { display: grid; gap: var(--world-space-3); }
+.community-entry-copy h2 { font-size: clamp(1.5rem,3vw,2rem); }
+.community-entry-action { grid-column: 2; }
+.community-entry-action .world-button { width: 100%; }
+.community-ideas ul { display: grid; gap: var(--world-space-3); margin: 0; padding-left: var(--world-space-6); }
+.community-notice p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.community-teaser { align-content: start; }
+@media (max-width: 768px) {
+  .community-game-entry { grid-template-columns: 64px minmax(0,1fr); gap: var(--world-space-3); }
+  .community-game-entry .community-entry-art { grid-row: 1; width: 64px; height: 64px; }
+  .community-entry-action { grid-column: 1/-1; }
+  .community-section-head { align-items: flex-start; flex-wrap: wrap; }
+  .community-teaser .community-section-head .world-button { width: 100%; }
+}

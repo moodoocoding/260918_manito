@@ -2,6 +2,8 @@
 
 이 문서는 [서비스 개발 계획서](./manitto-development-plan.md)의 논리 모델을 실제 Firestore 경로와 권한 경계로 구체화한다. 첫 구현 단계에서는 브라우저의 직접 쓰기를 모두 차단하고 Cloud Functions가 쓰기와 업무 규칙을 담당한다.
 
+**계층 기준:** 상위는 [통합 학급 플랫폼](class-platform-architecture.md)이며 기존 `classes`/`members`/로그인 자격·코드는 공통 기반으로 계승한다. `rounds`, `activeRoundId`, `lastRoundId`는 마니또 서비스의 문맥이지 학급 월드나 타 서비스의 실행 상태가 아니다. 회차 유무·종료로 학급 독립 기능을 차단하지 않는다. 아래 회차/배정 규칙은 마니또 기록에 적용한다. 기존 경로를 초기화·재생성하는 변경은 아니다.
+
 ## 핵심 결정
 
 - 학급은 여러 회차를 가진다. 지난 회차 문서를 초기화하거나 재사용하지 않는다.
@@ -18,11 +20,20 @@
 teachers/{teacherUid}
 classes/{classId}
   members/{studentUid}
+    teacherMailReceipts/{mailId}       # 본인 접수 영수증, Callable 전용
+  teacherMailSecrets/{mailId}          # 교사 수신 편지/신고 원문, 서버 전용
+  teacherMailCommands/{uid_requestId}  # 제출/처리 멱등 명령, 서버 전용
   customMissions/{missionId}              # 교사가 추가한 학급 미션, 서버 전용
   rightsRequests/{rightsRequestId}       # 학생 정보 열람·정정·삭제 요청, 서버 전용
   rightsCommands/{studentUid_requestId} # 요청 접수 중복 방지, 서버 전용
+  balanceGamePublic/progress             # 학급 독립 활동의 완료이름/수, 고정 명부 참가자 읽기
+  balanceGameSecrets/current             # 서버 전용 고정 명부·가명키·응답/짝 상태
+    submissions/{studentUid}             # 서버 전용 A/B 응답
   rounds/{roundId}
     participants/{studentUid}
+    balanceGamePublic/progress             # 이전 회차 종속 구현의 보존 경로(신규 기능에서 사용 안 함)
+    balanceGameSecrets/current             # 이전 회차 종속 비밀 기록, 자동 이전/삭제 없음
+      submissions/{studentUid}             # 서버 전용 10개 밸런스 응답
     studentData/{studentUid}
       missions/{missionInstanceId}
       inboxItems/{messageId}
@@ -49,6 +60,16 @@ missionCatalog/{missionId}              # 예약 경로; 현재 카탈로그는 
 deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 ```
 
+## 교사 우체통 · 2026-10-30 로컬 구현
+
+- 회차와 별개로 학급이 소유한다. `teacherMailSecrets`는 `kind:letter|report`, `studentUid`, 접수 당시 `studentName`, `status:received|resolved`, `createdAt`과 `letter:{subject,body}` 또는 `report:{relatedStudents,occurredAt,location,incident,reason,witnesses,feelings,desiredAction,neededHelp}`를 보관한다. 처리 시 교사 전용 `resolution`, `resolvedBy`, `resolvedAt`을 추가한다.
+- 목격자는 `{name,otherClass,className?}` 배열이다. 관련/목격 학생 이름은 작성 학생이 전한 내용이며 명부 검색/신원 확인/다른 학급 연락 모델이 아니다. 최대 길이와 개수는 함수 계약을 따른다.
+- 영수증에는 `kind,status,createdAt,resolvedAt?`만 둔다. 학생은 `listMyTeacherMail`에서 본인 영수증만 받고 원문/교사 처리기록/타학생 기록은 받지 않는다. 영수증도 브라우저 직접 읽기를 허용하지 않는다.
+- 명령은 요청자·정규화 입력 fingerprint·결과·서버시각만 보관한다. 본문을 복제하지 않는다. 목록/원문/처리 감사는 `teacher_mail.list/read/resolved`와 대상 ID·행위자·서버시각만 남긴다.
+- `teacherMailSecrets(kind,status,createdAt DESC)` 복합 인덱스로 교사 필터/최신20건 페이지를 지원한다. 모든 신규 경로 직접 읽기/쓰기는 학생·교사 모두 거절하고, Callable이 현재 학생 세션 또는 확인된 담당교사를 매번 검사한다.
+- 학급 전체 `recursiveDelete`에 세 경로가 포함된다. 기존 명부 제거는 전체 개인정보 삭제와 다르며 교사 원문 보존/권리 요청의 개별 삭제 정책을 확정한 기능으로 표현하지 않는다. 실제 학생 도입 전 기존 보존·삭제 정책 확정 과제가 그대로 남는다.
+- 학급 미처리 `report`가 있으면 회차 정체 공개를 막는다. 학생 화면에는 신고 수·신고자 목록·처리 비교를 공개하지 않는다.
+
 ## 문서별 책임
 
 2026-09-28부터 `classes/{classId}.customMissionCount`는 학급 전용 미션 개수를 세고, `customMissions/{id}`는 교사가 입력한 100자 이하 원문·작성자·시각을 서버 전용으로 보관한다. 새 시즌의 `rounds/{roundId}.missionPlan`은 시작 때 확정한 1~80개 미션 ID·원문·공개 범주 배열이다. 구 시즌에는 범주가 없을 수 있으며 서버가 기본 미션 ID로 복원하거나 `기타 미션`으로 응답한다. 참가 학생이 같은 미션을 읽으며 배정 관계·개별 활동 상태는 포함하지 않는다. `studentData/{uid}/missions`는 완료·쉬기·교체할 때만 생기는 개인 상태 문서다. `studentData/{uid}.focusMissionId`는 본인 편의 선택으로 서버만 갱신하며 완료·쉬기·교체 때 해제한다. 부모 문서의 학생 직접 읽기는 여전히 금지한다. `roundCommunity/{roundId}`는 교사 안내의 초안·게시본·게시 시각·버전·작성자를 서버 전용으로 보관한다. 학생은 Callable에서 게시 평문만 받으며 숫자 집계 문서는 아직 없다. 학급 전체 삭제는 이 하위 문서도 재귀 삭제한다. 과거 시즌의 시작 시 전부 만든 미션 문서는 계속 읽는다. `messageDays/{uid_date}.count`는 하루 최대 10건을 트랜잭션에서 보장한다. 이전 버전의 `count` 없는 문서는 1건으로 해석한다. `messageSecrets.replyToMessageId`는 실제 받은 메시지의 ID이며 학생 사본에는 발신 UID를 넣지 않는다. 교사 숨김 때 원문은 감사된 교사 조회를 위해 유지하면서 수신 사본의 `hidden`과 발신 사본의 `status`를 함께 갱신한다.
@@ -62,6 +83,9 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 | `rightsRequests`, `rightsCommands` | 정보 열람·정정·삭제 요청의 종류·내용·상태와 멱등 명령 | 아니요 | 감사 기록을 남기는 함수로 조회 | 서버만 |
 | `rounds/{roundId}` | 회차 일정·상태·메시지 정책·공통 미션 계획 | 참가 회차 | 담당 교사 | 아니요 |
 | `participants/{studentUid}` | 확정 명단과 중도 중단 상태 | 본인 | 담당 교사 | 아니요 |
+| `classes/{classId}/balanceGamePublic/progress` | 독립 자리바꾸기 완료 이름·완료/참가수·단계. 선택/짝UID 없음 | 활성 카드+고정 활동명부 참가자 | 아니요 | 아니요 |
+| `classes/{classId}/balanceGameSecrets/current` | 고정 UID명부·가명키·이름맵·최종짝·상태/시도잠금 | 아니요 | 아니요 | 서버만 |
+| `classes/{classId}/balanceGameSecrets/current/submissions/{uid}` | 본인의 밸런스 선택10개·제출시각 | 아니요 | 아니요 | 서버만 |
 | `studentData/{studentUid}` | 공개 승인 후 본인 관계·공개 결과. 이전 시즌 방식의 진행 중 상대 이름이 남을 수 있음 | 아니요, 부모 문서 직접 읽기 차단 | 함수로 감사 후 조회 | 아니요 |
 | `missions` | 학생이 변경한 미션 내용 스냅샷·상태. 과거 시즌에는 초기 미션도 보관 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
 | `inboxItems` | 즉시 전달된 수신 쪽지·답장 연결·숨김/신고 상태 | 활성 참가자 본인 | 함수로 조회 | 아니요 |
@@ -75,7 +99,7 @@ deletionJobs/{classId}                  # 삭제 재시도 상태, 서버 전용
 | `pairHistory` | 과거 방향별 배정 횟수 | 아니요 | 아니요 | 서버만 |
 | `studentCredentials` | 로그인 코드 해시·잠금·`encryptedCardCode`(AES-256-GCM 암호문, 신규/재발급 카드) | 아니요 | 아니요 | 서버만 |
 | `studentCredentialLookups` | 카드 로그인 ID를 학생 UID로 연결 | 아니요 | 아니요 | 서버만 |
-| `classCodes` | 8자리 학급 코드를 학급 ID로 연결 | 아니요 | 아니요 | 서버만 |
+| `classCodes` | 자동 생성6자리 또는 교사 지정4~12자리 학급 코드를 학급 ID로 연결 | 아니요 | 아니요 | 서버만 |
 | `teacherCommands` | 학급 생성 명령의 중복 실행 방지 | 아니요 | 아니요 | 서버만 |
 | `operatorAuditLogs` | 교사 승인·중지의 관리자 실행 기록 | 아니요 | 아니요 | 서버만 |
 | `auditLogs` | 민감정보 열람·매칭·공개·삭제 기록 | 아니요 | 담당 교사 | 서버만 |
@@ -94,7 +118,7 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 7. 회차 중단 학생과 연결된 대기 쪽지는 승인하지 않으며 정체 공개·감사 카드 대상에서도 제외한다.
 8. 회차 시작·쪽지·검토·공개·설정 복사·삭제 등 재시도 가능한 명령은 `requestId`를 받아 동일 요청이 중복 문서를 만들지 않게 한다.
 9. `teacherCommands`와 `classes/{classId}/commands`에는 명령 종류, 요청자, 입력 fingerprint를 기록한다. 재사용한 ID가 다른 입력 또는 작업을 뜻하면 거절한다. 등록 재시도 시 담당 학급 권한을 먼저 확인한다.
-10. 교사 직접 읽기는 Claims의 `teacherVerified`와 `teachers/{uid}.verificationStatus == verified`가 모두 맞아야 한다. 교사 상태가 `suspended`면 직접 읽기와 함수 실행을 거절한다.
+10. 교사 직접 읽기는 Google 로그인 provider(`firebase.sign_in_provider == google.com`), Claims의 `teacherVerified`, `teachers/{uid}.verificationStatus == verified`가 모두 맞아야 한다. 교사 상태가 `suspended`면 직접 읽기와 함수 실행을 거절한다. provider 보강의 배포 여부는 작업일지를 따른다.
 
 ## 서버 명령의 트랜잭션 범위
 
@@ -120,3 +144,7 @@ Firebase Admin SDK는 Security Rules를 우회한다. 따라서 ‘서버만’�
 회차·미션·쪽지·도움·공개·설정 복사, 학급 삭제, 학생 정보 요청 접수 경로를 구현했다. 교사는 학생 개인 데이터를 직접 읽지 않고 감사 기록을 남기는 함수로 안전 현황·배정·요청을 조회한다. 배정은 `assignmentSecrets`, 제외 관계는 `roundSettings`에만 저장한다. `roundSettings.excludedPairs`는 Firestore의 중첩 배열 제한 때문에 `{a,b}` 객체 배열이다. 실제 학생 활성화에는 개인정보 처리 근거, 학교·보호자 안내, 보존 기간과 요청 처리·백업 삭제 절차의 확정이 남아 있다.
 
 카드 출력은 담당 교사 확인 후 `getPrintableCards`를 통해서만 허용하고 대상 학생 UID·교사 UID·시각을 감사한다. `members.printableCardAvailable`은 목록 표시용으로 기존 문서에는 없을 수 있으며, 실제 출력 가능 여부는 서버 전용 자격 문서의 `encryptedCardCode`를 기준으로 재검증한다. 암호화 키 `CARD_PRINT_KEY`는 문서에 저장하지 않는다. 이전 카드에 암호문이 없을 때만 `reissueMissingCards`가 조회 키·해시·세션 버전·암호문·표시 상태를 단일 트랜잭션에서 교체한다. `rounds.startsAt`은 한국 시작일 00:00, `endsAt`은 한국 종료일 23:59:59.999의 ISO 시각을 저장한다.
+
+## 2026-10-30 자리바꾸기 회차 결합 복구
+
+자리바꾸기는 현재 마니또 회차가 없어도 열리는 학급 활동이다. 학급 직속 경로만 새로 사용하고 기존round의배정/날짜/기록·구자리바꾸기 경로는 변경하지 않는다. 최초 조회에서 활성 카드명부를 트랜잭션으로 고정하며 홀수·2명미만은 질문탐색만 허용한다. 참여/재시도/AI확정은 동일명부와현재카드·학급상태를재확인한다. 전체 명부/선택/전체짝은 학생에게 반환하지 않는다. 최초 독립세션의 다음활동 생성/초기화 UI는 미구현이다.

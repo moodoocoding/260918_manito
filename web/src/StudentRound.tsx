@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { call } from "./firebase";
-import { StudentCommunity } from "./StudentCommunity";
 import { StudentMail, type StudentMailData, type StudentMailDraft } from "./StudentMail";
+import { WorldButton } from "./WorldPage";
 export type {StudentMailDraft} from "./StudentMail";
 
 type Mission = { missionId: string; text: string; category: string; status: string };
@@ -34,7 +34,7 @@ function getCategorySlug(category?: string): string {
 
 export function StudentRound({ roundId, status, refreshVersion, view, gradeBand, onNavigate, missionUi, onMissionUiChange, mailDraftRef }: {
   roundId: string; status: string; refreshVersion: number; view: View; gradeBand?: string;
-  onNavigate?: (view: "missions" | "mail" | "community" | "history") => void;
+  onNavigate?: (view: "missions" | "mail" | "help" | "history") => void;
   missionUi: StudentMissionUi; onMissionUiChange: (value: StudentMissionUi) => void;
   mailDraftRef: RefObject<StudentMailDraft>;
 }) {
@@ -47,7 +47,6 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
   const [reflection, setReflection] = useState("");
   const [incomingVisible, setIncomingVisible] = useState(false);
   const [targetVisible, setTargetVisible] = useState(false);
-  const [targetCountdown, setTargetCountdown] = useState(0);
   const targetTimerRef = useRef<number | null>(null);
 
   const hideTarget = useCallback(() => {
@@ -56,29 +55,6 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
       targetTimerRef.current = null;
     }
     setTargetVisible(false);
-    setTargetCountdown(0);
-  }, []);
-
-  const showTarget = useCallback(() => {
-    if (targetTimerRef.current !== null) {
-      window.clearInterval(targetTimerRef.current);
-      targetTimerRef.current = null;
-    }
-    setTargetVisible(true);
-    setTargetCountdown(3);
-    targetTimerRef.current = window.setInterval(() => {
-      setTargetCountdown((prev) => {
-        if (prev <= 1) {
-          if (targetTimerRef.current !== null) {
-            window.clearInterval(targetTimerRef.current);
-            targetTimerRef.current = null;
-          }
-          setTargetVisible(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   }, []);
 
   const [thankYouSentLocal, setThankYouSentLocal] = useState(false);
@@ -135,77 +111,40 @@ export function StudentRound({ roundId, status, refreshVersion, view, gradeBand,
     {data && <>
       {view === "home" && <>
         <section className="panel student-season student-home-primary">
-          <div className="student-season-header">
-            <div className="student-season-badges">
-              <span className="eyebrow">{statusCopy[data.status] ?? "시즌 안내"}</span>
-              {data.status === "active" && <span className="meta-pill">다음 쪽지 활동일 · {niceDate(canSend ? today : nextDay) || "선생님께 확인"}</span>}
-            </div>
-            <h2>{data.title}</h2>
-            <p className="student-season-dates">활동 기간 {niceDate(data.startsOn)} ~ {niceDate(data.endsOn)}</p>
-          </div>
-          {data.targetDisplayName && !revealed && (
-            <div className={`student-target-secret-card ${targetVisible ? "is-revealed" : "is-hidden"}`}>
-              <div className="target-secret-header">
-                <span className="target-secret-pill">🔒 비밀친구 미션</span>
-                <span className="target-secret-timer-hint">
-                  {targetVisible ? `⏱️ ${targetCountdown}초 뒤 자동으로 가려져요` : "주변 친구가 보지 못하게 가리고 확인하세요"}
-                </span>
-              </div>
-              <div className="target-secret-body">
-                <div className="target-secret-label">내가 몰래 챙겨줄 마니또 친구</div>
-                <div className="target-secret-name-box">
-                  {targetVisible ? (
-                    <div className="target-revealed-view">
-                      <span className="target-name-tag">🎁 {data.targetDisplayName}</span>
-                      <p className="target-tip-text">친구 모르게 따뜻한 배려와 응원을 선물해 보세요!</p>
-                    </div>
-                  ) : (
-                    <div className="target-hidden-view">
-                      <span className="secret-lock-icon">🔒</span>
-                      <span className="secret-dots">••••••</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="target-secret-actions">
-                {targetVisible ? (
-                  <button type="button" className="small outline target-toggle-btn" onClick={hideTarget}>
-                    🙈 바로 다시 가리기
-                  </button>
-                ) : (
-                  <button type="button" className="small primary-cta target-toggle-btn" onClick={showTarget}>
-                    👁️ 비밀친구 살짝 확인하기 (3초)
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="student-home-summary" aria-label="내 미션 요약">
-            <div className="summary-head"><strong>내 미션 현황</strong></div>
-            {summaryElement}
-          </div>
-          <div className="student-next-mission">
+          <div className="student-next-mission world-section">
             <div className="spotlight-head">
+              <span className="eyebrow">{statusCopy[data.status] ?? "시즌 안내"}</span>
               <span className="spotlight-badge">오늘의 미션</span>
               {firstTodo && <span className={`category-pill cat-${getCategorySlug(firstTodo.category)}`}>{firstTodo.category ?? "기타 미션"}</span>}
             </div>
             {firstTodo ? <>
               <p className="student-mission-text">{firstTodo.text}</p>
               <div className="student-mission-actions inline-actions">
-                {data.canSubmit && <button className="primary-cta" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 멋지게 완료했어요! 🎉"); })}>✨ 해냈어요!</button>}
-                <button className="outline" onClick={() => onNavigate?.("missions")}>다른 미션 고르기 →</button>
+                {data.canSubmit && <WorldButton variant="primary" disabled={busy} onClick={() => void run(async () => { await call<object, object>("setMissionStatus", {missionId:firstTodo.missionId,status:"done"}); setNotice("미션을 멋지게 완료했어요! 🎉"); })}>해냈어요!</WorldButton>}
+                <WorldButton variant="secondary" onClick={() => onNavigate?.("missions")}>다른 미션 고르기</WorldButton>
               </div>
             </> : <>
               <p className="student-mission-empty">{missions.length ? "모든 미션을 완료했거나 진행 중인 미션이 없어요. 새로운 미션을 골라볼까요?" : "아직 준비된 미션이 없어요."}</p>
               <div className="student-mission-actions inline-actions">
-                <button className="outline" onClick={() => onNavigate?.("missions")}>{missions.length ? "미션 골라보기 →" : "내 기록 보기"}</button>
+                <WorldButton variant="secondary" onClick={() => onNavigate?.("missions")}>{missions.length ? "미션 골라보기" : "내 기록 보기"}</WorldButton>
               </div>
             </>}
             {view === "home" && feedback}
           </div>
+          <div className="student-season-header">
+            <div className="student-season-badges">
+              {data.status === "active" && <span className="meta-pill">다음 쪽지 활동일 · {niceDate(canSend ? today : nextDay) || "선생님께 확인"}</span>}
+            </div>
+            <h2>{data.title}</h2>
+            <p className="student-season-dates">활동 기간 {niceDate(data.startsOn)} ~ {niceDate(data.endsOn)}</p>
+          </div>
+          {!revealed && <div className="world-state"><strong>비밀친구는 아직 비밀이에요</strong><p>친구 이름은 선생님이 공개한 뒤에 확인할 수 있어요.</p></div>}
+          <div className="student-home-summary" aria-label="내 미션 요약">
+            <div className="summary-head"><strong>내 미션 현황</strong></div>
+            {summaryElement}
+          </div>
           {revealed && <p className="field-help">선생님이 친구를 공개했어요. 아래에서 내 관계를 확인할 수 있어요.</p>}
         </section>
-        <StudentCommunity roundId={roundId} preview onMore={() => onNavigate?.("community")} />
         <section className="panel student-archive-bar">
           <div>
             <strong>지난 시즌 기록이 궁금한가요?</strong>

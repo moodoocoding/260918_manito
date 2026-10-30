@@ -1,0 +1,17 @@
+{
+  "projectId": "manito-938cc",
+  "syntheticStudents": 4,
+  "state": "failed",
+  "submitted": 4,
+  "completedCount": 4,
+  "participantCount": 4,
+  "assignmentCount": 0,
+  "matchedAuditCount": 0,
+  "allAssignedOnce": false,
+  "noSelfPairs": false,
+  "symmetricPairs": false,
+  "manittoRoundCount": 0,
+  "providerMode": "configured Gemini API, no injected mock",
+  "aiGenerationVerified": false,
+  "confirmedBlockingReason": "INVALID_HEADER before request transmission"
+}

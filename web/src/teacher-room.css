@@ -1,0 +1,321 @@
+.teacher-login-description {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.teacher-login-redirect {
+  min-height: 48px;
+  padding-block: 10px;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.app-shell.teacher-world-shell {
+  background-position: center top;
+  background-attachment: fixed;
+}
+
+.teacher-world-page {
+  margin-block: 8px 28px;
+}
+
+.teacher-world-paper {
+  gap: 20px;
+  padding: clamp(16px, 2.4vw, 28px);
+}
+
+.teacher-preview-banner {
+  margin: 0;
+  padding: 10px 12px;
+  border: 2px solid var(--world-warning-ink);
+  background: var(--world-warning-bg);
+  color: var(--world-warning-ink);
+  font-weight: 750;
+}
+
+.teacher-world-paper .teacher-layout {
+  gap: 20px;
+}
+
+.teacher-world-paper button:not(.world-button) {
+  min-height: 48px;
+  border-radius: var(--world-radius);
+  border: 2px solid #96774d;
+  background: var(--world-card);
+  color: var(--world-ink);
+  box-shadow: 2px 2px 0 #4f351c44;
+  font: inherit;
+  font-weight: 750;
+}
+
+.teacher-world-paper button:not(.world-button):hover:not(:disabled) {
+  background: var(--world-info-bg);
+  color: var(--world-ink);
+}
+
+.teacher-world-paper button.primary-cta,
+.teacher-world-paper button.class-enter-btn {
+  border-color: #194a2b;
+  background: var(--world-forest);
+  color: #fffbed;
+  box-shadow: 2px 3px 0 #194a2b;
+}
+
+.teacher-world-paper button.danger,
+.teacher-world-paper button.class-delete-btn {
+  border-color: var(--world-error-border);
+  background: var(--world-error-ink);
+  color: #fff;
+}
+
+.teacher-world-paper button:focus-visible,
+.teacher-world-paper input:focus-visible,
+.teacher-world-paper textarea:focus-visible,
+.teacher-world-paper select:focus-visible {
+  outline: 3px solid var(--world-focus);
+  outline-offset: 3px;
+}
+
+.teacher-world-paper button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+  box-shadow: none;
+}
+
+.teacher-world-paper .panel,
+.teacher-world-paper .teacher-context,
+.teacher-world-paper .teacher-sidebar {
+  border: 2px solid var(--world-gold-border);
+  border-radius: var(--world-radius);
+  background-color: var(--world-card);
+  background-image: var(--world-parchment-texture);
+  background-size: 512px;
+  color: var(--world-ink);
+  box-shadow: 3px 3px 0 #a8b28b;
+}
+
+.teacher-world-paper .teacher-context {
+  min-width: 0;
+  padding: 18px 20px;
+}
+
+.teacher-world-paper .teacher-context > div,
+.teacher-world-paper .teacher-class-picker .page-header > div,
+.teacher-service-heading,
+.teacher-service-heading > div {
+  min-width: 0;
+}
+
+.teacher-world-paper .teacher-context > div {
+  flex: 1 1 220px;
+}
+
+.teacher-world-paper .teacher-context h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.teacher-world-paper .teacher-context h1,
+.teacher-world-paper .panel h1,
+.teacher-world-paper .panel h2,
+.teacher-world-paper .panel h3 {
+  color: var(--world-ink);
+}
+
+.teacher-world-paper .teacher-shell {
+  grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.teacher-world-paper .teacher-sidebar {
+  position: static;
+  gap: 5px;
+  padding: 12px;
+}
+
+.teacher-world-paper .teacher-sidebar button {
+  min-width: 0;
+  min-height: 44px;
+  border-radius: var(--world-radius);
+  color: var(--world-ink);
+  overflow-wrap: anywhere;
+}
+
+.teacher-world-paper .teacher-sidebar button:hover:not(:disabled) {
+  background: var(--world-info-bg);
+  color: var(--world-ink);
+}
+
+.teacher-world-paper .teacher-sidebar button[aria-current="page"] {
+  border-color: var(--world-forest-border);
+  background: var(--world-info-bg);
+  color: var(--world-ink);
+  box-shadow: inset 4px 0 var(--world-forest);
+}
+
+.teacher-world-paper .sidebar-label {
+  margin: 10px 8px 4px;
+  color: var(--world-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.teacher-world-paper .teacher-class-picker {
+  display: grid;
+  gap: 16px;
+}
+
+.teacher-world-paper .teacher-class-picker .page-header {
+  align-items: center;
+  gap: 16px;
+}
+
+.teacher-class-search {
+  display: grid;
+  gap: 8px;
+  max-width: var(--world-form-width);
+  font-weight: 750;
+}
+
+.teacher-class-search input {
+  min-height: 52px;
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #a49c79;
+  border-radius: var(--world-radius);
+  background: var(--world-card);
+  color: var(--world-ink);
+  font: inherit;
+}
+
+.teacher-service-hub {
+  display: grid;
+  gap: 18px;
+}
+
+.teacher-service-heading h2 {
+  margin: 8px 0 4px;
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+}
+
+.teacher-service-heading p,
+.teacher-service-card p {
+  margin: 0;
+  color: var(--world-muted);
+}
+
+.teacher-service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.teacher-service-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+  border: 2px solid var(--world-gold-border);
+  border-radius: var(--world-radius);
+  background-color: var(--world-card);
+  background-image: var(--world-parchment-texture);
+  background-size: 512px;
+  box-shadow: 3px 3px 0 #a8b28b;
+}
+
+.teacher-service-card--available {
+  border-color: var(--world-forest-border);
+}
+
+.teacher-service-card-head {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.teacher-service-card h3 {
+  margin: 0;
+  font-size: 1.25em;
+  overflow-wrap: anywhere;
+}
+
+.teacher-service-card .world-button {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.teacher-service-connection {
+  display: grid;
+  gap: 20px;
+}
+
+.teacher-service-connection h3 {
+  margin: 0 0 12px;
+}
+
+.teacher-service-connection ul {
+  margin: 0 0 12px;
+  padding-inline-start: 24px;
+}
+
+.teacher-service-connection li + li {
+  margin-top: 8px;
+}
+
+.teacher-world-paper [data-teacher-page-title]:focus {
+  outline: 3px solid var(--world-focus);
+  outline-offset: 3px;
+}
+
+.teacher-world-paper .mobile-teacher-menu {
+  border: 2px solid var(--world-gold-border);
+  border-radius: var(--world-radius);
+  background: var(--world-card);
+}
+
+.teacher-world-paper .mobile-teacher-menu summary {
+  min-height: 48px;
+  padding: 10px 14px;
+  font-weight: 750;
+}
+
+.teacher-world-paper .mobile-teacher-menu button {
+  width: 100%;
+  min-height: 48px;
+  border-radius: var(--world-radius);
+  color: var(--world-ink);
+}
+
+@media (max-width: 900px) {
+  .teacher-world-page {
+    margin-block: 0 20px;
+  }
+
+  .teacher-world-paper {
+    padding: 14px;
+  }
+
+  .teacher-world-paper .teacher-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teacher-world-paper .teacher-sidebar {
+    display: none;
+  }
+
+  .teacher-world-paper .mobile-teacher-menu {
+    display: block;
+  }
+
+  .teacher-service-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 901px) {
+  .teacher-world-paper .mobile-teacher-menu {
+    display: none;
+  }
+}

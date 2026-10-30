@@ -1,0 +1,68 @@
+.teacher-mailbox { display: grid; gap: 18px; min-width: 0; padding: 24px; border: 1px solid #cbd6cf; border-radius: 14px; background: #fff; }
+.teacher-mailbox-heading, .teacher-mailbox-detail-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.teacher-mailbox-heading h2 { margin: 0 0 7px; font-size: 1.45rem; }
+.teacher-mailbox-heading p { margin: 0; color: #52645b; line-height: 1.6; }
+.teacher-mailbox button { min-height: 48px; }
+.teacher-mailbox-privacy { margin: 0; padding: 13px 16px; border-left: 4px solid #4f7669; border-radius: 5px; background: #edf4ef; color: #345447; font-size: .84rem; line-height: 1.65; }
+.teacher-mailbox-filter-panel { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 15px; border: 1px solid #d7dfd7; border-radius: 10px; background: #f6f8f4; }
+.teacher-mailbox-kinds { width: min(100%, 260px); }
+.teacher-mailbox-kinds button { flex: 1; border: 1px solid transparent; background: transparent; color: #3c5548; box-shadow: none; }
+.teacher-mailbox-kinds button:hover:not([aria-pressed="true"]) { background: #e4ebdf; color: #294536; }
+.teacher-mailbox-kinds button[aria-pressed="true"] { background: #3d6454; color: #fff; border-color: #3d6454; box-shadow: 0 2px 4px #243d2f25; }
+.teacher-mailbox-status-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.teacher-mailbox-status-filters .is-selected { border-color: #365e4c; background: #e3eee4; color: #244832; box-shadow: inset 0 0 0 1px #365e4c; }
+.teacher-mailbox-list-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 5px 12px; }
+.teacher-mailbox-list-head h3 { margin: 0; font-size: 1.08rem; }
+.teacher-mailbox-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.teacher-mailbox-row { display: flex; align-items: center; gap: 13px; width: 100%; padding: 14px 16px; border: 1px solid #d0dcd3; border-radius: 9px; background: #fff; color: #243e31; box-shadow: none; text-align: left; }
+.teacher-mailbox-row:hover { border-color: #6b8b70; background: #f2f7ef; color: #243e31; }
+.teacher-mailbox-row.is-open { border-color: #54775b; background: #eaf2e7; box-shadow: inset 3px 0 0 #54775b; }
+.teacher-mailbox-kind { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-width: 47px; min-height: 36px; border: 1px solid #bbd0bd; border-radius: 5px; background: #ecf4e6; color: #34533a; font-size: .78rem; font-weight: 800; }
+.teacher-mailbox-kind.is-report { border-color: #d9c0aa; background: #fff0df; color: #794820; }
+.teacher-mailbox-sender { display: grid; flex: 1; min-width: 0; gap: 5px; overflow-wrap: anywhere; }
+.teacher-mailbox-sender strong { font-size: .97rem; }
+.teacher-mailbox-sender time { font-size: .75rem; font-weight: 500; color: #5b6e61; }
+.teacher-mailbox-row-end { display: grid; flex: 0 0 auto; justify-items: end; gap: 6px; color: #506348; font-size: .75rem; }
+.teacher-mailbox-row-end .meta-pill { font-size: .72rem; }
+.teacher-mailbox-empty { display: grid; gap: 9px; padding: 34px 20px; border: 1px dashed #cbd7cc; border-radius: 10px; background: #f8faf5; color: #506249; text-align: center; line-height: 1.6; }
+.teacher-mailbox-empty p { margin: 0; font-size: .85rem; }
+.teacher-mailbox-pagination { display: flex; justify-content: center; }
+.teacher-mailbox-detail { display: grid; gap: 18px; min-width: 0; padding: 22px; border: 2px solid #789578; border-radius: 10px; background: #f9fcf6; scroll-margin-top: 20px; }
+.teacher-mailbox-detail-head { align-items: center; padding-bottom: 13px; border-bottom: 1px solid #d1ddcb; }
+.teacher-mailbox-detail-head h3 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.teacher-mailbox-detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: #5b6b58; font-size: .8rem; }
+.teacher-mailbox-fields { display: grid; gap: 0; margin: 0; border: 1px solid #d5dfcf; border-radius: 8px; overflow: hidden; background: #fff; }
+.teacher-mailbox-fields > div { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr); border-bottom: 1px solid #e0e6db; }
+.teacher-mailbox-fields > div:last-child { border-bottom: 0; }
+.teacher-mailbox-fields dt, .teacher-mailbox-fields dd { padding: 14px; margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
+.teacher-mailbox-fields dt { background: #eef4e9; color: #3e5538; font-size: .82rem; font-weight: 800; }
+.teacher-mailbox-fields dd { color: #293b2d; font-size: .92rem; white-space: pre-wrap; }
+.teacher-mailbox-fields dd ul { margin: 0; padding-left: 19px; }
+.teacher-mailbox-fields dd li + li { margin-top: 5px; }
+.teacher-mailbox-resolution { display: grid; gap: 10px; padding: 18px; border: 1px solid #c8d5be; border-radius: 8px; background: #eef4e7; }
+.teacher-mailbox-resolution h4 { margin: 0; font-size: 1rem; }
+.teacher-mailbox-resolution p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.teacher-mailbox-resolution label { display: grid; gap: 3px; margin: 3px 0 0; font-size: .9rem; }
+.teacher-mailbox-resolution textarea { width: 100%; min-height: 120px; margin: 0; resize: vertical; }
+.teacher-mailbox-resolution time { color: #627158; font-size: .78rem; }
+.teacher-mailbox-resolution-actions { display: flex; justify-content: flex-end; padding-top: 3px; }
+.teacher-mailbox :is(button, h2, h3, textarea):focus-visible { outline: 3px solid #285b89; outline-offset: 3px; }
+@media (max-width: 700px) {
+  .teacher-mailbox { gap: 16px; padding: 16px; border-radius: 10px; }
+  .teacher-mailbox-heading h2 { font-size: 1.28rem; }
+  .teacher-mailbox-heading p { font-size: .88rem; }
+  .teacher-mailbox-heading > button { width: 100%; }
+  .teacher-mailbox-filter-panel { display: grid; gap: 13px; padding: 12px; }
+  .teacher-mailbox-kinds { width: 100%; }
+  .teacher-mailbox-status-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-mailbox-row { flex-wrap: wrap; gap: 10px; padding: 13px 12px; }
+  .teacher-mailbox-row-end { grid-template-columns: auto auto; align-items: center; width: 100%; justify-content: space-between; }
+  .teacher-mailbox-detail { padding: 14px; gap: 15px; }
+  .teacher-mailbox-detail-head { align-items: flex-start; }
+  .teacher-mailbox-detail-head > button { width: 100%; }
+  .teacher-mailbox-fields > div { grid-template-columns: minmax(0, 1fr); }
+  .teacher-mailbox-fields dt { padding: 10px 12px; }
+  .teacher-mailbox-fields dd { padding: 12px; }
+  .teacher-mailbox-resolution { padding: 13px; }
+  .teacher-mailbox-resolution-actions > button { width: 100%; }
+}

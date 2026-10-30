@@ -9,25 +9,65 @@ import { TeacherAssignments } from "./TeacherAssignments";
 import { StudentRound, type StudentMissionUi } from "./StudentRound";
 import { emptyStudentMailDraft, type StudentMailDraft } from "./StudentMail";
 import { StudentCommunity } from "./StudentCommunity";
+import { StudentClassroom } from "./StudentClassroom";
+import { StudentTodayTasks } from "./StudentTodayTasks";
+import { schooldocMissionsClient } from "./schooldocMissionsConfig";
+import { StudentLogin } from "./StudentLogin";
+import { TeacherLogin } from "./TeacherLogin";
+import { TeacherServiceConnection, TeacherServiceHub } from "./TeacherServiceHub";
+import { teacherLanding, teacherLocation, teacherMailServerReady, teacherNavigationGroups, teacherPages, type TeacherPage } from "./teacherNavigation";
+import { APP_NAME } from "./appIdentity";
+import { WorldButton, WorldPageBoundary, WorldPageFrame, WorldPageHeader, WorldPaper } from "./WorldPage";
+import { StudentTeacherMailbox, StudentTeacherMailboxPending, emptyTeacherMailboxDraft, isTeacherMailboxDraftDirty, type TeacherMailboxDraft } from "./StudentTeacherMailbox";
+import { TeacherMailbox } from "./TeacherMailbox";
+import type { CreateTeacherMailInput, CreateTeacherMailResult, TeacherMailPage, TeacherMailSummary } from "./teacherMailTypes";
+import { StudentExpansionSpace } from "./StudentExpansionSpace";
+import { expansionSpaceIds, expansionSpaces, isExpansionSpaceId, type ExpansionSpaceId } from "./expansionSpaces";
 import { StudentRights, TeacherRights } from "./RightsRequests";
 import { CheckboxRow, ConfirmDialog } from "./DesignSystem";
 import { StudentRosterImporter } from "./StudentRosterImporter";
 import "./style.css";
+import "./student-login.css";
+import "./student-world.css";
+import "./student-manitto.css";
+import "./student-teacher-mailbox.css";
+import "./teacher-room.css";
 
-type TeacherPage = "classes" | "overview" | "students" | "rounds" | "assignments" | "status" | "history" | "settings";
-type StudentPage = "today" | "missions" | "mail" | "community" | "help" | "history";
-const teacherPages: Array<{id: TeacherPage; label: string}> = [
-  {id:"overview",label:"운영 요약"},{id:"rounds",label:"시즌 설정"},{id:"assignments",label:"배정 확인"},
-  {id:"students",label:"입장 카드"},{id:"status",label:"상태 확인"},
-  {id:"history",label:"지난 활동"},{id:"settings",label:"정보 요청·삭제"},
+const isTeacherRoomPreview = import.meta.env.DEV
+  && new URLSearchParams(window.location.search).get("teacherRoomPreview") === "1";
+const teacherPreviewUrl = (path: string) => `${path}${isTeacherRoomPreview ? "?teacherRoomPreview=1" : ""}`;
+const teacherRoomPreviewClasses: ClassItem[] = [
+  { classId: "preview-long-class", classCode: "FAKE2026", name: "2026학년도 5학년 3반 · 늘봄과학탐험대 긴 이름 실험 학급", schoolYear: 2026, gradeBand: "upper", memberCount: 12 },
+  { classId: "preview-empty-class", classCode: "EMPTY26", name: "빈 명단 확인용 학급", schoolYear: 2026, gradeBand: "middle", memberCount: 0 },
+  { classId: "preview-class-three", classCode: "ROOM003", name: "3학년 3반 미리보기", schoolYear: 2026, gradeBand: "middle", memberCount: 3 },
 ];
-function teacherLocation(path: string): {classId: string | null; page: TeacherPage} {
-  const parts = path.split("/").filter(Boolean);
-  const page = parts[3] === "safety" ? "status" : parts[3];
-  return { classId: parts[1] === "classes" && parts[2] ? parts[2] : null,
-    page: teacherPages.some((item) => item.id === page) ? page as TeacherPage : parts[2] ? "overview" : "classes" };
-}
+const teacherRoomPreviewMembers: Member[] = Array.from({ length: 12 }, (_, index) => ({
+  studentUid: `preview-student-${String(index + 1).padStart(2, "0")}`,
+  displayName: `연습 학생 ${String(index + 1).padStart(2, "0")}`,
+  accessStatus: index === 10 ? "blocked" : "active",
+  printableCardAvailable: true,
+}));
+const previewTeacherMailApi = {
+  list: async () => ({ items: [], nextCursor: null }) as TeacherMailPage<TeacherMailSummary>,
+  detail: async () => { throw new Error("미리보기에서는 편지 원문을 불러오지 않아요."); },
+  resolve: async () => { throw new Error("미리보기에서는 상태를 저장하지 않아요."); },
+};
 
+type StudentPage = "today" | "today-tasks" | "manitto" | "missions" | "mail" | "friend-mail" | "community" | "help" | "history" | ExpansionSpaceId;
+const manittoServicePages: StudentPage[] = ["manitto", "missions", "friend-mail", "help", "history"];
+const studentSubPages: StudentPage[] = ["today-tasks", "manitto", "missions", "mail", "friend-mail", "community", "help", "history", ...expansionSpaceIds.filter((id) => id !== "space-1")];
+function studentLocation(path: string): StudentPage {
+  const segment = path.split("/")[2];
+  if (segment === "space-1") return "manitto";
+  return studentSubPages.find((page) => page === segment) ?? "today";
+}
+const legacyStudentContexts: Partial<Record<StudentPage, { title: string; intro: string }>> = {
+  manitto: { title: "마니또", intro: "내가 해 볼 배려를 찾고, 친구와 마음을 나눠요." },
+  missions: { title: "마니또 · 미션", intro: "마니또 활동에서 원하는 미션을 골라 해 보거나 부담 없이 쉬어 갈 수 있어요." },
+  "friend-mail": { title: "친구 쪽지", intro: "내가 맡은 친구와 나를 맡은 친구, 두 대화가 따로 보관돼요." },
+  help: { title: "선생님 도움", intro: "불편하거나 걱정되는 점은 언제든 비공개로 선생님께 알릴 수 있어요." },
+  history: { title: "지난 활동", intro: "예전 시즌의 공개 결과와 미션·쪽지 기록을 돌아볼 수 있어요." },
+};
 type TeacherStatus = { status: "pending" | "verified" | "suspended"; displayName: string };
 type ClassItem = { classId: string; classCode?: string; name: string; schoolYear: number; gradeBand: string; memberCount: number };
 type ClassInfo = ClassItem & { classCode: string };
@@ -62,10 +102,9 @@ function App() {
   const [route, setRoute] = useState<"student" | "teacher">(window.location.pathname.startsWith("/teacher") ? "teacher" : "student");
   const [teacherPage, setTeacherPage] = useState<TeacherPage>(() => teacherLocation(window.location.pathname).page);
   const [teacherStatusTarget, setTeacherStatusTarget] = useState<TeacherStatusSection | null>(null);
-  const [studentPage, setStudentPage] = useState<StudentPage>(() => {
-    const page = window.location.pathname.split("/")[2];
-    return ["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today";
-  });
+  const [studentPage, setStudentPage] = useState<StudentPage>(() => studentLocation(window.location.pathname));
+  const studentPageRef = useRef(studentPage);
+  studentPageRef.current = studentPage;
   const [studentMissionUi, setStudentMissionUi] = useState<StudentMissionUi>({filter:"all",category:"전체",limit:8});
   const [role, setRole] = useState<"none" | "teacher" | "student">("none");
   const [loading, setLoading] = useState(true);
@@ -86,6 +125,9 @@ function App() {
   const [pendingPrint, setPendingPrint] = useState<{studentUids: string[]; missingStudentUids: string[]} | null>(null);
   const [home, setHome] = useState<StudentHome | null>(null);
   const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyReload, setHistoryReload] = useState(0);
   const [studentRefreshVersion, setStudentRefreshVersion] = useState(0);
   const [openHistoryRoundId, setOpenHistoryRoundId] = useState<string | null>(null);
   const [classCodeInput, setClassCodeInput] = useState("");
@@ -99,6 +141,7 @@ function App() {
   const [namesInput, setNamesInput] = useState("");
   const [deleteName, setDeleteName] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [classSearch, setClassSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState("all");
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [confirmMember, setConfirmMember] = useState<{member: Member; action: "rotate" | "block" | "remove"} | null>(null);
@@ -118,6 +161,9 @@ function App() {
   const classSelectVersion = useRef(0);
   const studentRoundId = useRef<string | null>(null);
   const studentMailDraft = useRef<StudentMailDraft>(emptyStudentMailDraft());
+  const teacherMailboxDraft = useRef<TeacherMailboxDraft>(emptyTeacherMailboxDraft());
+  const teacherMailboxBusy = useRef(false);
+  const studentWorldPosition = useRef(studentPage === "manitto" ? expansionSpaces["space-1"].x : 8);
   const roundDirty = useRef(false);
   const lastTeacherPath = useRef(window.location.pathname);
   const pendingCreate = useRef<{ key: string; requestId: string } | null>(null);
@@ -127,8 +173,15 @@ function App() {
   const cardReadVersion = useRef(0);
   const channel = useRef<BroadcastChannel | null>(null);
   const mobileTeacherMenu = useRef<HTMLDetailsElement | null>(null);
+  const teacherClassTitle = useRef<HTMLHeadingElement | null>(null);
+  const teacherCreateToggle = useRef<HTMLButtonElement | null>(null);
   const focusStudentTitleAfterNavigation = useRef(false);
   const preserveErrorOnSignOut = useRef(false);
+
+  useEffect(() => {
+    const locationTitle = route === "teacher" ? "선생님 방" : role === "student" ? "우리 반 월드" : "학생 입장";
+    document.title = `${locationTitle} · ${APP_NAME}`;
+  }, [route, role]);
 
   useEffect(() => {
     if (selected) {
@@ -146,7 +199,7 @@ function App() {
   }, [studentPage]);
 
   useEffect(() => {
-    if (route === "teacher" && role === "none") prepareTeacherAuth();
+    if (!isTeacherRoomPreview && route === "teacher" && role === "none") prepareTeacherAuth();
   }, [route, role]);
 
   const clearPrivate = useCallback(() => {
@@ -157,9 +210,12 @@ function App() {
     setPrintSheet(null); setSelectedCardUids([]); setPendingPrint(null); setHome(null);
     cardReadVersion.current++; setCardCodes({}); setCardCodesHidden(false);
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
-    setHistoryRounds([]); setOpenHistoryRoundId(null);
+    setHistoryRounds([]); setHistoryLoading(false); setHistoryError(""); setOpenHistoryRoundId(null);
     studentRoundId.current = null; setStudentMissionUi({filter:"all",category:"전체",limit:8});
     studentMailDraft.current = emptyStudentMailDraft();
+    teacherMailboxDraft.current = emptyTeacherMailboxDraft();
+    teacherMailboxBusy.current = false;
+    studentWorldPosition.current = 8;
     setCardCodeInput(""); setClassCodeInput(""); setShowCardInput(false);
     setTeacherPage("classes"); setStudentPage("today"); setConfirmMember(null);
     setEditingMemberUid(null); setEditingMemberName("");
@@ -222,10 +278,7 @@ function App() {
 
   const loadStudent = useCallback(async () => {
     const current = generation.current;
-    const [result, historyResult] = await Promise.all([
-      call<null, StudentHome>("getStudentHome", null),
-      call<null, {rounds: HistoryRound[]}>("listStudentRounds", null),
-    ]);
+    const result = await call<null, StudentHome>("getStudentHome", null);
     if (current !== generation.current) return;
     if (studentRoundId.current !== result.round?.roundId) {
       studentRoundId.current = result.round?.roundId ?? null;
@@ -233,20 +286,69 @@ function App() {
       studentMailDraft.current = emptyStudentMailDraft();
     }
     setHome(result);
-    setHistoryRounds(historyResult.rounds);
     setStudentRefreshVersion((version) => version + 1);
   }, []);
 
   useEffect(() => {
-    void consumeAuthRedirectError().then((redirectError) => {
-      if (redirectError) setError(errorText(redirectError));
-    });
+    if (role !== "student" || studentPage !== "history") return;
+    let active = true;
+    setHistoryLoading(true);
+    setHistoryError("");
+    void call<null, {rounds: HistoryRound[]}>("listStudentRounds", null)
+      .then((result) => { if (active) setHistoryRounds(result.rounds); })
+      .catch((caught) => { if (active) setHistoryError(errorText(caught)); })
+      .finally(() => { if (active) setHistoryLoading(false); });
+    return () => { active = false; };
+  }, [role, studentPage, historyReload]);
+
+  useEffect(() => {
+    if (isTeacherRoomPreview) {
+      const previewMembersByClass: Record<string, Member[]> = {
+        "preview-long-class": teacherRoomPreviewMembers,
+        "preview-empty-class": [],
+        "preview-class-three": teacherRoomPreviewMembers.slice(0, 3),
+      };
+      (window as unknown as { __MANITTO_PREVIEW__?: unknown }).__MANITTO_PREVIEW__ = {
+        teacherRoomPreview: true,
+        membersByClass: previewMembersByClass,
+      };
+      classesRef.current = teacherRoomPreviewClasses;
+      setClasses(teacherRoomPreviewClasses);
+      setTeacher({ status: "verified", displayName: "가상 선생님" });
+      setRole("teacher");
+      setRoute("teacher");
+      const previewLocation = teacherLocation(window.location.pathname);
+      const previewClass = teacherRoomPreviewClasses.find((item) => item.classId === previewLocation.classId);
+      if (previewClass) {
+        setSelected({ ...previewClass, classCode: previewClass.classCode ?? "" });
+        setMembers(previewMembersByClass[previewClass.classId]);
+        setTeacherPage(previewLocation.page);
+      } else setTeacherPage("classes");
+      setLoading(false);
+    } else {
+      void consumeAuthRedirectError().then((redirectError) => {
+        if (redirectError) setError(errorText(redirectError));
+      });
+    }
     channel.current = new BroadcastChannel("manitto-session");
     channel.current.onmessage = (event) => {
       if (event.data?.type === "logout") void exit(false);
     };
     const onPop = () => {
       const path = window.location.pathname;
+      const hasFriendMailDraft = Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim());
+      if (studentPageRef.current === "friend-mail" && path !== "/student/friend-mail" && hasFriendMailDraft
+        && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) {
+        history.pushState(null, "", "/student/friend-mail");
+        return;
+      }
+      if (path !== "/student/mail" && (teacherMailboxBusy.current || isTeacherMailboxDraftDirty(teacherMailboxDraft.current))) {
+        if (teacherMailboxBusy.current || !window.confirm("아직 보내지 않은 편지나 신고가 있어요. 내용을 지우고 이동할까요?")) {
+          history.pushState(null, "", "/student/mail");
+          return;
+        }
+        teacherMailboxDraft.current = emptyTeacherMailboxDraft();
+      }
       if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) {
         history.pushState(null, "", lastTeacherPath.current);
         return;
@@ -259,13 +361,14 @@ function App() {
         if (location.classId) void selectClass(location.classId, location.page, false);
         else { setSelected(null); setTeacherPage("classes"); }
       } else {
-        const page = path.split("/")[2];
         focusStudentTitleAfterNavigation.current = true;
-        setStudentPage(["missions","mail","community","help","history"].includes(page) ? page as StudentPage : "today");
+        const studentPath = studentLocation(path);
+        setStudentPage(studentPath);
+        if (studentPath === "manitto") studentWorldPosition.current = expansionSpaces["space-1"].x;
       }
     };
     window.addEventListener("popstate", onPop);
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = isTeacherRoomPreview ? () => undefined : onAuthStateChanged(auth, async (user) => {
       clearPrivate();
       const current = generation.current;
       setLoading(true);
@@ -281,14 +384,29 @@ function App() {
         if (token.claims.role === "student") {
           setRole("student"); setRoute("student");
           if (!window.location.pathname.startsWith("/student")) history.replaceState(null, "", "/student");
-          const studentPath = window.location.pathname.split("/")[2];
-          setStudentPage(["missions", "mail", "community", "help", "history"].includes(studentPath) ? studentPath as StudentPage : "today");
+          const studentPath = studentLocation(window.location.pathname);
+          setStudentPage(studentPath);
+          if (isExpansionSpaceId(studentPath)) studentWorldPosition.current = expansionSpaces[studentPath].x;
+          else if (studentPath === "manitto") studentWorldPosition.current = expansionSpaces["space-1"].x;
+          else if (studentPath === "today-tasks") studentWorldPosition.current = 16;
           await loadStudent();
         } else {
+          if (token.claims.firebase?.sign_in_provider !== "google.com") {
+            await exit(true, true);
+            setError("선생님 방은 Google 계정으로만 이용할 수 있어요. Google로 다시 로그인해 주세요.");
+            return;
+          }
           setRole("teacher"); setRoute("teacher");
           await loadTeacher();
           const location = teacherLocation(window.location.pathname);
-          if (location.classId) await selectClass(location.classId, location.page, false);
+          const landing = teacherLanding(window.location.pathname, classesRef.current.map((item) => item.classId));
+          if (landing.classId) {
+            await selectClass(landing.classId, landing.page, false);
+            if (!location.classId) {
+              history.replaceState(null, "", `/teacher/classes/${landing.classId}/${landing.page}`);
+              lastTeacherPath.current = window.location.pathname;
+            }
+          }
           else if (!window.location.pathname.startsWith("/teacher")) history.replaceState(null, "", "/teacher");
         }
       } catch (caught) {
@@ -302,7 +420,8 @@ function App() {
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
-      if (roundDirty.current) { event.preventDefault(); event.returnValue = ""; }
+      const hasFriendMailDraft = Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim());
+      if (roundDirty.current || teacherMailboxBusy.current || isTeacherMailboxDraftDirty(teacherMailboxDraft.current) || hasFriendMailDraft) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
@@ -344,6 +463,7 @@ function App() {
   }
 
   function openTeacherPage(page: TeacherPage, section?: TeacherStatusSection) {
+    if (page === "classes") { openClasses(); return; }
     if (!selected) return;
     if (page !== teacherPage && roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 이동할까요?")) return;
     if (page !== teacherPage) roundDirty.current = false;
@@ -351,23 +471,31 @@ function App() {
     setTeacherStatusTarget(page === "status" ? section ?? null : null);
     setPrintSheet(null); setPendingPrint(null);
     if (page !== "students") setSelectedCardUids([]);
-    history.pushState(null, "", `/teacher/classes/${selected.classId}/${page}`);
+    history.pushState(null, "", teacherPreviewUrl(`/teacher/classes/${selected.classId}/${page}`));
     lastTeacherPath.current = window.location.pathname;
     window.scrollTo(0, 0);
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-teacher-page-title]")?.focus());
   }
 
   function openClasses() {
     if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급 목록으로 이동할까요?")) return;
     roundDirty.current = false;
-    setTeacherPage("classes"); setTeacherStatusTarget(null); setPrintSheet(null); setPendingPrint(null); setSelectedCardUids([]);
-    history.pushState(null, "", "/teacher");
+    setTeacherPage("classes"); setShowCreateClass(false); setTeacherStatusTarget(null); setPrintSheet(null); setPendingPrint(null); setSelectedCardUids([]);
+    history.pushState(null, "", teacherPreviewUrl("/teacher"));
     lastTeacherPath.current = "/teacher";
     window.scrollTo(0, 0);
+    window.requestAnimationFrame(() => teacherClassTitle.current?.focus());
   }
 
   function openStudentPage(page: StudentPage) {
     if (studentPage === page) return;
-    if (studentPage === "mail" && page !== "mail"
+    if (studentPage === "mail" && page !== "mail") {
+      if (teacherMailboxBusy.current) return;
+      if (isTeacherMailboxDraftDirty(teacherMailboxDraft.current)
+        && !window.confirm("아직 보내지 않은 편지나 신고가 있어요. 내용을 지우고 이동할까요?")) return;
+      teacherMailboxDraft.current = emptyTeacherMailboxDraft();
+    }
+    if (studentPage === "friend-mail" && page !== "friend-mail"
       && Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim())
       && !window.confirm("작성 중인 쪽지가 있어요. 다른 화면으로 이동할까요? 내용은 이 입장 동안만 남아요.")) return;
     focusStudentTitleAfterNavigation.current = true;
@@ -383,7 +511,7 @@ function App() {
     finally { setBusy(false); }
   }
 
-  async function selectClass(classId: string, page: TeacherPage = "overview", recordHistory = true) {
+  async function selectClass(classId: string, page: TeacherPage = "services", recordHistory = true) {
     if (roundDirty.current && !window.confirm("저장하지 않은 시즌 준비 내용이 있어요. 입력을 버리고 학급을 바꿀까요?")) return;
     roundDirty.current = false;
     const current = generation.current;
@@ -402,14 +530,15 @@ function App() {
       setMembersLoading(true);
       setTeacherPage(page);
       setTeacherStatusTarget(null);
-      if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
+      if (recordHistory) history.pushState(null, "", teacherPreviewUrl(`/teacher/classes/${classId}/${page}`));
       lastTeacherPath.current = window.location.pathname;
       window.scrollTo(0, 0);
     }
 
     await task(async () => {
       try {
-        const previewMembers = (window as unknown as { __MANITTO_PREVIEW__?: { members?: Member[] } }).__MANITTO_PREVIEW__?.members;
+        const preview = (window as unknown as { __MANITTO_PREVIEW__?: { members?: Member[]; membersByClass?: Record<string, Member[]> } }).__MANITTO_PREVIEW__;
+        const previewMembers = preview?.membersByClass?.[classId] ?? preview?.members;
         const membersPromise = previewMembers
           ? Promise.resolve(previewMembers)
           : getDocs(query(collection(db, `classes/${classId}/members`), orderBy("displayNameSortKey"))).then((result) =>
@@ -436,7 +565,7 @@ function App() {
         if (!cached) {
           setTeacherPage(page);
           setTeacherStatusTarget(null);
-          if (recordHistory) history.pushState(null, "", `/teacher/classes/${classId}/${page}`);
+          if (recordHistory) history.pushState(null, "", teacherPreviewUrl(`/teacher/classes/${classId}/${page}`));
           lastTeacherPath.current = window.location.pathname;
           window.scrollTo(0, 0);
         }
@@ -450,6 +579,7 @@ function App() {
 
   async function createClass(event: React.FormEvent) {
     event.preventDefault();
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학급을 만들거나 저장하지 않아요."); return; }
     await task(async () => {
       const createdName = newClassName.trim();
       const createdCode = newClassCode.trim().toUpperCase();
@@ -476,13 +606,15 @@ function App() {
       const nextClasses = [...classesRef.current.filter((item) => item.classId !== result.classId), optimisticItem];
       classesRef.current = nextClasses;
       setClasses(nextClasses);
-      await Promise.all([loadTeacher(), selectClass(result.classId)]);
-      setNotice("학급을 만들었어요.");
+      setShowCreateClass(false);
+      await Promise.all([loadTeacher(), selectClass(result.classId, "students")]);
+      setNotice("공통 학급을 개설했어요. 학생을 등록하고 입장 카드를 준비해 주세요.");
     });
   }
 
   async function register(event: React.FormEvent) {
     event.preventDefault();
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학생을 등록하거나 저장하지 않아요."); return; }
     if (!selected) return;
     const displayNames = namesInput.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
     if (displayNames.length < 1 || displayNames.length > 40) {
@@ -503,6 +635,7 @@ function App() {
   }
 
   async function rotate(member: Member) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 카드를 재발급하지 않아요."); return; }
     if (!selected) return;
     await task(async () => {
       const result = await call<object, { studentUid: string; cardCode: string }>("rotateStudentCredential", {
@@ -516,6 +649,7 @@ function App() {
   }
 
   async function changeAccess(member: Member) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 입장 상태를 변경하지 않아요."); return; }
     if (!selected) return;
     const status = member.accessStatus === "active" ? "blocked" : "active";
     await task(async () => {
@@ -530,6 +664,7 @@ function App() {
   }
 
   async function saveMemberName(member: Member) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학생 이름을 저장하지 않아요."); return; }
     if (!selected) return;
     const trimmed = editingMemberName.trim();
     if (!trimmed) { setError("학생 이름을 입력해 주세요."); return; }
@@ -551,6 +686,7 @@ function App() {
   }
 
   async function removeMember(member: Member) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학생을 삭제하지 않아요."); return; }
     if (!selected) return;
     await task(async () => {
       await call<object, object>("removeStudentMember", {
@@ -574,6 +710,7 @@ function App() {
 
   async function updateClassBasicInfo(event: React.FormEvent) {
     event.preventDefault();
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학급 정보를 저장하지 않아요."); return; }
     if (!selected) return;
     const trimmed = editClassName.trim();
     if (!trimmed) { setError("학급 이름을 입력해 주세요."); return; }
@@ -607,6 +744,7 @@ function App() {
   }
 
   async function deleteClass() {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학급 데이터를 삭제하지 않아요."); return; }
     if (!selected || deleteName !== selected.name) return;
     if (!window.confirm(`${selected.name} 학급의 시즌·쪽지·카드·학생 계정을 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
     await task(async () => {
@@ -617,6 +755,7 @@ function App() {
   }
 
   async function saveQuickClassCode() {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학급 코드를 저장하지 않아요."); return; }
     if (!selected) return;
     const trimmed = editingClassCodeInput.trim().toUpperCase();
     if (trimmed.length < 4 || trimmed.length > 12) {
@@ -648,6 +787,7 @@ function App() {
   }
 
   async function registerBatchStudents(names: string[]) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 학생을 등록하거나 저장하지 않아요."); return; }
     if (!selected || !names.length) return;
     if (members.length + names.length > 40) {
       setError("한 학급에는 최대 40명까지 등록할 수 있어요.");
@@ -698,6 +838,7 @@ function App() {
   }
 
   async function batchReissue(studentUids: string[]) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 카드를 재발급하지 않아요."); return; }
     if (!selected || !studentUids.length) return;
     setConfirmBatchReissue(null);
     await task(async () => {
@@ -724,6 +865,7 @@ function App() {
   }
 
   async function preparePrint(studentUids: string[]) {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 개인 코드를 조회하거나 출력하지 않아요."); return; }
     if (!selected || !studentUids.length) return;
     await task(async () => {
       const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
@@ -737,6 +879,7 @@ function App() {
   }
 
   async function reissueAndPrint() {
+    if (isTeacherRoomPreview) { setNotice("개발 미리보기에서는 카드를 재발급하거나 출력하지 않아요."); return; }
     if (!selected || !pendingPrint) return;
     const target = pendingPrint;
     setPendingPrint(null);
@@ -763,6 +906,11 @@ function App() {
     setCardCodes({}); setCardCodesHidden(false); setCardCodesError(false);
     if (cardCodeTimeout.current !== null) window.clearTimeout(cardCodeTimeout.current);
     if (!studentUids.length) return;
+    if (isTeacherRoomPreview) {
+      setCardCodesHidden(true);
+      setCardCodesLoading(false);
+      return;
+    }
     setCardCodesLoading(true);
     try {
       const result = await call<object, {cards: Card[]; missingStudentUids: string[]}>("getPrintableCards",
@@ -792,105 +940,98 @@ function App() {
   const filteredMembers = members.filter((member) => member.displayName.includes(memberSearch)
     && (memberFilter === "all" || member.accessStatus === memberFilter));
 
-  return <div className={`app-shell${role === "student" ? " student-app" : ""}`}>
-    <div className="topbar-surface no-print">
+  const studentFrame = legacyStudentContexts[studentPage];
+  return <div className={`app-shell${role === "student" ? " student-app world-theme" : ""}${role === "student" && studentPage === "today" ? " classroom-app" : ""}${(role === "student" && studentPage !== "today") || role === "teacher" ? " world-feature-shell" : ""}${role === "teacher" ? " teacher-world-shell" : ""}${role === "student" && studentPage === "today-tasks" ? " today-tasks-app" : ""}${role === "none" ? (route === "student" ? " student-entry-app" : " teacher-entry-app") : ""}`}>
+    {role === "none" && <div className="topbar-surface no-print">
       <header className="topbar">
-        <a className="brand" href={role === "teacher" ? "/teacher" : "/student"} onClick={(event) => { event.preventDefault();
-          if (role === "teacher") openClasses();
-          else if (role === "student") openStudentPage("today"); else navigate("student");
-        }}><span className="brand-icon" aria-hidden="true">✉️</span> <span>우리 반 비밀친구</span></a>
+        <a className="brand" href="/student" onClick={(event) => { event.preventDefault(); navigate("student"); }}><span className="brand-icon" aria-hidden="true">🏫</span> <span>{APP_NAME}</span></a>
         {role === "none" && <nav className="service-switch" aria-label="서비스 선택">
           <button type="button" className={route === "student" ? "nav-active" : "nav-link"} aria-pressed={route === "student"} onClick={() => navigate("student")}>학생 입장</button>
           <button type="button" className={route === "teacher" ? "nav-active" : "nav-link"} aria-pressed={route === "teacher"} onClick={() => navigate("teacher")}>선생님 방</button>
         </nav>}
         {role !== "none" && <div className="topbar-actions">
-          {role === "student" && <button className="small outline" onClick={() => openStudentPage("help")}>선생님 도움</button>}
-          <button className="small outline" onClick={() => void exit()}>{role === "teacher" ? "로그아웃" : "활동 마치기"}</button>
+          <button className="small outline" onClick={() => void exit()}>로그아웃</button>
         </div>}
       </header>
-    </div>
+    </div>}
 
     <main className="content no-print">
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
       {loading ? <section className="panel centered"><p>입장 정보를 확인하고 있어요…</p></section> :
         role === "student" ? <section className="student-grid student-shell">
-          <nav className="student-nav segmented-track" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"우편함"},{id:"community",label:"우리 반"}] as const).map((item) =>
-            <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
-          {studentPage === "today" && <><div className="student-page-header"><div><span className="context-badge">{home?.className}</span><h1 className="student-page-title" tabIndex={-1}>안녕, {home?.displayName}!</h1><p className="student-intro">오늘도 친구를 위한 작은 배려에 편하게 참여해요.</p></div><button className="small outline" disabled={busy} onClick={() => void task(loadStudent)}>새 소식 확인</button></div>
-            {home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} onNavigate={openStudentPage} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />
-              : <section className="panel empty"><h2>선생님이 다음 활동을 준비하고 있어요</h2><p>새 활동이 시작되면 여기서 확인할 수 있어요.</p><button className="outline" onClick={() => openStudentPage("history")}>지난 활동 보기</button></section>}</>}
-          {studentPage === "missions" && <><div className="student-page-header"><div><span className="context-badge">나의 활동</span><h1 className="student-page-title" tabIndex={-1}>미션</h1><p className="student-intro">원하는 미션을 골라 해 보거나 부담 없이 쉬어 갈 수 있어요.</p></div></div>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 홈에서 새 소식을 확인해 주세요.</p></section>}</>}
-          {studentPage === "mail" && <><div className="student-page-header"><div><span className="context-badge">익명 응원 대화</span><h1 className="student-page-title" tabIndex={-1}>우편함</h1><p className="student-intro">내가 맡은 친구와 나를 맡은 친구, 두 대화가 따로 보관돼요.</p></div></div>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="panel"><p>진행 중인 활동이 없어요. 지난 활동에서 받은 쪽지를 확인할 수 있어요.</p></section>}</>}
-          {studentPage === "community" && <><div className="student-page-header"><div><span className="context-badge">{home?.className}</span><h1 className="student-page-title" tabIndex={-1}>우리 반</h1><p className="student-intro">교실에서 실천할 수 있는 배려 아이디어와 선생님 안내를 확인해요.</p></div></div>{home?.round ? <StudentCommunity key={home.round.roundId} roundId={home.round.roundId} /> : <section className="panel"><p>진행 중인 시즌이 없어요. 새 시즌이 시작되면 이곳에서 활동 아이디어를 볼 수 있어요.</p></section>}</>}
-          {studentPage === "help" && <><div className="student-page-header"><div><span className="context-badge">안전·도움 센터</span><h1 className="student-page-title" tabIndex={-1}>선생님 도움</h1><p className="student-intro">불편하거나 걱정되는 점은 언제든 비공개로 선생님께 알릴 수 있어요.</p></div></div>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
+          <WorldPageBoundary title={studentFrame?.title} icon={studentPage === "manitto" ? "sprout" : studentPage === "friend-mail" ? "envelope" : studentPage === "history" ? "book" : "clipboard"} intro={studentFrame?.intro} onBack={() => openStudentPage("today")} onExit={() => {
+            const hasDraft = Object.values(studentMailDraft.current.drafts).some((draft) => draft.freeText.trim());
+            if (studentPage === "friend-mail" && hasDraft && !window.confirm("작성 중인 쪽지가 있어요. 활동을 마칠까요? 작성한 내용은 지워져요.")) return;
+            void exit();
+          }}>
+          {studentFrame && (manittoServicePages.includes(studentPage)
+            ? <nav className="student-nav manitto-student-nav segmented-track" aria-label="마니또 메뉴">{([{id:"manitto",label:"활동 홈"},{id:"missions",label:"미션"},{id:"friend-mail",label:"친구 쪽지"},{id:"help",label:"도움"},{id:"history",label:"지난 활동"}] as const).map((item) =>
+              <a key={item.id} href={`/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>
+            : <nav className="student-nav segmented-track" aria-label="학생 활동 메뉴">{([{id:"today",label:"홈"},{id:"missions",label:"미션"},{id:"mail",label:"비밀 우체통"},{id:"friend-mail",label:"친구 쪽지"},{id:"community",label:"우리 반"},{id:"help",label:"도움"}] as const).map((item) =>
+              <a key={item.id} href={item.id === "today" ? "/student" : `/student/${item.id}`} aria-current={studentPage === item.id ? "page" : undefined} onClick={(event) => {event.preventDefault();openStudentPage(item.id);}}>{item.label}</a>)}</nav>)}
+          {studentPage === "today" && <StudentClassroom className={home?.className || "우리 반"} onNavigate={openStudentPage}
+            initialPosition={studentWorldPosition.current} onPositionChange={(position) => { studentWorldPosition.current = position; }} onExit={() => { void exit(); }} />}
+          {studentPage === "today-tasks" && <StudentTodayTasks client={schooldocMissionsClient} autoConnect authorize={async () => {
+            const current = generation.current;
+            try {
+              const verifiedHome = await call<null, StudentHome>("getStudentHome", null);
+              if (current !== generation.current) throw new DOMException("요청이 취소됐어요.", "AbortError");
+              return verifiedHome.displayName;
+            } catch (caught) {
+              const code = caught && typeof caught === "object" && "code" in caught ? String(caught.code) : "";
+              if (current === generation.current && (code.includes("permission-denied") || code.includes("unauthenticated"))) await exit();
+              throw new Error(errorText(caught));
+            }
+          }} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} onHelp={() => openStudentPage("help")} />}
+          {isExpansionSpaceId(studentPage) && <StudentExpansionSpace spaceId={studentPage} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} />}
+          {studentPage === "manitto" && <>{home?.round
+            ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="home" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} onNavigate={(view) => openStudentPage(view === "mail" ? "friend-mail" : view)} />
+            : <section className="world-section manitto-empty-state"><h2>지금 진행 중인 활동이 없어요</h2><p>마니또 회차가 준비되면 이곳에서 미션과 친구 쪽지를 이용할 수 있어요. 다른 학급 서비스는 계속 이용할 수 있어요.</p><WorldButton variant="secondary" onClick={() => openStudentPage("history")}>지난 활동 보기</WorldButton></section>}</>}
+          {studentPage === "missions" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="missions" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="world-section"><h2>지금 진행 중인 활동이 없어요</h2><p>미션은 마니또 회차가 시작되면 이곳에서 확인할 수 있어요.</p></section>}</>}
+          {studentPage === "mail" && (teacherMailServerReady ? <StudentTeacherMailbox draftRef={teacherMailboxDraft} onSubmit={async (input) => {
+            const current = generation.current;
+            try { return await call<CreateTeacherMailInput, CreateTeacherMailResult>("createTeacherMail", input); }
+            catch (caught) {
+              const code = caught && typeof caught === "object" && "code" in caught ? String(caught.code) : "";
+              if (current === generation.current && (code.includes("permission-denied") || code.includes("unauthenticated"))) {
+                await exit();
+                setError("입장 정보가 변경됐어요. 선생님께 카드를 확인하고 다시 입장해 주세요.");
+              }
+              throw caught;
+            }
+          }} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} onBusyChange={(value) => { teacherMailboxBusy.current = value; }} /> : <StudentTeacherMailboxPending onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} />)}
+          {studentPage === "friend-mail" && <>{home?.round ? <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="mail" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} /> : <section className="world-section"><h2>친구 쪽지가 아직 열리지 않았어요</h2><p>진행 중인 마니또 활동이 시작되면 친구와 쪽지를 주고받을 수 있어요. 지난 쪽지는 지난 활동에서 볼 수 있어요.</p><WorldButton variant="secondary" onClick={() => openStudentPage("history")}>지난 활동 보기</WorldButton></section>}</>}
+          {studentPage === "community" && <StudentCommunity roundId={home?.round?.roundId} onBack={() => openStudentPage("today")} onExit={() => { void exit(); }} classLabel={home?.className} />}
+          {studentPage === "help" && <>{home?.round && <StudentRound key={home.round.roundId} roundId={home.round.roundId} status={home.round.status} refreshVersion={studentRefreshVersion} view="help" gradeBand={home.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}
             <StudentRights /></>}
-          {studentPage === "history" && <><div className="student-page-header"><div><span className="context-badge">활동 보관함</span><h1 className="student-page-title" tabIndex={-1}>지난 활동</h1><p className="student-intro">예전 시즌의 공개 결과와 미션·쪽지 기록을 돌아볼 수 있어요.</p></div></div><section className="panel"><div className="panel-section-head"><h2>시즌 목록</h2><p className="field-help">예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p></div>{historyRounds.length === 0 ? <p className="muted">아직 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>}</section>
+          {studentPage === "history" && <><section className="world-section"><div className="panel-section-head"><h2>공개된 활동</h2><p className="field-help">예전 활동과 쪽지는 각 활동 안에서만 볼 수 있어요.</p></div>{historyLoading && <p role="status">지난 활동을 불러오는 중이에요…</p>}{historyError && <div className="world-state world-state--error" role="alert">{historyError}<div><WorldButton variant="secondary" onClick={() => setHistoryReload((version) => version + 1)}>다시 불러오기</WorldButton></div></div>}{!historyLoading && !historyError && (historyRounds.length === 0 ? <p className="muted">아직 공개된 지난 활동이 없어요.</p> : <div className="round-list">{historyRounds.map((item) => <button key={item.roundId} className="outline" aria-expanded={openHistoryRoundId === item.roundId} onClick={() => setOpenHistoryRoundId((old) => old === item.roundId ? null : item.roundId)}><strong>{item.title}</strong><small>{item.startsAt ? `${koreaDateLabel(item.startsAt)} 시작 · ` : ""}{item.status === "archived" ? "보관됨" : "친구 공개됨"} · {openHistoryRoundId === item.roundId ? "닫기" : "기록 보기"}</small></button>)}</div>)}</section>
             {openHistoryRoundId && <StudentRound key={openHistoryRoundId} roundId={openHistoryRoundId} status="archived" refreshVersion={studentRefreshVersion} view="history" gradeBand={home?.gradeBand} missionUi={studentMissionUi} onMissionUiChange={setStudentMissionUi} mailDraftRef={studentMailDraft} />}</>}
-        </section> : route === "student" && role === "none" ? <section className="entry-layout">
-          <div className="hero">
-            <span className="eyebrow">초등 학급 마니또 · 학생용</span>
-            <h1>비밀친구 작전,<br />시작해 볼까요?</h1>
-            <p>선생님께 받은 학급 코드와 내 입장 카드 코드를 적어 주세요.</p>
-            <ul className="hero-highlights" aria-label="활동 안내">
-              <li><strong>오늘의 미션</strong> 교실에서 바로 해 볼 수 있는 따뜻한 배려 미션</li>
-              <li><strong>비밀 우편함</strong> 이름 없이 주고받는 안전한 응원 쪽지</li>
-            </ul>
-          </div>
-          <form className="panel entry-form" onSubmit={(event) => { event.preventDefault(); void task(async () => {
+          </WorldPageBoundary>
+        </section> : route === "student" && role === "none" ? <StudentLogin
+          classCode={classCodeInput} cardCode={cardCodeInput} remember={rememberStudent} showCard={showCardInput} busy={busy}
+          onClassCodeChange={setClassCodeInput} onCardCodeChange={setCardCodeInput}
+          onRememberChange={setRememberStudent} onToggleCard={() => setShowCardInput((value) => !value)}
+          onSubmit={() => { void task(async () => {
             await studentLogin(classCodeInput.trim().toUpperCase(), cardCodeInput.trim().toUpperCase(), rememberStudent);
             setCardCodeInput("");
-          }); }}>
-            <div className="entry-form-head">
-              <span className="context-badge">입장 카드 로그인</span>
-              <h2>내 카드로 입장하기</h2>
-            </div>
-            <label htmlFor="student-class-code">학급 코드
-              <input id="student-class-code" autoComplete="off" maxLength={12} value={classCodeInput} onChange={(event) => setClassCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="선생님이 알려준 학급 코드" required />
-            </label>
-            <div className="field-group">
-              <div className="field-label-row">
-                <label htmlFor="student-card-code">개인 카드 코드</label>
-                <button type="button" className="small outline inline-toggle" onClick={() => setShowCardInput((value) => !value)}>{showCardInput ? "코드 가리기" : "코드 보기"}</button>
-              </div>
-              <input id="student-card-code" type={showCardInput ? "text" : "password"} autoComplete="off" maxLength={16} value={cardCodeInput} onChange={(event) => setCardCodeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))} placeholder="카드에 적힌 4자리 코드 (예: 7K9X)" required />
-            </div>
-            <div className="checkbox-row remember-row">
-              <label htmlFor="student-remember-me" className="checkbox-label">
-                <input id="student-remember-me" type="checkbox" checked={rememberStudent} onChange={(e) => setRememberStudent(e.target.checked)} />
-                <span>이 기기에서 로그인 기억하기 (자동 로그인)</span>
-              </label>
-            </div>
-            <p className="field-help">공용 컴퓨터에서는 체크를 해제해 주세요. 창을 닫으면 자동으로 로그아웃돼요.</p>
-            <button className="wide primary-cta" disabled={busy}>{busy ? "확인 중…" : "입장하기"}</button>
-            <p className="help">카드를 잃어버렸거나 입장이 안 되면 선생님께 말씀해 주세요. 이름만으로는 입장할 수 없어요.</p>
-          </form>
-        </section> : route === "teacher" && role === "none" ? <section className="entry-layout">
-          <div className="hero teacher-hero">
-            <span className="eyebrow">초등 학급 마니또 · 교사용</span>
-            <h1>우리 반의 작은 배려를<br />준비해요</h1>
-            <p>선생님 Google 계정으로 학급을 만들고 입장 카드와 시즌을 안전하게 운영할 수 있어요.</p>
-            <ul className="hero-highlights" aria-label="교사 기능 안내">
-              <li><strong>간편한 카드 발급</strong> 이메일·휴대전화 없이 학급 코드와 개인 카드로 학생 참여</li>
-              <li><strong>안전한 모니터링</strong> 도움 요청 우선 확인, 쪽지 숨김, 교사 승인 후 정체 공개</li>
-            </ul>
-          </div>
-          <div className="panel entry-form">
-            <div className="entry-form-head">
-              <span className="context-badge">교사 인증</span>
-              <h2>선생님 로그인</h2>
-            </div>
-            <p>Google 계정으로 로그인하면 바로 학급을 만들고 운영할 수 있어요.</p>
-            <button className="wide primary-cta" disabled={busy} onClick={() => void task(teacherLogin)}>{busy ? "로그인 중…" : "Google로 로그인"}</button>
-            <button type="button" className="wide outline" disabled={busy} onClick={() => void task(teacherLoginRedirect)}>팝업이 안 열리면 현재 창에서 로그인</button>
-          </div>
-        </section> : role === "teacher" && teacher?.status !== "verified" ? <section className="panel centered">
+          }); }}
+        /> : route === "teacher" && role === "none" ? <TeacherLogin busy={busy}
+          onLogin={() => { void task(teacherLogin); }}
+          onLoginRedirect={() => { void task(teacherLoginRedirect); }}
+        /> : role === "teacher" && teacher?.status !== "verified" ? <section className="panel centered">
           <div className="big-icon">🔒</div><h1>{teacher?.status === "suspended" ? "이용이 중지됐어요" : "선생님 확인을 기다리고 있어요"}</h1>
           <p>학급 정보는 확인이 끝난 계정에서만 볼 수 있어요.</p>
           <button onClick={() => void task(async () => { await auth.currentUser?.getIdToken(true); await loadTeacher(); })}>상태 다시 확인</button>
-        </section> : role === "teacher" ? <section className="teacher-layout">
-          {teacherPage === "classes" || !selected ? <section className="panel"><div className="page-header"><div><span className="context-badge">교사 대시보드</span><h1>내 학급</h1><p>운영할 학급을 선택하거나 새 학급을 만들어 주세요.</p></div><button onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "만들기 닫기" : "새 학급 만들기"}</button></div>
-            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.map((item) => <li key={item.classId} className="class-card-item">
+        </section> : role === "teacher" ? <WorldPageFrame className="teacher-world-page" ariaLabel="선생님 방">
+          <WorldPageHeader title="선생님 방" icon="clipboard" onBack={openClasses} backLabel="학급 공통 관리" onExit={() => { void exit(); }} />
+          <WorldPaper className="teacher-world-paper">
+            {isTeacherRoomPreview && <p className="teacher-preview-banner" role="status">개발 전용 미리보기 · 가상 학급으로 화면만 확인해요. 실제 학급을 불러오거나 내용을 저장하지 않아요.</p>}
+            <section className="teacher-layout">
+          {teacherPage === "classes" || !selected ? <section className="panel teacher-class-picker"><div className="page-header"><div><h2 ref={teacherClassTitle} tabIndex={-1}>학급 공통 관리</h2><p>학급을 한 번 개설하면 같은 명부와 입장 카드로 마니또와 여러 학급 서비스를 이용해요.</p></div><WorldButton ref={teacherCreateToggle} variant="secondary" aria-expanded={showCreateClass} aria-controls="teacher-create-class" onClick={() => setShowCreateClass((value) => !value)}>{showCreateClass ? "학급 목록으로" : "새 학급 개설"}</WorldButton></div>
+            {!showCreateClass && <><h3>내 학급</h3>
+            {classes.length > 0 && <label className="teacher-class-search">학급 찾기<input type="search" value={classSearch} onChange={(event) => setClassSearch(event.target.value)} placeholder="학급 이름 또는 학년도" /></label>}
+            {classes.length === 0 ? <p className="muted">아직 만든 학급이 없어요.</p> : <ul className="class-list">{classes.filter((item) => `${item.name} ${item.schoolYear} ${item.classCode ?? ""}`.toLocaleLowerCase().includes(classSearch.trim().toLocaleLowerCase())).map((item) => <li key={item.classId} className="class-card-item">
               <div className="class-card-info" role="button" tabIndex={0} onClick={() => void selectClass(item.classId)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") void selectClass(item.classId); }}>
                 <strong className="class-card-name">{item.name}</strong>
                 <div className="class-card-meta">
@@ -901,19 +1042,23 @@ function App() {
                 </div>
               </div>
               <div className="class-card-actions">
-                <button type="button" className="class-enter-btn" disabled={busy} onClick={() => void selectClass(item.classId)}>입장하기 →</button>
-                <button type="button" className="class-delete-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); setClassToDelete(item); }}>삭제</button>
+                <WorldButton disabled={busy} onClick={() => void selectClass(item.classId)}>학급 선택 →</WorldButton>
+                <WorldButton variant="danger" disabled={busy || isTeacherRoomPreview} onClick={(e) => { e.stopPropagation(); setClassToDelete(item); }}>삭제</WorldButton>
               </div>
             </li>)}</ul>}
-            {showCreateClass && <form onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h2>새 학급 만들기</h2><label>학급 이름<input value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
+            {classes.length > 0 && !classes.some((item) => `${item.name} ${item.schoolYear} ${item.classCode ?? ""}`.toLocaleLowerCase().includes(classSearch.trim().toLocaleLowerCase())) && <p className="muted" role="status">검색한 학급이 없어요. 이름이나 학년도를 바꿔 보세요.</p>}
+            </>}
+            {showCreateClass && <form id="teacher-create-class" onSubmit={(event) => void createClass(event)} className="stack teacher-page-form sub-panel"><h3>새 학급 개설</h3><p className="field-help">공통 학급과 학생 입장 정보를 준비하는 단계예요. 마니또 시즌은 학급 준비 후 서비스 모음에서 만들 수 있어요.</p><label>학급 이름<input autoFocus value={newClassName} maxLength={40} onChange={(event) => setNewClassName(event.target.value)} required /></label>
               <label>학급 코드 (선택)<input value={newClassCode} maxLength={12} onChange={(event) => setNewClassCode(event.target.value.toUpperCase())} placeholder="미입력 시 6자리 영문·숫자 자동 생성 (예: SUN2026)" /><small className="field-help">선생님이 기억하기 쉬운 4~12자 영문 대소문자·숫자를 직접 지정할 수 있어요.</small></label>
               <label>학년도<input type="number" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))} required /></label>
               <label>학년군<select value={newGrade} onChange={(event) => setNewGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label>
-              <button disabled={busy}>학급 만들기</button></form>}</section> : <div className="teacher-shell">
-            <nav className="teacher-sidebar" aria-label="학급 메뉴"><span className="sidebar-label">학급 운영 메뉴</span>{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav>
+              <div className="actions"><WorldButton type="submit" disabled={busy}>{busy ? "개설 중…" : "공통 학급 개설"}</WorldButton><WorldButton variant="secondary" disabled={busy} onClick={() => {setShowCreateClass(false); window.requestAnimationFrame(() => teacherCreateToggle.current?.focus());}}>취소</WorldButton></div></form>}</section> : <div className="teacher-shell">
+            <nav className="teacher-sidebar" aria-label="선생님 방 메뉴">{teacherNavigationGroups.map((group) => <React.Fragment key={group.label}><span className="sidebar-label">{group.label}</span>{group.pages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</React.Fragment>)}</nav>
             <div className="teacher-main">
-              <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h1>{selected.name}</h1><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
-              <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherPages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</nav></details>
+              <div className="teacher-context"><div><span className="context-badge">현재 선택 학급</span><h2>{selected.name}</h2><p>{selected.schoolYear}학년도 · {selected.gradeBand === "lower" ? "1~2학년" : selected.gradeBand === "middle" ? "3~4학년" : "5~6학년"} · 학생 {membersLoading && members.length === 0 ? selected.memberCount : members.length}명</p></div><button className="small outline" onClick={openClasses}>학급 바꾸기</button></div>
+              <details ref={mobileTeacherMenu} className="mobile-teacher-menu"><summary>학급 메뉴 · {teacherPages.find((page) => page.id === teacherPage)?.label}</summary><nav aria-label="학급 메뉴">{teacherNavigationGroups.map((group) => <React.Fragment key={group.label}><span className="sidebar-label">{group.label}</span>{group.pages.map((page) => <button key={page.id} aria-current={teacherPage === page.id ? "page" : undefined} onClick={() => openTeacherPage(page.id)}>{page.label}</button>)}</React.Fragment>)}</nav></details>
+              {teacherPage === "services" && <TeacherServiceHub onOpen={openTeacherPage} />}
+              {(teacherPage === "today-tasks" || teacherPage === "class-board") && <TeacherServiceConnection page={teacherPage} onOpen={openTeacherPage} />}
               {teacherPage === "students" && <section className="panel student-cards-panel"><div className="page-header"><div><h2>입장 카드</h2><p>학생 등록과 입장 카드를 이곳에서 관리해요.</p></div></div>
                 <div className="class-code">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: "6px" }}>
@@ -1018,14 +1163,15 @@ function App() {
                     })}</ol>}
               </section>}
               {(["overview","rounds","status","history"] as TeacherPage[]).includes(teacherPage) && <TeacherRounds key={selected.classId} classId={selected.classId} gradeBand={selected.gradeBand} members={members} view={teacherPage as "overview" | "rounds" | "status" | "history"} statusTarget={teacherStatusTarget} onNavigate={openTeacherPage} onDirtyChange={(value) => { roundDirty.current = value; }} onRegisterStudents={registerBatchStudents} />}
-              {teacherPage === "assignments" && <TeacherAssignments key={selected.classId} classId={selected.classId} />}
-              {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학급 코드·학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학급 코드<input value={editClassCode} maxLength={12} onChange={(event) => setEditClassCode(event.target.value.toUpperCase())} placeholder="예: SUN2026" required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><p className="field-help">학급 코드를 바꾸면 기존에 인쇄한 카드의 학급 코드도 변경되므로 학생들에게 바뀐 코드를 안내해 주세요.</p><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section><TeacherRights classId={selected.classId} /><section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
+              {teacherPage === "mailbox" && (teacherMailServerReady ? <TeacherMailbox key={selected.classId} classId={selected.classId} api={isTeacherRoomPreview ? previewTeacherMailApi : undefined} /> : <TeacherServiceConnection page="mailbox" onOpen={openTeacherPage} />)}
+              {teacherPage === "assignments" && (isTeacherRoomPreview ? <section className="panel"><h2>배정 확인</h2><p>개발 미리보기에는 가상 배정 결과가 없어요.</p></section> : <TeacherAssignments key={selected.classId} classId={selected.classId} />)}
+              {teacherPage === "settings" && <><section className="panel"><form onSubmit={(event) => void updateClassBasicInfo(event)} className="stack teacher-page-form"><h2>학급 기본 정보 수정</h2><p className="field-help">학급 이름 오타를 고치거나 학급 코드·학년도·학년군(기본 미션 40개 구성 기준)을 수정할 수 있어요.</p><div className="form-grid"><label>학급 이름<input value={editClassName} maxLength={40} onChange={(event) => setEditClassName(event.target.value)} required /></label><label>학급 코드<input value={editClassCode} maxLength={12} onChange={(event) => setEditClassCode(event.target.value.toUpperCase())} placeholder="예: SUN2026" required /></label><label>학년도<input type="number" value={editClassYear} onChange={(event) => setEditClassYear(Number(event.target.value))} required /></label><label>학년군<select value={editClassGrade} onChange={(event) => setEditClassGrade(event.target.value)}><option value="lower">1~2학년</option><option value="middle">3~4학년</option><option value="upper">5~6학년</option></select></label></div><p className="field-help">학급 코드를 바꾸면 기존에 인쇄한 카드의 학급 코드도 변경되므로 학생들에게 바뀐 코드를 안내해 주세요.</p><div className="action-row"><button type="submit" disabled={busy || !editClassName.trim()}>학급 정보 저장</button></div></form></section><section className="panel"><h2>정보 요청·삭제</h2><p>학생이 보낸 정보 열람·정정·삭제 요청을 확인하고, 학급 전체가 더 이상 필요 없을 때 데이터를 삭제하는 곳이에요. 학생 요청은 접수만 되며 이 화면에서 자동으로 정정·삭제되지는 않아요. 개별 학생의 이름 수정이나 삭제는 입장 카드 메뉴에서 바로 처리할 수 있어요.</p><div className="action-row"><button type="button" className="small outline" onClick={() => openTeacherPage("students")}>입장 카드(학생 이름 수정·삭제)로 이동</button></div></section>{isTeacherRoomPreview ? <section className="panel"><h2>학생 정보 요청</h2><p>미리보기에서는 가상 요청이 없는 상태를 표시해요.</p><p role="status">접수된 요청이 없어요.</p></section> : <TeacherRights classId={selected.classId} />}<section className="panel"><h2>학급 데이터 삭제</h2><p>모든 시즌을 보관하거나 취소(또는 삭제)한 뒤 학급, 학생 카드와 활동 기록을 영구 삭제할 수 있어요. 되돌릴 수 없습니다.</p><label>확인을 위해 학급 이름 입력<input value={deleteName} onChange={(e) => setDeleteName(e.target.value)} /></label><button className="danger" disabled={busy || deleteName !== selected.name} onClick={() => void deleteClass()}>학급 데이터 영구 삭제</button></section></>}
             </div></div>}
-          {classToDelete && <ConfirmDialog title={`${classToDelete.name} 학급을 삭제할까요?`} detail={`${classToDelete.name} 학급의 학생 명단, 입장 카드, 시즌과 쪽지 활동 기록이 완전히 삭제되며 복구할 수 없습니다.`} confirmLabel="학급 영구 삭제" busy={busy} onCancel={() => setClassToDelete(null)} onConfirm={async () => { const target = classToDelete; setClassToDelete(null); await task(async () => { await call<object, object>("deleteClassData", { classId: target.classId, requestId: crypto.randomUUID() }); if (selected?.classId === target.classId) { setSelected(null); setMembers([]); } await loadTeacher(); setNotice(`${target.name} 학급 데이터를 삭제했어요.`); }); }} />}
+          {classToDelete && <ConfirmDialog title={`${classToDelete.name} 학급을 삭제할까요?`} detail={`${classToDelete.name} 학급의 학생 명단, 입장 카드, 시즌과 쪽지 활동 기록이 완전히 삭제되며 복구할 수 없습니다.`} confirmLabel="학급 영구 삭제" busy={busy} onCancel={() => setClassToDelete(null)} onConfirm={async () => { if (isTeacherRoomPreview) { setClassToDelete(null); setNotice("개발 미리보기에서는 학급 데이터를 삭제하지 않아요."); return; } const target = classToDelete; setClassToDelete(null); await task(async () => { await call<object, object>("deleteClassData", { classId: target.classId, requestId: crypto.randomUUID() }); if (selected?.classId === target.classId) { setSelected(null); setMembers([]); } await loadTeacher(); setNotice(`${target.name} 학급 데이터를 삭제했어요.`); }); }} />}
           {confirmMember && <ConfirmDialog title={confirmMember.action === "rotate" ? "입장 카드를 재발급하고 출력할까요?" : confirmMember.action === "remove" ? "이 학생을 명단에서 삭제할까요?" : "학생 입장을 차단할까요?"} detail={confirmMember.action === "rotate" ? `${confirmMember.member.displayName} 학생의 이전 카드는 즉시 사용할 수 없어요. 새 카드 한 장을 이어서 출력합니다.` : confirmMember.action === "remove" ? `${confirmMember.member.displayName} 학생의 입장 카드와 명단 정보를 삭제합니다. 진행 중인 시즌에 참여하고 있는 학생은 먼저 시즌을 중지하거나 학생 참여를 중단해야 삭제할 수 있어요.` : `${confirmMember.member.displayName} 학생은 차단 해제 전까지 입장할 수 없어요.`} confirmLabel={confirmMember.action === "rotate" ? "재발급 후 출력" : confirmMember.action === "remove" ? "학생 삭제" : "입장 차단"} busy={busy} onCancel={() => setConfirmMember(null)} onConfirm={() => { const target = confirmMember; setConfirmMember(null); if (target.action === "rotate") void rotate(target.member); else if (target.action === "remove") void removeMember(target.member); else void changeAccess(target.member); }} />}
           {confirmBatchReissue && <ConfirmDialog title={`${confirmBatchReissue.label}의 카드를 4자리 새 코드로 재발급할까요?`} detail="새로운 4자리 코드(예: 7K9X)가 즉시 발급됩니다. 대상 학생의 이전 카드와 로그인 세션은 즉시 무효화되므로 새 카드를 인쇄하여 배부해 주세요." confirmLabel="4자리 새 코드로 재발급" busy={busy} onCancel={() => setConfirmBatchReissue(null)} onConfirm={() => void batchReissue(confirmBatchReissue.studentUids)} />}
           {pendingPrint && <ConfirmDialog title="기존 카드를 새로 발급할까요?" detail={`선택한 학생 중 ${pendingPrint.missingStudentUids.length}명의 기존 카드 코드는 다시 출력할 수 없어요. 새로 발급하면 그 학생들의 이전 카드와 로그인 세션은 즉시 무효화됩니다. 새 카드를 이어서 출력합니다.`} confirmLabel="재발급 후 출력" busy={busy} onCancel={() => setPendingPrint(null)} onConfirm={() => void reissueAndPrint()} />}
-        </section> : null}
+        </section></WorldPaper></WorldPageFrame> : null}
     </main>
 
     {printSheet && selected && <div className="print-sheet-wrapper">
@@ -1040,7 +1186,7 @@ function App() {
         </div>
       </div>
       <div className="print-only">{printSheet.cards.map((card) => <div className="printed-card" key={card.studentUid}>
-        <span className="printed-card-brand">💌 우리 반 비밀친구</span>
+        <span className="printed-card-brand">🏫 {APP_NAME}</span>
         <h1>{card.displayName} 입장 카드</h1>
         <div className="printed-card-entry"><img src={printSheet.qrDataUrl} alt="학생 입장 페이지 QR 코드" width="160" height="160" />
           <div><strong>QR로 입장 페이지 열기</strong><p>스캔한 뒤 아래 학급 코드와 내 카드 코드를 입력하세요.</p><p className="printed-card-url">QR을 쓸 수 없다면: {printSheet.entryUrl}</p></div></div>

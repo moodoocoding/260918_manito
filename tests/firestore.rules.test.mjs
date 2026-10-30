@@ -81,7 +81,11 @@ after(async () => {
 });
 
 function teacherDb(uid) {
-  return testEnv.authenticatedContext(uid, { role: "teacher", teacherVerified: true }).firestore();
+  return testEnv.authenticatedContext(uid, {
+    firebase: { sign_in_provider: "google.com" },
+    role: "teacher",
+    teacherVerified: true,
+  }).firestore();
 }
 
 function studentDb(uid, classId = "class-a", sessionVersion = 1) {
@@ -118,6 +122,17 @@ test("suspended and unverified teachers cannot read student data", async () => {
     await setDoc(doc(context.firestore(), "teachers/teacher-a"), { verificationStatus: "suspended" });
   });
   await assertFails(getDoc(doc(teacherDb("teacher-a"), "classes/class-a/members/student-a")));
+});
+
+test("non-Google teacher credentials cannot read teacher data", async () => {
+  for (const provider of ["password", "custom", "apple.com"]) {
+    const db = testEnv.authenticatedContext("teacher-a", {
+      firebase: { sign_in_provider: provider },
+      role: "teacher",
+      teacherVerified: true,
+    }).firestore();
+    await assertFails(getDoc(doc(db, "classes/class-a")));
+  }
 });
 
 test("a student cannot directly read a round view containing a legacy assigned name", async () => {
@@ -164,6 +179,25 @@ test("relationship secrets are denied even to a classroom teacher", async () => 
   await assertFails(
     getDoc(doc(db, "classes/class-a/rounds/round-a/assignmentSecrets/student-a")),
   );
+});
+
+test("teacher mail originals, receipts and commands are callable-only for every browser role", async () => {
+  const paths = [
+    "classes/class-a/teacherMailSecrets/mail-private",
+    "classes/class-a/members/student-a/teacherMailReceipts/mail-private",
+    "classes/class-a/teacherMailCommands/command-private",
+  ];
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    for (const path of paths) await setDoc(doc(context.firestore(), path), { status: "received", kind: "report" });
+  });
+  const browsers = [testEnv.unauthenticatedContext().firestore(), teacherDb("teacher-a"), teacherDb("teacher-b"),
+    studentDb("student-a"), studentDb("student-b")];
+  for (const db of browsers) {
+    for (const path of paths) {
+      await assertFails(getDoc(doc(db, path)));
+      await assertFails(setDoc(doc(db, path), { status: "resolved" }));
+    }
+  }
 });
 
 test("login credentials and class-code lookups are server-only", async () => {

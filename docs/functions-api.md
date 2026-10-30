@@ -2,8 +2,11 @@
 
 모든 함수는 `asia-northeast3`의 Firebase Callable Function이다. App Check는 사용하지 않는다. 각 함수는 Firebase Auth·업무 권한을 검증하며, Firestore 쓰기는 이 함수들만 수행한다.
 
+**서비스 경계:** 공통 학급/학생 자격과 개별 서비스의 실행 조건을 구분한다. 기존 `getStudentHome`의 optional `round`는 마니또 호환 문맥이며 통합 마을·오늘 할 일·비밀 우체통·자리바꾸기의 공통 진입 조건이 아니다. 학생 자격은 class/member/sessionVersion으로 확인한다. [상위 구조](class-platform-architecture.md)를 따르며 이 문구로 함수명/입출력/서버 권한을 변경하지 않는다.
+
 ## 공통 규칙
 
+- 교사 전용 함수와 `getTeacherStatus`는 Firebase ID Token의 `firebase.sign_in_provider == "google.com"`을 요구한다. 비 Google 인증은 교사 문서 생성·자동 확인 전에 `permission-denied`로 거절한다. 학생의 카드 로그인과 Custom Token 검증 경로는 별도다. 이 보강의 로컬 검증·배포 상태는 작업일지를 따른다.
 - `requestId`는 클라이언트가 한 사용자 행동마다 생성하는 8~64자의 영문·숫자·`_`·`-` 문자열이다.
 - 같은 `requestId`를 네트워크 재시도로 다시 보내도 학급이나 학생이 중복 생성되지 않는다.
 - 신규·재발급 카드 코드는 검증용 해시와 별도로 AES-256-GCM 암호문으로 서버 전용 `studentCredentials`에 보관한다. `CARD_PRINT_KEY`는 Firebase Secret Manager에서 관련 함수에만 바인딩하며 Firestore 직접 읽기는 모든 클라이언트에 금지한다.
@@ -11,6 +14,26 @@
 - 학생 카드 재발급은 `sessionVersion`을 올려 기존 로그인 세션도 즉시 읽기 권한을 잃게 한다.
 - 재시도 명령은 작업 종류·요청자·정규화한 입력의 fingerprint가 같을 때만 같은 `requestId`를 인정한다. 다른 입력 또는 다른 명령으로 재사용하면 `already-exists`다.
 - 업무 재시도에는 같은 `requestId`를 사용한다. App Check 토큰은 요구하지 않는다.
+
+## 교사에게 보내는 비밀 우체통 · 2026-10-30 로컬 구현
+
+2026-10-30 배포 전 함수 메타데이터 확인에서 아래 새5함수는 개발 클라우드에 없었다. 웹 공개본은 공통 준비 상수로 접수·조회 컴포넌트를 보류하며 준비 안내를 표시한다. 아래 계약은 로컬 구현이며 현재 클라우드 제공 완료를 뜻하지 않는다. 실제 배포에는 미처리 신고의 공개 차단 등 안전 의존성도 함께 검증해야 한다.
+
+마니또 친구 쪽지와 별도인 학급 단위 기능이다. 회차가 없어도 유효한 학생 카드로 제출한다. 클라우드 배포 여부는 작업일지를 따른다.
+
+| 함수 | 입력 | 출력·권한 |
+|---|---|---|
+| `createTeacherMail` | `{kind:"letter",letter:{subject?,body},requestId}` 또는 `{kind:"report",report:{relatedStudents?,occurredAt?,location?,incident,reason?,witnesses?,feelings?,desiredAction?,neededHelp?},requestId}` | `{mailId,status:"received"}`. 학생 토큰의 학급·본인·현재 sessionVersion을 검증하고 담당 교사 수신함에만 저장. 수신자/다른 학급 ID를 입력받지 않음. 같은 내용·요청ID 재시도는 단일 접수 |
+| `listMyTeacherMail` | `null` 또는 `{cursor?}` | `{items:[{mailId,kind,status,createdAt,resolvedAt?}],nextCursor}`. 본인 영수증만 최신20건, 원문/제목/관련 학생 이름/교사 내부 처리기록 없음 |
+| `listTeacherMail` | `{classId,kind:"letter"\|"report",status:"received"\|"resolved",cursor?}` | `{items:[{mailId,kind,status,studentName,createdAt,resolvedAt?}],nextCursor}`. 담당 교사·활성 학급 검증 후 감사된 요약20건. 원문·제목 미노출 |
+| `getTeacherMail` | `{classId,mailId}` | 위 요약과 `letter` 또는 `report`, 처리 후 `resolution` 반환. 담당 교사만 감사 조회. 읽기만으로 처리 완료 상태를 변경하지 않음 |
+| `resolveTeacherMail` | `{classId,mailId,resolution,requestId}` | `{mailId,status:"resolved"}`. 내부 처리기록 필수1~1000자. 담당교사/상태 재검증, 멱등 완료·학생 영수증 상태 갱신·감사 기록 |
+
+- `subject` 최대80자, `body` 필수1~4000자, `incident` 필수1~6000자. 문단/줄바꿈은 보존하고 NFC·CRLF 정규화/양끝 공백 제거를 적용한다.
+- `relatedStudents`는 자유입력 이름 배열 최대40명/각80자. 다른 학생 명부를 제공하지 않는다. `occurredAt`/`location` 최대200자, `reason`/`feelings`/`desiredAction`/`neededHelp` 최대1000자. 사건 설명 외에는 모름을 빈 값으로 허용한다.
+- `witnesses`는 최대40개의 `{name,otherClass:boolean,className?}`. 이름80자, 다른반이면 반80자 필수. 학생이 기록한 내용이며 확인된 사실/명부 매칭 결과로 표현하지 않는다.
+- `cursor`는 직전 페이지의 마지막 mailId이며 서버에서 해당 목록에 속하는지 확인한다. `nextCursor:null`이면 다음 목록이 없다. 시각은 서버가 기록한 ISO 문자열이다. 사건 시점은 학생이 아는 자유 문장이다.
+- 모든 신규 경로의 클라이언트 Firestore 직접 접근은 거절한다. 원문·이름을 로그/URL/감사 이벤트 본문에 넣지 않는다. 학급의 미처리 신고가 있으면 `revealRound`는 `failed-precondition`으로 공개를 막는다.
 
 ## `createClass`
 
@@ -179,3 +202,23 @@ Google 로그인한 교사(비학생 인증 계정)는 `getTeacherStatus` 또는
 `startRound`는 서버 시각이 `startsAt`보다 이르면 `failed-precondition`으로 거절한다. 시작일 전에 배정·학생 화면이 공개되지 않는다.
 
 권리 요청은 현재 접수와 비공개 조회까지만 구현했다. 본인 확인, 처리 기한, 개별 정정·삭제 및 백업 처리 절차는 운영 정책 확정 전이다. `deleteClassData`는 학급 전체 삭제를 검증하는 개발 기능이며 실제 학생 운영에 대한 법적 준비 완료를 뜻하지 않는다.
+
+## 자리바꾸기 API (2026-10-30)
+
+| 함수 | 요청 | 응답·제한 |
+|---|---|---|
+| `getStudentBalanceGame` | `{}` (`roundId` 구입력은 범위 결정에 사용하지 않음) | 검증한 본인 학급의 질문10개·준비상태·본인응답·공개진행수·본인짝만 반환 |
+| `submitBalanceGameChoices` | `{choices:Choice[10]}` | `Choice`는 `A`/`B`. 본인 최초응답만 저장하고 전원 제출 뒤 서버에서 Gemini 매칭 시작 |
+| `retryStudentBalanceMatching` | `{}` | 전원 제출 뒤 실패 또는3분 이상 지난 생성만 재시도하며 한 시도만 허용 |
+
+자리바꾸기는 마니또 회차/기간과 독립적인 학급 활동이다. 기존 활성 학생 카드 검증 뒤 본인 토큰의 `classId`만 사용하며, 클라이언트가 학급이나 수신자를 지정하지 못한다. 첫 조회에서 활성 학급 명부2~40명 짝수를 서버에서 고정한다. 명부 부족·홀수·시작 후 변경이어도 질문10개는 반환하지만 `gameId:null`, `canSubmit:false`, `availabilityMessage`, `progress:null`로 준비불가를 알리고 제출/AI확정은 차단한다. 정상 응답은 `gameId:'current'`, `canSubmit`, `availabilityMessage:null`, `progress:{completedCount,participantCount}`를 포함한다. 상태는 `collecting|matching|complete|failed`다.
+
+실시간 경로는 학급 직속 `classes/{classId}/balanceGamePublic/progress`다. 완료한 이름·완료수·참가수·단계만 담고, 현재 카드 자격을 가진 고정 명부 참가자만 읽는다. 원문 선택·UID별짝·전체명부는 `classes/{classId}/balanceGameSecrets/current`와 `submissions`에 서버전용으로 보관한다. Callable은 본인 저장선택과 본인 상대 이름만 반환한다. 구 round 아래 자리바꾸기 기록은 이동·복사·삭제하지 않는다.
+
+학생 자격/카드버전·학급 상태·활성 명부를 초기화/제출/재시도 트랜잭션에서 확인한다. 마지막 제출이 단일 매칭 잠금을 확정하고 AI 저장 직전에 학급/전체명부가 그대로인지 재확인한다. 다른 마니또의 기간 연장·재개·배정 변경은 하지 않는다. Gemini에는 활동별 임의ID와 A/B 배열만 전달하고, 서버가 자기짝·중복·누락·외부ID·선택점수 불일치를 거부한다. 짝/선택/점수는 전체 공개하지 않는다. 실패는 재시도로 남기고 임의 결과를 만들지 않는다. 오래된 시도는 AI호출/결과 덮어쓰기를 막으며 성공확정은 민감원문 없는 `balance_game.matched` 감사기록을 남긴다.
+
+현재 독립 활동은 학급별 고정세션1개다. 교사의 다음 자리바꾸기 생성/초기화 UI는 제공하지 않으며, 명부 변경을 이유로 기존 응답·짝을 자동 덮어쓰지 않는다.
+
+서버 Secret Manager에 `GEMINI_API_KEY` 등록이 필요하다. 현재 endpoint는 Google Gemini API의 구조화 JSON 출력과 `gemini-3.8-flash`를 사용한다. 에뮬레이터 검증은 주입형 가짜 `fetch`/provider 응답을 사용한다. 2026-10-30 개발 `manito-938cc`에 세 함수를 추가 배포한 뒤, 위 학급 독립 계약으로 동일 세 함수와 신규 학급 경로 Rules만 선택 업데이트했다. 기존59개 함수 불변·제출/재시도 함수의 기존 Secret 버전1 연결·비인증403을 확인했다. 실제 AI 호출/키 유효성/짝 품질은 검증하지 않았다.
+
+실제AI검증 후속 수정은 Gemini3.8의 지원 요청에 맞춰 deprecated sampling 설정을 제외하고 `thinkingConfig.thinkingLevel:'low'`, 출력상한8192토큰·90초 요청제한을 사용한다. 응답의 생각파트는 제외하고 최종텍스트를 합쳐 구조JSON을 검사한다. 실패 로그 `balance_game.match_failed`는 고정 category·HTTP숫자·허용목록 reason만 담으며 키/학생ID/선택/원문/짝은 기록하지 않는다. 학생에게 provider 원문을 반환하지 않고 저장된응답 보존과 짝 재시도 안내를 제공한다. 실제검증 결과는 `docs/design-reviews/2026-10-30-balance-live-ai-e2e.md`를 따른다.

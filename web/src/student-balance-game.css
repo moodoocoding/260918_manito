@@ -1,0 +1,38 @@
+.balance-game-content { gap: var(--world-space-4); }
+.balance-game :is(h2,p) { margin: 0; }
+.balance-game h2 { font-size: 1.25rem; line-height: 1.4; }
+.balance-game-context { display: flex; align-items: center; justify-content: space-between; gap: var(--world-space-3); }
+.balance-game-context .world-button { flex: 0 0 auto; }
+.balance-game-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--world-space-2); }
+.balance-game-summary strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.balance-question form { display: grid; gap: var(--world-space-4); min-width: 0; }
+.balance-question-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--world-space-3); }
+.balance-question progress { width: min(45%, 220px); height: 12px; accent-color: var(--world-forest); }
+.balance-question fieldset { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--world-space-3); min-width: 0; margin: 0; padding: 0; border: 0; }
+.balance-question legend { width: 100%; margin-bottom: var(--world-space-3); font-size: 1.125rem; font-weight: 750; }
+.balance-choice { display: flex; align-items: center; justify-content: center; gap: var(--world-space-3); min-height: 108px; margin: 0; font-weight: 750; text-align: center; cursor: pointer; overflow-wrap: anywhere; }
+.balance-choice.is-selected { border-color: var(--world-forest-border); outline: 2px solid var(--world-forest-border); outline-offset: -2px; }
+.balance-choice input { flex: 0 0 auto; width: 22px; height: 22px; margin: 0; accent-color: var(--world-forest); }
+.balance-choice-copy { display: grid; gap: var(--world-space-1); min-width: 0; }
+.balance-choice-letter { color: var(--world-muted); font-size: .875rem; }
+.balance-question-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--world-space-3); }
+.balance-question-actions .world-button { flex: 1 1 120px; }
+.balance-review ol { display: grid; gap: var(--world-space-2); padding: 0; margin: 0; list-style-position: inside; }
+.balance-review li span, .balance-review li strong { display: block; overflow-wrap: anywhere; }
+.balance-review li span { color: var(--world-muted); font-size: .875rem; }
+.balance-review li strong { margin-top: var(--world-space-1); }
+.balance-waiting > div { display: grid; gap: var(--world-space-3); }
+.balance-result { text-align: center; }
+.balance-result > div { display: grid; justify-items: center; gap: var(--world-space-3); min-width: 0; }
+.balance-result strong { display: block; max-width: 100%; min-width: min(260px,100%); margin: 0; font-size: 1.35rem; overflow-wrap: anywhere; }
+.balance-game-progress section { display: grid; gap: var(--world-space-3); }
+.balance-game-progress ul { display: flex; flex-wrap: wrap; gap: var(--world-space-2); margin: 0; padding: 0; list-style: none; }
+.balance-game-progress li { max-width: 100%; padding: var(--world-space-2) var(--world-space-3); overflow-wrap: anywhere; }
+.balance-game-privacy { color: var(--world-muted); font-size: .875rem; }
+@media (max-width: 768px) {
+  .balance-game-context { align-items: flex-start; flex-direction: column; gap: 0; }
+  .balance-game-context .world-button { min-height: 48px; padding: 0; }
+  .balance-question fieldset { grid-template-columns: 1fr; }
+  .balance-choice { justify-content: flex-start; min-height: 64px; text-align: left; padding: var(--world-space-2) var(--world-space-3); }
+  .balance-choice-copy { display: flex; align-items: baseline; gap: var(--world-space-3); }
+}

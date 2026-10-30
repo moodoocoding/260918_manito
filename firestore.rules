@@ -8,6 +8,7 @@ service cloud.firestore {
 
     function isTeacher() {
       return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
         && request.auth.token.role == 'teacher'
         && request.auth.token.teacherVerified == true
         && exists(/databases/$(database)/documents/teachers/$(request.auth.uid))
@@ -67,10 +68,39 @@ service cloud.firestore {
         allow read: if isClassTeacher(classId)
           || isActiveClassStudent(classId, studentUid);
         allow write: if false;
+
+        match /teacherMailReceipts/{mailId} {
+          // Receipt metadata is returned only after a fresh card/session check.
+          allow read, write: if false;
+        }
+      }
+
+      match /teacherMailSecrets/{mailId} {
+        // Original letters and reports need an audited teacher callable.
+        allow read, write: if false;
+      }
+
+      match /teacherMailCommands/{commandId} {
+        allow read, write: if false;
       }
 
       match /customMissions/{missionId} {
         allow read, write: if false;
+      }
+
+      match /balanceGamePublic/{progressId} {
+        allow read: if progressId == 'progress'
+          && isActiveClassStudent(classId, request.auth.uid)
+          && classRecord(classId).data.status == 'active'
+          && request.auth.uid in get(/databases/$(database)/documents/classes/$(classId)/balanceGameSecrets/current).data.participantUids;
+        allow write: if false;
+      }
+
+      match /balanceGameSecrets/{gameId} {
+        allow read, write: if false;
+        match /submissions/{studentUid} {
+          allow read, write: if false;
+        }
       }
 
       match /rounds/{roundId} {
@@ -83,6 +113,22 @@ service cloud.firestore {
           allow read: if isClassTeacher(classId)
             || isRoundParticipant(classId, roundId, studentUid);
           allow write: if false;
+        }
+
+        match /balanceGamePublic/{progressId} {
+          // This document contains only completion names and aggregate counts.
+          allow read: if progressId == 'progress'
+            && isRoundParticipant(classId, roundId, request.auth.uid);
+          allow write: if false;
+        }
+
+        match /balanceGameSecrets/{secretId} {
+          // Student answers and the final pair map are callable-only.
+          allow read, write: if false;
+
+          match /submissions/{studentUid} {
+            allow read, write: if false;
+          }
         }
 
         match /studentData/{studentUid} {

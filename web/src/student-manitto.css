@@ -1,0 +1,49 @@
+.student-app .world-feature-page .student-nav.manitto-student-nav {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.student-app .world-feature-page .manitto-student-nav :is(a, button) { min-height: 48px; }
+
+.manitto-empty-state p { margin: 0; }
+
+.student-app .world-feature-page .student-activities .student-next-mission {
+  padding: var(--world-space-6);
+  border: 2px solid var(--world-forest-border);
+  border-radius: var(--world-radius);
+  background-color: var(--world-card);
+  background-image: var(--world-parchment-texture);
+}
+
+.student-app .world-feature-page .student-activities .student-mission-text { color: var(--world-ink); }
+.student-app .world-feature-page .student-activities .student-stat-tile {
+  border-radius: var(--world-radius);
+  border-color: var(--world-gold-border);
+  background: var(--world-card);
+  color: var(--world-ink);
+}
+.student-app .world-feature-page .student-activities .student-stat-tile.is-done { background: var(--world-info-bg); }
+.student-app .world-feature-page .student-activities .student-stat-tile.is-todo { background: var(--world-warning-bg); border-color: var(--world-gold-border); }
+.student-app .world-feature-page .student-activities .student-mission-card,
+.student-app .world-feature-page .student-activities .student-mission-list li {
+  border-radius: var(--world-radius);
+  border-color: var(--world-gold-border);
+  background-color: var(--world-card);
+  background-image: var(--world-parchment-texture);
+}
+
+.student-app .world-feature-page .student-conversations .kakao-chat-room {
+  border: 2px solid var(--world-wood-border);
+  border-radius: var(--world-radius);
+  background: var(--world-paper);
+}
+.student-app .world-feature-page .student-conversations .kakao-chat-header { background: var(--world-paper-shade); color: var(--world-ink); }
+.student-app .world-feature-page .student-conversations .kakao-chat-scroll { background: var(--world-card); }
+.student-app .world-feature-page .student-conversations .kakao-bubble { border-radius: var(--world-radius); border-color: var(--world-gold-border); }
+.student-app .world-feature-page .student-conversations .kakao-received { background: var(--world-paper); color: var(--world-ink); }
+.student-app .world-feature-page .student-conversations .kakao-sent { background: var(--world-info-bg); color: var(--world-ink); }
+
+@media (max-width: 768px) {
+  .student-app .world-feature-page .student-nav.manitto-student-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .student-app .world-feature-page .student-activities .student-next-mission { padding: var(--world-space-4); }
+}

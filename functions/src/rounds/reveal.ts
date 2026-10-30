@@ -50,11 +50,12 @@ export const revealRound = onCall(async (request) => {
   const commandRef = classRef.collection("commands").doc(requestId);
   const fingerprint = inputFingerprint({ classId, roundId });
   return db.runTransaction(async (tx) => {
-    const [classDoc, round, command, helps, messages, assignments, participants, members] = await Promise.all([
+    const [classDoc, round, command, helps, messages, assignments, participants, members, teacherReports] = await Promise.all([
       tx.get(classRef), tx.get(roundRef), tx.get(commandRef),
       tx.get(roundRef.collection("helpSecrets")), tx.get(roundRef.collection("messageSecrets")),
       tx.get(roundRef.collection("assignmentSecrets")), tx.get(roundRef.collection("participants")),
       tx.get(classRef.collection("members")),
+      tx.get(classRef.collection("teacherMailSecrets").where("kind", "==", "report").where("status", "==", "received").limit(1)),
     ]);
     assertClassTeacher(classDoc.data(), teacherUid);
     if (command.exists) {
@@ -65,8 +66,8 @@ export const revealRound = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "공개 대기 중인 회차가 아니에요.");
     }
     if (helps.docs.some((doc) => doc.get("status") === "open")
-      || messages.docs.some((doc) => doc.get("status") === "pending")) {
-      throw new HttpsError("failed-precondition", "도움 요청과 쪽지 검토를 먼저 마쳐 주세요.");
+      || messages.docs.some((doc) => doc.get("status") === "pending") || !teacherReports.empty) {
+      throw new HttpsError("failed-precondition", "도움 요청, 학생 신고와 쪽지 검토를 먼저 마쳐 주세요.");
     }
     const active = new Set(participants.docs.filter((doc) => doc.get("participationStatus") === "active").map((doc) => doc.id));
     const names = new Map(members.docs.map((doc) => [doc.id, doc.get("displayName") as string]));

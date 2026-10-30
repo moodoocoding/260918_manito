@@ -19,10 +19,12 @@ export { getStudentHome, listStudentRounds } from "./students/getStudentHome.js"
 export { setStudentAccess, updateStudentName, removeStudentMember } from "./students/setStudentAccess.js";
 export { deleteClassData } from "./classes/deleteClassData.js";
 export { createRightsRequest, listMyRightsRequests, getRightsRequestsForTeacher } from "./classes/rightsRequests.js";
+export { createTeacherMail, listMyTeacherMail, listTeacherMail, getTeacherMail, resolveTeacherMail } from "./classes/teacherMail.js";
 export { listRounds, getRoundSettingsForTeacher, createRound, updateRound, prepareRound, startRound,
   changeRoundStatus, extendRound, getAssignmentsForTeacher, deleteRound } from "./rounds/flow.js";
 export { getMissionCatalog, createCustomMission, updateCustomMission, deleteCustomMission, setMissionStatus, setStudentMissionFocus, replaceMission } from "./rounds/missions.js";
 export { getStudentCommunity, getTeacherCommunity, updateRoundCommunity } from "./rounds/community.js";
+export { getStudentBalanceGame, submitBalanceGameChoices, retryStudentBalanceMatching } from "./rounds/balanceGame.js";
 export { getStudentActivity, sendMessage, reviewMessage, hideMessage, reactToMessage,
   createHelpRequest, resolveHelpRequest, getTeacherRoundOverview, getMessageForReview,
   listTeacherMessages, moderateMessage } from "./rounds/activity.js";

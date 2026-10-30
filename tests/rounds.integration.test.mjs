@@ -7,6 +7,7 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInWithCustomToken, signOut } from "firebase/auth";
 import { connectFirestoreEmulator, doc, getDoc, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
+import { signInEmulatorGoogle } from "../scripts/emulator-google-auth.mjs";
 
 const projectId = "demo-manitto";
 const authPort = Number(process.env.MANITTO_TEST_AUTH_PORT ?? 9099);
@@ -56,10 +57,8 @@ before(async () => {
     await adminDb.doc(`teachers/${id}`).set({verificationStatus:"verified", displayName:id,
       createdAt:FieldValue.serverTimestamp()});
   }
-  await signInWithCustomToken(teacher.auth, await adminAuth.createCustomToken(uid,
-    {role:"teacher", teacherVerified:true}));
-  await signInWithCustomToken(other.auth, await adminAuth.createCustomToken(otherUid,
-    {role:"teacher", teacherVerified:true}));
+  await signInEmulatorGoogle(teacher.auth, adminAuth, uid);
+  await signInEmulatorGoogle(other.auth, adminAuth, otherUid);
 });
 after(async () => {
   await Promise.allSettled([teacher, other, ...students].map((c) => signOut(c.auth)));
@@ -160,12 +159,24 @@ test("four students complete two isolated rounds with review, help, reveal and h
   assert.equal("incomingDisplayName" in firstHome.round,false);
   const ownDataPath = `classes/${classId}/rounds/${roundId}/studentData/${ids[0]}`;
   assert.equal((await adminDb.doc(ownDataPath).get()).get("targetDisplayName"),undefined);
-  await adminDb.doc(ownDataPath).update({targetDisplayName:"이전 시즌 방식의 이름"});
+  assert.equal((await adminDb.doc(ownDataPath).get()).get("incomingDisplayName"),undefined);
+  await students[0].call("getStudentActivity",null);
+  assert.equal((await adminDb.doc(ownDataPath).get()).get("targetDisplayName"),undefined,
+    "reading an unrevealed activity must not restore a relationship name");
+  await adminDb.doc(ownDataPath).update({targetDisplayName:"이전 시즌 방식의 이름",incomingDisplayName:"이전 시즌 방식의 다른 이름"});
   await assert.rejects(getDoc(doc(students[0].db,ownDataPath)));
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/assignmentSecrets/${ids[0]}`)));
   await assert.rejects(getDoc(doc(students[0].db,`classes/${classId}/rounds/${roundId}/studentData/${ids[1]}`)));
   await assert.rejects(getDoc(doc(teacher.db,ownDataPath)));
   const activity = await students[0].call("getStudentActivity",null);
+  const roundStateRef = adminDb.doc(`classes/${classId}/rounds/${roundId}`);
+  for (const hiddenStatus of ["paused", "reveal_pending"]) {
+    await roundStateRef.update({status:hiddenStatus});
+    const hiddenActivity = await students[0].call("getStudentActivity",null);
+    assert.equal(hiddenActivity.targetDisplayName,null);
+    assert.equal(hiddenActivity.incomingDisplayName,null);
+  }
+  await roundStateRef.update({status:"active"});
   const firstCommunity = await students[0].call("getStudentCommunity",{roundId});
   assert.equal(firstCommunity.state,"contentOnly");
   assert.equal(firstCommunity.teacherNotice,null);

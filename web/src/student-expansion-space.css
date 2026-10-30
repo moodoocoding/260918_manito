@@ -1,0 +1,15 @@
+.student-expansion-space .expansion-space-waiting {
+  justify-items: center;
+  align-content: center;
+  min-height: 320px;
+  padding-block: var(--world-space-8);
+  text-align: center;
+}
+
+.student-expansion-space .expansion-space-waiting :is(h2, p) {
+  margin: 0;
+}
+
+.student-expansion-space .expansion-space-waiting .world-button {
+  margin-top: var(--world-space-2);
+}

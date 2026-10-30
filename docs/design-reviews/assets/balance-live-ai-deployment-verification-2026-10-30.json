@@ -1,0 +1,34 @@
+{
+  "project": "manito-938cc",
+  "functionCount": 62,
+  "unchangedFunctions": 60,
+  "updatedFunctions": [
+    {
+      "function": "retryStudentBalanceMatching",
+      "revision": "retrystudentbalancematching-00005-raz",
+      "runtime": "nodejs22",
+      "state": "ACTIVE"
+    },
+    {
+      "function": "submitBalanceGameChoices",
+      "revision": "submitbalancegamechoices-00003-jok",
+      "runtime": "nodejs22",
+      "state": "ACTIVE"
+    }
+  ],
+  "secretReferencesUnchanged": true,
+  "deployedRulesUnchanged": true,
+  "teacherGoogleLocalPolicyNotDeployed": true,
+  "unauthenticatedGuards": [
+    {
+      "function": "retryStudentBalanceMatching",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    },
+    {
+      "function": "submitBalanceGameChoices",
+      "httpStatus": 403,
+      "error": "PERMISSION_DENIED"
+    }
+  ]
+}

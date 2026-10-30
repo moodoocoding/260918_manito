@@ -131,7 +131,13 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
   const load = useCallback(async () => {
     setRoundsLoading(true);
     try {
-      const hasPreview = Boolean((window as unknown as { __MANITTO_PREVIEW__?: unknown }).__MANITTO_PREVIEW__);
+      const preview = (window as unknown as { __MANITTO_PREVIEW__?: { teacherRoomPreview?: boolean; rounds?: Round[] } }).__MANITTO_PREVIEW__;
+      if (preview?.teacherRoomPreview) {
+        setRounds(preview.rounds ?? []);
+        setRoundsError(false);
+        return;
+      }
+      const hasPreview = Boolean(preview);
       if (!hasPreview) {
         try {
           const snapshot = await getDocs(collection(db, `classes/${classId}/rounds`));
@@ -598,6 +604,21 @@ export function TeacherRounds({ classId, gradeBand, members, view, statusTarget,
         )}
       </div>
     );
+  }
+
+  const isTeacherRoomPreview = Boolean((window as unknown as { __MANITTO_PREVIEW__?: { teacherRoomPreview?: boolean } }).__MANITTO_PREVIEW__?.teacherRoomPreview);
+  if (isTeacherRoomPreview) {
+    const previewTitles: Record<TeacherRoundView, string> = {
+      overview: "마니또 운영 요약",
+      rounds: "시즌 설정",
+      status: "상태 확인",
+      history: "지난 활동",
+    };
+    return <section className="panel round-panel" aria-labelledby="teacher-round-preview-title">
+      <h2 id="teacher-round-preview-title">{previewTitles[view]}</h2>
+      <p>개발 미리보기에는 가상 시즌과 학생 활동 기록이 없어요. 실제 서버 데이터를 불러오거나 저장하지 않습니다.</p>
+      <p role="status">시즌 기록 0건</p>
+    </section>;
   }
 
   return <section className="panel round-panel">
